@@ -1,0 +1,16 @@
+# TRELYAN inscription — test / deploy virtualenv (the RUNTIME side).
+# Python 3.12+ works here; pytest drives localnet (test_inscription.py) and deploy_testnet.py runs TestNet.
+algokit-utils>=4,<5
+pytest>=8
+py-algorand-sdk>=2
+
+# --- Falcon (off-chain deterministic signer) ---
+# Not a pip package: build the algorand/falcon C library into libfalcondet1024.so and set
+# FALCON_DET1024_LIB to its path (see falcon_det1024.py header for the exact `cc` line).
+
+# --- COMPILATION is a SEPARATE, pinned venv (PuyaPy needs Python <=3.13, NOT 3.14) ---
+# Created by compile_contract.ps1 at %USERPROFILE%\trelyan-build:
+#   puyapy==5.8.1
+#   algorand-python==3.5.0
+# Build: puyapy crypto/contracts/inscription.py --out-dir crypto/contracts/out --target-avm-version 12
+# Then:  algokit generate client crypto/contracts/out/TrelyanInscription.arc56.json --output crypto/contracts/trelyan_client.py

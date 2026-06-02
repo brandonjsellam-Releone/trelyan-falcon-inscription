@@ -1,0 +1,21 @@
+# transient run logs / local state
+last_run.log
+*.log
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# native Falcon shared library (build locally per falcon_det1024.py header)
+*.so
+*.dylib
+*.dll
+
+# compiled contract artifacts are regeneratable; keep out/ if you want reviewers to skip compiling,
+# otherwise uncomment to exclude:
+# contracts/out/
+
+# OS
+.DS_Store
