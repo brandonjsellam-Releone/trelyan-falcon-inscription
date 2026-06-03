@@ -5,7 +5,7 @@ that verifies a **Falcon‑1024** signature *on‑chain* using Algorand's native
 then writes a **write‑once** record. Built so any Algorand developer can fork the pattern for
 post‑quantum authorization in their own contract.
 
-> **Live on Algorand TestNet** (2 June 2026): app **`763809096`**, Cell ASA `763809098` —
+> **Live on Algorand TestNet** (2 June 2026): app **`763809096`**, asset `763809098` —
 > https://lora.algokit.io/testnet/application/763809096 . The on‑chain `i_` inscription box is written
 > only *after* the Falcon‑1024 signature verifies on‑chain and every authorization check passes, so the
 > deployment is a real, publicly verifiable post‑quantum inscription. Reproducible via
@@ -18,7 +18,7 @@ externally audited; not on MainNet.** Treat as a reference, not production‑rea
 Algorand ships `falcon_verify` as a live native AVM opcode, but two non‑obvious things will cost the
 next team a week. This repo solves both, with the reasoning written down:
 
-1. **The opcode wants *Deterministic* Falcon‑1024, COMPRESSED, header `0xBA`** (`= 0x3A | 0x80`) — not
+1. **The opcode wants *Deterministic* Falcon‑1024, COMPRESSED, header `0xBA`** (`0x3A` is the standard compressed-1024 header; the `| 0x80` high bit selects the deterministic mode Algorand's opcode requires) — not
    generic randomized Falcon (`0x3A`), which is rejected. `contracts/falcon_det1024.py` is an off‑chain
    signer that emits exactly the accepted bytes, byte‑matched to the on‑chain message build.
 2. **A single app call's ApplicationArgs total is capped at 2048 bytes**, but a Falcon‑1024 public key
@@ -55,6 +55,24 @@ Post‑quantum **authorization at the inscription layer** — not total quantum 
 consensus‑crypto upgrades are separate). Falcon‑1024 is NIST‑selected and the basis of the forthcoming
 **FIPS 206 (FN‑DSA)** standard, **not yet finalized**; this reference tracks the current Falcon spec and
 Algorand's opcode and will version when FIPS 206 finalizes.
+
+## Scope & relationship to TRELYAN
+
+This repository is the **post-quantum inscription tooling** — the open primitive:
+a contract that verifies a Falcon-1024 signature on-chain and writes a write-once
+record, plus the off-chain signer, tests, spec, and threat model. It is
+**MIT-licensed and fully open**, and the grant-relevant work happens here, in the open.
+
+- **"Cell" is a technical identifier** — a per-record NFT (`cell_id`) that the
+  reference design keys inscriptions to. The reference cap of 1,024 records is a
+  parameter of this implementation, **not a sales construct**.
+- **This codebase contains no token sale, fundraising, pricing, or commercial
+  product.** Any separate TRELYAN non-profit/foundation activity is governed
+  elsewhere and is **not required** to build, run, reproduce, or fork anything here.
+- **Reuse encouraged:** fork the pattern for post-quantum authorization in any
+  Algorand contract. The construction is chain-agnostic in principle; Algorand is
+  the reference substrate because its native `falcon_verify` opcode makes on-chain
+  verification possible today.
 
 ## License
 MIT — see `LICENSE`.

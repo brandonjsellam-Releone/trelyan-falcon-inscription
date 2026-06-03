@@ -84,7 +84,7 @@ fixes adopted from the Council review are tagged **[FIX]** with attribution.
 
 | Object | On-chain | Notes |
 |---|---|---|
-| **Vault Cell** | NFT ASA (total 1, decimals 0). 1,024 total. | Ownership = control of the ASA. |
+| **Record cell** | NFT ASA (total 1, decimals 0). 1,024 total. | Ownership = control of the ASA. |
 | **Cell mint record** | Immutable, written atomically at mint. | Holds `committed_key_hash[cell_id]`. **[FIX/Hermes#4]** |
 | **Inscription** | Write-once box keyed by `cell_id`. | In the TRELYAN app's box storage. |
 | **Artifact** | Off-chain (IPFS/Arweave). | Only `H(artifact)` is on-chain. |
@@ -168,7 +168,7 @@ inscription signatures except the target. Goals: G1 forge, G2 mutate, G3 replay,
 
 ### 6.3 Lifecycle threats (**[watsonx]** — institutional-audit gaps)
 - **Key loss:** a Cell whose inscription `sk` is lost is **permanently un-inscribable** (by
-  design — no key, no signature). MUST be disclosed to buyers as a known, accepted property.
+  design — no key, no signature). MUST be disclosed to record holders as a known, accepted property.
   Optionally: a Stiftung-held recovery/attestation path, but that reintroduces trust and must
   be explicitly designed + audited, not bolted on.
 - **Abandoned/never-inscribed Cells:** Cells retain membership value un-inscribed; define their
