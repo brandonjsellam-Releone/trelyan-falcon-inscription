@@ -1,0 +1,59 @@
+name: trelyan-pq CI
+
+on:
+  push:
+    paths: ["sdk/**", ".github/workflows/ci.yml"]
+  pull_request:
+    paths: ["sdk/**", ".github/workflows/ci.yml"]
+  workflow_dispatch: {}
+
+jobs:
+  wire-format:
+    name: Wire-format tests (no network, no native lib)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install (dev extra) and run the wire-format + golden-vector suite
+        working-directory: sdk
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pytest tests -v
+
+  testnet-e2e:
+    name: TestNet end-to-end (manual; needs DEPLOYER_MNEMONIC secret + generated client)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Build the deterministic Falcon-1024 shared library
+        run: |
+          git clone --depth 1 https://github.com/algorand/falcon
+          cd falcon
+          cc -O3 -fPIC -shared -o libfalcondet1024.so \
+            codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c
+          echo "FALCON_DET1024_LIB=$PWD/libfalcondet1024.so" >> "$GITHUB_ENV"
+      - name: Install SDK with the Algorand extra
+        working-directory: sdk
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[algorand,dev]"
+      - name: Reproducible TestNet inscribe (prints app + asset IDs to the run log)
+        working-directory: sdk
+        env:
+          DEPLOYER_MNEMONIC: ${{ secrets.DEPLOYER_MNEMONIC }}
+        run: |
+          # Requires the generated typed client (trelyan_client.py) importable on PYTHONPATH,
+          # produced from the contract ARC-56:  algokit generate client ... --output trelyan_client.py
+          # Copy it next to examples/ or add contracts/ to PYTHONPATH, then:
+          PYTHONPATH="src:../contracts:." python examples/quickstart.py

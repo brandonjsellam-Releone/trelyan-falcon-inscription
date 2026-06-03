@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "trelyan-pq"
+version = "0.1.0"
+description = "Post-quantum (Falcon-1024) inscription tooling for Algorand: a deterministic signer in the exact encoding the native falcon_verify opcode accepts, on-chain message construction, and the pubkey-box-commit / 2048-byte arg-cap helpers."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Brandon J. Sellam" }]
+keywords = [
+  "algorand", "post-quantum", "falcon", "falcon-1024", "fn-dsa", "fips-206",
+  "lattice", "cryptography", "pqc", "falcon_verify", "inscriptions", "avm",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Security :: Cryptography",
+]
+dependencies = []  # core (falcon signer + message/box helpers) is stdlib-only
+
+[project.optional-dependencies]
+# the high-level on-chain client (trelyan_pq.inscription) needs the Algorand stack:
+algorand = ["algokit-utils>=4,<5", "py-algorand-sdk>=2"]
+dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/brandonjsellam-Releone/trelyan-falcon-inscription"
+Repository = "https://github.com/brandonjsellam-Releone/trelyan-falcon-inscription"
+Issues = "https://github.com/brandonjsellam-Releone/trelyan-falcon-inscription/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/trelyan_pq"]
