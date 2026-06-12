@@ -50,6 +50,20 @@ python -m pytest contracts/test_inscription.py -v          # 20 passed
 python contracts/deploy_testnet.py                          # needs DEPLOYER_MNEMONIC + a funded TestNet account
 ```
 
+## Verify it yourself (one command, no account)
+
+```
+pip install trelyan-pq
+python sdk/examples/verify_trelyan.py
+```
+
+Fourteen read-only checks against the live TestNet deployment (application
+`763809096`): package constants, pinned golden vectors, the deployed bytecode
+fingerprint, the on-chain Falcon-1024 public key and inscription record, and a
+byte-exact local rebuild of the domain-separated message. CI runs the same
+verification weekly — see the Actions tab. The deterministic Falcon source we
+build from is pinned and reproducible: see `PINNED_BUILD.md`.
+
 ## Scope of the claim
 Post‑quantum **authorization at the inscription layer** — not total quantum resistance (Algorand's own
 consensus‑crypto upgrades are separate). Falcon‑1024 is NIST‑selected and the basis of the forthcoming
