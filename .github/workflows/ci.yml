@@ -5,12 +5,15 @@ on:
     paths: ["sdk/**", ".github/workflows/ci.yml"]
   pull_request:
     paths: ["sdk/**", ".github/workflows/ci.yml"]
+  schedule:
+    - cron: "23 6 * * 1"   # Mondays 06:23 UTC — continuous proof the deployed app still verifies
   workflow_dispatch: {}
 
 jobs:
   wire-format:
     name: Wire-format tests (no network, no native lib)
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     strategy:
       fail-fast: false
       matrix:
@@ -27,6 +30,25 @@ jobs:
           pip install -e ".[dev]"
           pytest tests -v
 
+  verify-live:
+    name: Live TestNet verification (read-only, no secrets)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install the published package from PyPI and verify the deployed app
+        run: |
+          python -m pip install --upgrade pip
+          pip install trelyan-pq
+          python sdk/examples/verify_trelyan.py
+        # 14 checks: package constants, pinned golden vectors, live app 763809096
+        # (bytecode fingerprint), on-chain Falcon key + inscription record, and a
+        # byte-exact local rebuild of the domain-separated message. Exits non-zero
+        # on any failure. No account, no mnemonic, no secrets.
+
   testnet-e2e:
     name: TestNet end-to-end (manual; needs DEPLOYER_MNEMONIC secret + generated client)
     runs-on: ubuntu-latest
@@ -38,8 +60,9 @@ jobs:
           python-version: "3.13"
       - name: Build the deterministic Falcon-1024 shared library
         run: |
-          git clone --depth 1 https://github.com/algorand/falcon
+          git clone https://github.com/algorand/falcon
           cd falcon
+          git checkout ce15e75bceb372867daf6b8e81918ab6978686eb   # pinned — see PINNED_BUILD.md
           cc -O3 -fPIC -shared -o libfalcondet1024.so \
             codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c
           echo "FALCON_DET1024_LIB=$PWD/libfalcondet1024.so" >> "$GITHUB_ENV"
