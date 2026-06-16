@@ -128,7 +128,7 @@ jobs:
           # (2) portable build: ZERO runtime-UB of ANY class under full UBSan + -fno-strict-aliasing
           cc -DFALCON_UNALIGNED=0 -fno-strict-aliasing -O0 -g -fsanitize=undefined -fno-sanitize-trap=undefined -o san_ub $SRC
           OUT2=$(./san_ub 2>&1); echo "ubsan/portable: $(echo "$OUT2" | tail -1)"
-          N=$(echo "$OUT2" | grep -ic "runtime error"); echo "UBSan runtime-error lines: $N"
+          N=$(echo "$OUT2" | grep -ic "runtime error" || true); echo "UBSan runtime-error lines: $N"   # || true: grep exits 1 on 0 matches (the clean case) and would abort set -e
           [ "$N" = "0" ] || { echo "FAIL: residual UB under -fsanitize=undefined"; echo "$OUT2" | grep -i "runtime error" | head; exit 1; }
           # (3) gate must be REAL: the DEFAULT autodetected build MUST trap on x86_64 (else the test proves nothing)
           if [ "$(uname -m)" = "x86_64" ]; then
