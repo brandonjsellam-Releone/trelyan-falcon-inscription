@@ -66,12 +66,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Fetch pinned Falcon source (commit ce15e75…)
+      - name: Fetch pinned Falcon source (commit ce15e75…, tarball = byte-exact to the pin)
         shell: bash
+        # Use the GitHub source TARBALL, not `git clone`: a clone applies the runner's
+        # core.autocrlf, which on some runners rewrites the C sources LF→CRLF and changes
+        # their bytes (deterministic.c → e005ebda instead of the pinned 601390dc), failing
+        # the digest gate below for a non-substantive reason. The tarball is LF on every OS
+        # and is exactly what the pin (and verify.html) were computed from.
         run: |
-          git clone https://github.com/algorand/falcon falcon-src
-          cd falcon-src
-          git checkout ce15e75bceb372867daf6b8e81918ab6978686eb
+          curl -sL https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz | tar xz
+          mv falcon-ce15e75bceb372867daf6b8e81918ab6978686eb falcon-src
 
       - name: Assert pinned-build digest + emulated FP backend (fail fast if upstream drifted)
         shell: bash
