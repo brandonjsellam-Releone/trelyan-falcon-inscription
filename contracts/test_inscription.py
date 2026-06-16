@@ -334,6 +334,20 @@ def test_register_rejects_bad_pubkey_length(algorand, deployed):
         register(client, admin, cell, b"\x00" * 1792)             # one byte short of PUBKEY_LEN (1793)
 
 
+def test_register_rejects_bad_pubkey_header(algorand, deployed):
+    """T4/Q13: register_cell rejects a CORRECT-length (1793 B) key whose HEADER byte != 0x0A
+    (Deterministic Falcon-1024 logn=10 public keys begin with 0x0A). This is distinct from the
+    length check above — the key is the right size but the wrong shape. A real det1024 key (header
+    0x0A from keygen) still registers."""
+    client, app_id, admin = deployed
+    cell = mint_cell(algorand, admin, admin)
+    with pytest.raises(Exception):                                # right length, wrong header (0x00 != 0x0A)
+        register(client, admin, cell, b"\x00" * 1793)
+    pk, _ = falcon_keypair()                                      # real key, header 0x0A -> accepted
+    cell_ok = mint_cell(algorand, admin, admin)
+    register(client, admin, cell_ok, pk)
+
+
 def test_reregister_rejected(algorand, deployed):
     client, app_id, admin = deployed
     pk, _ = falcon_keypair()
@@ -421,3 +435,37 @@ def test_get_inscription_missing_raises(algorand, deployed):
     register(client, admin, cell, pk)                 # registered, NOT inscribed
     with pytest.raises(Exception):
         client.send.get_inscription(args=(cell,))
+
+
+# ---------------------------------------------------------------- T5/Q2: encoding rejection matrix
+def test_signature_encoding_rejection_matrix(algorand, deployed):
+    """T5/Q2: the malformed-signature rejection matrix AT THE OPCODE BOUNDARY, spelled out. One
+    registered cell; every malformed encoding is rejected (so the cell stays un-inscribed across all
+    of them), then the valid sigma accepts. Mirrors test_signature_kat.test_sdk_encoding_rejection_
+    matrix off-chain. A fuzzing harness over these is a noted follow-up (out of scope)."""
+    client, app_id, admin = deployed
+    pk, sk = falcon_keypair()
+    cell = mint_cell(algorand, admin, admin)
+    artifact_hash = sha512_256(b"encoding-matrix")
+    register(client, admin, cell, pk)
+    m = build_message(app_id, cell, artifact_hash, genesis())
+    good = falcon_sign(sk, m)
+    assert good[0] == 0xBA and good[1] == 0x00                      # det1024 compressed header + salt-version
+
+    wrong_header = bytes([0x3A]) + good[1:]                         # not 0xBA (randomized-Falcon header)
+    truncated = good[:-64]                                          # short of a complete sigma
+    over_long = good + b"\x00" * (1424 - len(good))                 # > SIG_COMPRESSED_MAXLEN (1423)
+    bad_salt = bytes([good[0], good[1] ^ 0xFF]) + good[2:]          # tampered salt-version byte
+    wrong_m = falcon_sign(sk, build_message(app_id, cell, sha512_256(b"different"), genesis()))  # valid sig, wrong M
+
+    # DIFFERENTIAL ORACLE: the off-chain verifier and the on-chain falcon_verify opcode must AGREE
+    # on every case — the SDK can't accept what the chain rejects, or vice-versa.
+    assert falcon_det1024.verify_compressed(good, pk, m)           # off-chain accept (matches on-chain)
+    for bad in (wrong_header, truncated, over_long, bad_salt, wrong_m):
+        assert not falcon_det1024.verify_compressed(bad, pk, m)    # off-chain rejects (no crash)...
+        with pytest.raises(Exception):                             # ...and on-chain rejects too
+            do_inscribe(client, admin, cell=cell, artifact_hash=artifact_hash, sig=bad)
+
+    do_inscribe(client, admin, cell=cell, artifact_hash=artifact_hash, sig=good)   # positive accept
+    rec = client.send.get_inscription(args=(cell,)).abi_return
+    assert bytes(rec.artifact_hash) == artifact_hash

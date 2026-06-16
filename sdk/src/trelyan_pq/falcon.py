@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+import sys
 from typing import Optional, Tuple
 
 from .message import PUBKEY_LEN, SIG_COMPRESSED_MAXSIZE, DET_COMPRESSED_HEADER
@@ -46,6 +47,39 @@ PRIVKEY_SIZE = 2305              # FALCON_PRIVKEY_SIZE(10)
 CURRENT_SALT_VERSION = 0
 
 _DEFAULT_LIB_PATH = os.environ.get("FALCON_DET1024_LIB", "./libfalcondet1024.so")
+
+
+def _lock_pages(buf: "ctypes.Array") -> bool:
+    """Best-effort: pin a buffer's pages in RAM so private-key material can't be paged to swap.
+    VirtualLock (Windows) / mlock (POSIX). Returns True iff the lock call succeeded.
+
+    This is DEFENSE-IN-DEPTH, NOT a security guarantee: it does not protect against a privileged
+    attacker, a debugger / process-memory read, hibernation-image capture, or DMA. It narrows the
+    swap-to-disk exposure window for the ephemeral key in trelyan_pq.seal (T1). Failures are ignored
+    (e.g. working-set/RLIMIT_MEMLOCK limits) — the wipe still runs regardless.
+    """
+    try:
+        addr = ctypes.c_void_p(ctypes.addressof(buf))
+        size = ctypes.c_size_t(len(buf))
+        if sys.platform == "win32":
+            return bool(ctypes.windll.kernel32.VirtualLock(addr, size))
+        libc = ctypes.CDLL(None, use_errno=True)
+        return libc.mlock(addr, size) == 0
+    except Exception:
+        return False
+
+
+def _unlock_pages(buf: "ctypes.Array") -> None:
+    """Reverse _lock_pages (VirtualUnlock / munlock). Best-effort; call AFTER wiping the buffer."""
+    try:
+        addr = ctypes.c_void_p(ctypes.addressof(buf))
+        size = ctypes.c_size_t(len(buf))
+        if sys.platform == "win32":
+            ctypes.windll.kernel32.VirtualUnlock(addr, size)
+        else:
+            ctypes.CDLL(None).munlock(addr, size)
+    except Exception:
+        pass
 
 
 class _Shake256Context(ctypes.Structure):
@@ -110,6 +144,33 @@ class FalconDet1024:
         if rc != 0:
             raise RuntimeError(f"falcon_det1024_keygen failed (rc={rc})")
         return pubkey.raw[:PUBKEY_SIZE], privkey.raw[:PRIVKEY_SIZE]
+
+    def _keygen_into_buffer(self) -> Tuple[bytes, "ctypes.Array"]:
+        """Keygen returning (pubkey[1793] as bytes, privkey as a MUTABLE ctypes buffer[2305]).
+
+        Unlike keygen(), the private key is left in a MUTABLE ctypes buffer the caller can wipe in
+        place with ctypes.memset — it is NEVER copied into an immutable `bytes` object (which cannot
+        be wiped). This is the low-level zeroizing entry point used by
+        trelyan_pq.seal.keygen_sign_seal for sign-once-destroy (T1). The CALLER is responsible for
+        wiping the returned buffer. The public key is public, so returning it as bytes is fine.
+        """
+        lib = self._lib_ref()
+        rng = _Shake256Context()
+        if lib.shake256_init_prng_from_system(ctypes.byref(rng)) != 0:
+            raise RuntimeError("shake256_init_prng_from_system failed (no OS RNG?)")
+        privkey = ctypes.create_string_buffer(PRIVKEY_SIZE)
+        _lock_pages(privkey)   # best-effort: keep the private key off swap (mlock / VirtualLock)
+        pubkey = ctypes.create_string_buffer(PUBKEY_SIZE)
+        rc = lib.falcon_det1024_keygen(ctypes.byref(rng), privkey, pubkey)
+        if rc != 0:
+            # wipe any partial private material before surfacing the failure
+            ctypes.memset(ctypes.addressof(privkey), 0, PRIVKEY_SIZE)
+            _unlock_pages(privkey)
+            ctypes.memset(ctypes.addressof(rng), 0, ctypes.sizeof(rng))
+            raise RuntimeError(f"falcon_det1024_keygen failed (rc={rc})")
+        # the SHAKE256 PRNG context can hold key-derivation state — wipe it too (best-effort)
+        ctypes.memset(ctypes.addressof(rng), 0, ctypes.sizeof(rng))
+        return pubkey.raw[:PUBKEY_SIZE], privkey
 
     def sign(self, privkey: bytes, message: bytes) -> bytes:
         """Sign the RAW message M (low-level; prefer sign_inscription()). Do NOT pre-hash M.

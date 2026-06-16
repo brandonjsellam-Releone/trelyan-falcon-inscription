@@ -7,20 +7,20 @@ main:
     bytecblock "admin" "cells_registered" 0x6f5f 0x695f 0x6b5f 0x068101
     txn ApplicationID
     bnz main_after_if_else@2
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:156-157
+    // inscription.py:156-157
     // # governance (network is pinned via native Global.genesis_hash in _build_message — A2)
     // self.admin = Account()
     bytec_0 // "admin"
     global ZeroAddress
     app_global_put
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:158
+    // inscription.py:158
     // self.cells_registered = UInt64(0)
     bytec_1 // "cells_registered"
     intc_0 // 0
     app_global_put
 
 main_after_if_else@2:
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:129
+    // inscription.py:129
     // class TrelyanInscription(ARC4Contract):
     txn NumAppArgs
     bz main_bare_routing@15
@@ -35,7 +35,7 @@ main_after_if_else@2:
     err
 
 main_create_NoOp@11:
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:129
+    // inscription.py:129
     // class TrelyanInscription(ARC4Contract):
     pushbytes 0x4c5c61ba // method "create()void"
     txna ApplicationArgs 0
@@ -43,7 +43,7 @@ main_create_NoOp@11:
     err
 
 main_bare_routing@15:
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:129
+    // inscription.py:129
     // class TrelyanInscription(ARC4Contract):
     pushints 4 5 // UpdateApplication, DeleteApplication
     txn OnCompletion
@@ -51,32 +51,32 @@ main_bare_routing@15:
     err
 
 main_on_delete@17:
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:348
+    // inscription.py:353
     // @arc4.baremethod(allow_actions=["DeleteApplication"])
     txn ApplicationID
     assert
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:351
+    // inscription.py:356
     // assert False, "contract is non-deletable (I1/I5)"  # noqa: B011
     err // contract is non-deletable (I1/I5)
 
 main_on_update@16:
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:343
+    // inscription.py:348
     // @arc4.baremethod(allow_actions=["UpdateApplication"])
     txn ApplicationID
     assert
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:346
+    // inscription.py:351
     // assert False, "contract is non-upgradable (I5)"  # noqa: B011
     err // contract is non-upgradable (I5)
 
 
 // inscription.TrelyanInscription.create[routing]() -> void:
 create:
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:169
+    // inscription.py:169
     // self.admin = Txn.sender
     bytec_0 // "admin"
     txn Sender
     app_global_put
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:164
+    // inscription.py:164
     // @arc4.abimethod(create="require")
     intc_1 // 1
     return
@@ -84,7 +84,7 @@ create:
 
 // inscription.TrelyanInscription.register_cell[routing]() -> void:
 register_cell:
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:171
+    // inscription.py:171
     // @arc4.abimethod
     txna ApplicationArgs 1
     dup
@@ -113,7 +113,7 @@ register_cell:
     len
     ==
     assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:196-197
+    // inscription.py:196-197
     // # admin-only mint authority
     // assert Txn.sender == self.admin, "only admin may register cells"
     txn Sender
@@ -123,7 +123,7 @@ register_cell:
     assert // check self.admin exists
     ==
     assert // only admin may register cells
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:198-199
+    // inscription.py:198-199
     // # bind to a REAL Cell ASA: pure NFT (total 1 / decimals 0) created by the admin (I4/M1)
     // assert cell.total == UInt64(1) and cell.decimals == UInt64(0), "cell must be a pure NFT"
     asset_params_get AssetTotal
@@ -138,11 +138,11 @@ register_cell:
     intc_1 // 1
 
 register_cell_bool_merge@5:
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:198-199
+    // inscription.py:198-199
     // # bind to a REAL Cell ASA: pure NFT (total 1 / decimals 0) created by the admin (I4/M1)
     // assert cell.total == UInt64(1) and cell.decimals == UInt64(0), "cell must be a pure NFT"
     assert // cell must be a pure NFT
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:200
+    // inscription.py:200
     // assert cell.creator == self.admin, "cell ASA not created by admin"
     dig 2
     dup
@@ -154,7 +154,7 @@ register_cell_bool_merge@5:
     assert // check self.admin exists
     ==
     assert // cell ASA not created by admin
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:201-205
+    // inscription.py:201-205
     // # Cells must be immutable, owner-controlled NFTs: no clawback (can't be seized or balance-gamed
     // # to fake the C1 holding check), no freeze (can't be frozen to block inscription), no manager
     // # (so clawback/freeze can never be re-added later). [council/Grok: closes the AssetHoldingGet
@@ -166,7 +166,7 @@ register_cell_bool_merge@5:
     global ZeroAddress
     ==
     assert // cell must have no clawback
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:206
+    // inscription.py:206
     // assert cell.freeze == Global.zero_address, "cell must have no freeze"
     dup
     asset_params_get AssetFreeze
@@ -174,7 +174,7 @@ register_cell_bool_merge@5:
     global ZeroAddress
     ==
     assert // cell must have no freeze
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:207
+    // inscription.py:207
     // assert cell.manager == Global.zero_address, "cell manager must be cleared (immutable config)"
     dup
     asset_params_get AssetManager
@@ -182,7 +182,7 @@ register_cell_bool_merge@5:
     global ZeroAddress
     ==
     assert // cell manager must be cleared (immutable config)
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:208-210
+    // inscription.py:208-210
     // # validate the committed key length at the ONLY point a key enters state (C5/I4/A9).
     // # A malformed (wrong-length) key would brick the cell — reject it at the source.
     // assert committed_pubkey.native.length == PUBKEY_LEN, "bad committed pubkey length"  # .native = raw bytes (no ARC4 len prefix)
@@ -193,7 +193,19 @@ register_cell_bool_merge@5:
     pushint 1793
     ==
     assert // bad committed pubkey length
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:211-212
+    // inscription.py:211-215
+    // # [T4/Q13] header-byte well-formedness: a Deterministic Falcon-1024 (logn=10) public key
+    // # begins with 0x0A (FALCON_ENCODING_2026-06-01.md; confirmed against the algorand/falcon
+    // # keygen). Checked at the ONLY point a key enters state, so a wrong-curve/malformed key can
+    // # never be committed. ABI-compatible: added assert only, no signature/selector change.
+    // assert op.getbyte(committed_pubkey.native, UInt64(0)) == UInt64(0x0A), "bad committed pubkey header (logn=10)"
+    dup
+    intc_0 // 0
+    getbyte
+    pushint 10
+    ==
+    assert // bad committed pubkey header (logn=10)
+    // inscription.py:216-217
     // # 1,024 cell hard cap (spec §2)
     // assert self.cells_registered < TOTAL_CELLS, "all 1024 cells registered"
     intc_0 // 0
@@ -204,7 +216,7 @@ register_cell_bool_merge@5:
     pushint 1024
     <
     assert // all 1024 cells registered
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:213-214
+    // inscription.py:218-219
     // # register-once: committed key and owner must not already exist
     // assert cid not in self.committed_pubkey, "cell already registered"
     uncover 2
@@ -217,7 +229,7 @@ register_cell_bool_merge@5:
     bury 1
     !
     assert // cell already registered
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:215
+    // inscription.py:220
     // assert cid not in self.controlling_owner, "cell already registered (owner)"
     bytec_2 // 0x6f5f
     uncover 2
@@ -227,7 +239,7 @@ register_cell_bool_merge@5:
     bury 1
     !
     assert // cell already registered (owner)
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:217-218
+    // inscription.py:222-223
     // # write immutable commitments atomically
     // self.committed_pubkey[cid] = committed_pubkey.native   # store the raw 1793 B key, NOT the ARC4-prefixed encoding
     dig 1
@@ -236,21 +248,21 @@ register_cell_bool_merge@5:
     swap
     uncover 3
     box_put
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:219
+    // inscription.py:224
     // self.controlling_owner[cid] = controlling_owner.bytes
     dup
     box_del
     pop
     dig 3
     box_put
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:220
+    // inscription.py:225
     // self.cells_registered += UInt64(1)
     intc_1 // 1
     +
     bytec_1 // "cells_registered"
     swap
     app_global_put
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:171
+    // inscription.py:171
     // @arc4.abimethod
     intc_1 // 1
     return
@@ -264,7 +276,7 @@ register_cell_bool_false@4:
 inscribe:
     intc_0 // 0
     dupn 2
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:226
+    // inscription.py:231
     // @arc4.abimethod
     txna ApplicationArgs 1
     dupn 2
@@ -302,7 +314,7 @@ inscribe:
     len
     ==
     assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:250-251
+    // inscription.py:255-256
     // # --- structural preconditions ---
     // assert cid in self.committed_pubkey, "cell not registered"             # must be minted
     dig 2
@@ -317,7 +329,7 @@ inscribe:
     box_len
     bury 1
     assert // cell not registered
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:252
+    // inscription.py:257
     // assert falcon_sig.native.length <= SIG_COMPRESSED_MAXLEN, "falcon sig too large"  # .native (no ARC4 prefix); det1024 compressed <=1423B: cheap pre-verify DoS bound
     swap
     extract 2 0
@@ -327,14 +339,14 @@ inscribe:
     pushint 1423
     <=
     assert // falcon sig too large
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:254
+    // inscription.py:259
     // assert payload_uri.native.length <= URI_MAXLEN, "payload_uri too long"  # .native (no ARC4 prefix); spec §3 <=128B: bounds the write-once box size (M3)
     extract 2 0
     len
     pushint 128
     <=
     assert // payload_uri too long
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:256-261
+    // inscription.py:261-266
     // # --- C1: ownership, HARDENED [Hermes#2] ---
     // # Sender must (a) currently hold exactly the Cell, AND (b) be the controlling owner recorded
     // # at mint. (b) defeats transient/flash-custody: a temporary ASA holder is not the recorded
@@ -344,7 +356,7 @@ inscribe:
     txn Sender
     swap
     asset_holding_get AssetBalance
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:262
+    // inscription.py:267
     // assert exists and balance == UInt64(1), "sender does not hold the cell"
     bz inscribe_bool_false@4
     dup
@@ -354,10 +366,10 @@ inscribe:
     intc_1 // 1
 
 inscribe_bool_merge@5:
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:262
+    // inscription.py:267
     // assert exists and balance == UInt64(1), "sender does not hold the cell"
     assert // sender does not hold the cell
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:263
+    // inscription.py:268
     // assert cid in self.controlling_owner, "no controlling owner set"
     bytec_2 // 0x6f5f
     dig 4
@@ -368,14 +380,14 @@ inscribe_bool_merge@5:
     box_len
     bury 1
     assert // no controlling owner set
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:264
+    // inscription.py:269
     // assert self.controlling_owner[cid] == Txn.sender.bytes, "sender not controlling owner"
     box_get
     pop
     txn Sender
     ==
     assert // sender not controlling owner
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:266-267
+    // inscription.py:271-272
     // # --- C2: single-use / write-once (I1) ---
     // assert cid not in self.inscriptions, "cell already inscribed"
     bytec_3 // 0x695f
@@ -387,7 +399,7 @@ inscribe_bool_merge@5:
     bury 1
     !
     assert // cell already inscribed
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:269-273
+    // inscription.py:274-278
     // # --- C5: the controlling key is the one committed at mint, read from the IMMUTABLE mint
     // # record [Hermes#4]. There is no pubkey argument to validate against a hash anymore (A9): the
     // # contract uses the committed key DIRECTLY, so key-substitution is impossible by construction
@@ -398,35 +410,35 @@ inscribe_bool_merge@5:
     swap
     bury 10
     assert // check self.committed_pubkey entry exists
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:302
+    // inscription.py:307
     // + op.itob(Global.current_application_id.id)   # [Hermes#3] bind to THIS app
     global CurrentApplicationID
     itob
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:301
+    // inscription.py:306
     // DOMAIN_TAG
     pushbytes 0x5452454c59414e2d494e534352495054494f4e2d7631
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:301-302
+    // inscription.py:306-307
     // DOMAIN_TAG
     // + op.itob(Global.current_application_id.id)   # [Hermes#3] bind to THIS app
     swap
     concat
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:301-303
+    // inscription.py:306-308
     // DOMAIN_TAG
     // + op.itob(Global.current_application_id.id)   # [Hermes#3] bind to THIS app
     // + op.itob(cell_id)
     swap
     concat
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:301-304
+    // inscription.py:306-309
     // DOMAIN_TAG
     // + op.itob(Global.current_application_id.id)   # [Hermes#3] bind to THIS app
     // + op.itob(cell_id)
     // + artifact_hash
     dig 6
     concat
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:305
+    // inscription.py:310
     // + Global.genesis_hash          # A2: native network genesis (not a deploy-time arg)
     global GenesisHash
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:301-305
+    // inscription.py:306-310
     // DOMAIN_TAG
     // + op.itob(Global.current_application_id.id)   # [Hermes#3] bind to THIS app
     // + op.itob(cell_id)
@@ -455,7 +467,7 @@ inscribe_while_top@9:
     b inscribe_while_top@9
 
 inscribe_after_while@14:
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:282-283
+    // inscription.py:287-288
     // # --- C4: Falcon-1024 signature check against the COMMITTED key (the expensive opcode, run last) ---
     // assert op.falcon_verify(m, falcon_sig.native, pubkey), "falcon signature invalid"  # .native: raw compressed sig, no ARC4 len prefix
     dig 9
@@ -463,17 +475,17 @@ inscribe_after_while@14:
     dig 9
     falcon_verify
     assert // falcon signature invalid
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:291
+    // inscription.py:296
     // inscribed_round=arc4.UInt64(Global.round),
     global Round
     itob
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:292
+    // inscription.py:297
     // inscriber=arc4.Address(Txn.sender),
     txn Sender
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:288
+    // inscription.py:293
     // version=arc4.UInt8(INS_VERSION),
     pushbytes 0x01
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:285-294
+    // inscription.py:290-299
     // # --- effect: write the write-once record. The committed pubkey is NOT duplicated here — it
     // # already lives permanently in committed_pubkey[cid]; an I3 re-verifier reads both boxes. ---
     // rec = InscriptionRecord(
@@ -496,7 +508,7 @@ inscribe_after_while@14:
     concat
     dig 5
     concat
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:295
+    // inscription.py:300
     // self.inscriptions[cid] = rec.copy()
     dig 9
     dup
@@ -504,7 +516,7 @@ inscribe_after_while@14:
     pop
     swap
     box_put
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:226
+    // inscription.py:231
     // @arc4.abimethod
     intc_1 // 1
     return
@@ -516,7 +528,7 @@ inscribe_bool_false@4:
 
 // inscription.TrelyanInscription.update_owner[routing]() -> void:
 update_owner:
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:312
+    // inscription.py:317
     // @arc4.abimethod
     txna ApplicationArgs 1
     dup
@@ -531,7 +543,7 @@ update_owner:
     intc_3 // 32
     ==
     assert // invalid number of bytes for arc4.static_array<arc4.uint8, 32>
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:321
+    // inscription.py:326
     // assert cid in self.controlling_owner, "cell not registered"
     swap
     itob
@@ -542,7 +554,7 @@ update_owner:
     box_len
     bury 1
     assert // cell not registered
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:322
+    // inscription.py:327
     // assert self.controlling_owner[cid] == Txn.sender.bytes, "only controlling owner"
     dup
     box_get
@@ -550,7 +562,7 @@ update_owner:
     txn Sender
     ==
     assert // only controlling owner
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:323
+    // inscription.py:328
     // assert cid not in self.inscriptions, "already inscribed; owner frozen"
     bytec_3 // 0x695f
     uncover 2
@@ -559,14 +571,14 @@ update_owner:
     bury 1
     !
     assert // already inscribed; owner frozen
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:324
+    // inscription.py:329
     // self.controlling_owner[cid] = new_owner.bytes
     dup
     box_del
     pop
     swap
     box_put
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:312
+    // inscription.py:317
     // @arc4.abimethod
     intc_1 // 1
     return
@@ -574,7 +586,7 @@ update_owner:
 
 // inscription.TrelyanInscription.get_inscription[routing]() -> void:
 get_inscription:
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:330
+    // inscription.py:335
     // @arc4.abimethod(readonly=True)
     txna ApplicationArgs 1
     dup
@@ -582,7 +594,7 @@ get_inscription:
     intc_2 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:337
+    // inscription.py:342
     // return self.inscriptions[cell_id.native]
     btoi
     itob
@@ -591,7 +603,7 @@ get_inscription:
     concat
     box_get
     assert // check self.inscriptions entry exists
-    // C:/Users/User/OneDrive - releone llc/STELE.io/STELE.io/crypto/contracts/inscription.py:330
+    // inscription.py:335
     // @arc4.abimethod(readonly=True)
     pushbytes 0x151f7c75
     swap

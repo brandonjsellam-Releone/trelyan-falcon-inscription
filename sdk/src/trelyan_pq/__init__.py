@@ -50,6 +50,16 @@ from .falcon import (
     verify_inscription,
     default_signer,
 )
+from .seal import (
+    SealResult,
+    SealStore,
+    JsonFileSealStore,
+    InMemorySealStore,
+    CellAlreadySealed,
+    SealVerificationError,
+    keygen_sign_seal,
+    keygen_sign_seal_isolated,
+)
 
 __version__ = "0.1.0"
 
@@ -64,6 +74,9 @@ __all__ = [
     # falcon signer
     "FalconDet1024", "PUBKEY_SIZE", "PRIVKEY_SIZE", "CURRENT_SALT_VERSION",
     "keygen", "sign", "verify", "sign_inscription", "verify_inscription", "default_signer",
+    # sign-once-destroy (T1) + isolated-signer containment
+    "SealResult", "SealStore", "JsonFileSealStore", "InMemorySealStore",
+    "CellAlreadySealed", "SealVerificationError", "keygen_sign_seal", "keygen_sign_seal_isolated",
 ]
 
 # Optional on-chain client (only importable with the [algorand] extra installed).

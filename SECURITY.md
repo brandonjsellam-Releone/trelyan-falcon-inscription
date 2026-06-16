@@ -35,6 +35,23 @@ for a fix before any public disclosure; we will credit reporters who wish it.
 - The economics or governance of any separate TRELYAN activity — not part of
   this codebase.
 
+## Test vectors (committed test keys are intentional)
+
+`sdk/tests/vectors/det1024_kat.json` is a **known-answer test (KAT)** fixture. By design it
+contains a **committed test-only keypair — including a private key** — plus fixed messages and their
+expected signatures, used to assert byte-identical signatures across compilers and operating systems
+(the build-divergence / determinism control).
+
+This follows standard cryptographic practice: NIST PQC KATs (`.rsp`), IETF RFC test vectors
+(Ed25519/ECDSA), and Google Wycheproof all ship private keys inside their test files — because the
+verifier must reproduce a *fixed* answer. **This key is a PUBLIC TEST VECTOR, not an operational
+secret:** it is a throwaway bound to no Cell, never used on-chain, never produced via the
+sign-once-destroy (`keygen_sign_seal`) path, and must never be used operationally. Secret scanners
+will flag it by design; it is allow-listed by path in `.gitleaks.toml`, and a test
+(`test_kat_private_key_does_not_leak_into_source`) fails the build if those key bytes ever appear in
+source outside that one fixture. The repo rule "never commit secrets" targets operational credentials,
+not published test vectors.
+
 ## Planned hardening
 
 An **independent third-party security audit** is planned before any MainNet

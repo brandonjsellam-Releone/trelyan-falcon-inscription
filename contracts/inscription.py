@@ -208,6 +208,11 @@ class TrelyanInscription(ARC4Contract):
         # validate the committed key length at the ONLY point a key enters state (C5/I4/A9).
         # A malformed (wrong-length) key would brick the cell — reject it at the source.
         assert committed_pubkey.native.length == PUBKEY_LEN, "bad committed pubkey length"  # .native = raw bytes (no ARC4 len prefix)
+        # [T4/Q13] header-byte well-formedness: a Deterministic Falcon-1024 (logn=10) public key
+        # begins with 0x0A (FALCON_ENCODING_2026-06-01.md; confirmed against the algorand/falcon
+        # keygen). Checked at the ONLY point a key enters state, so a wrong-curve/malformed key can
+        # never be committed. ABI-compatible: added assert only, no signature/selector change.
+        assert op.getbyte(committed_pubkey.native, UInt64(0)) == UInt64(0x0A), "bad committed pubkey header (logn=10)"
         # 1,024 cell hard cap (spec §2)
         assert self.cells_registered < TOTAL_CELLS, "all 1024 cells registered"
         # register-once: committed key and owner must not already exist
