@@ -13,7 +13,7 @@ the prior Council pass.
 | File | Was | Now | Why |
 |---|---|---|---|
 | status.html (summary) | "AVM v12 · falcon_verify live · 21/21 tests" | "native falcon_verify · reference contract drafted · pre-audit" | AVM version is disputed across sources; "21/21 tests" is unbackable (no public suite). Gemini: UNVERIFIABLE. |
-| status.html (meta) | "Falcon-1024 · 1,232-byte sig" | "~1,280-byte compressed sig" | **1,232 is wrong.** Falcon-1024 ≈ 1,280 B (≈1,261 avg incl. 40-B nonce; 1,577 fixed). Confirmed via NIST/Falcon refs + Gemini. |
+| status.html (meta) | "Falcon-1024 · 1,232-byte sig" | "~1,222-byte compressed sig (≤1,423 max)" | det-compressed Falcon-1024 is typically **~1,222–1,233 B** (committed KAT goldens 1232–1233; ≤1,423 max). The **1,280 B** figure is the distinct *padded* fixed encoding; **~1,262 B** is the compressed *average* — neither is the det-compressed typical. Live status.html now states ~1,222 B. |
 
 ## WATCH-LIST (not yet edited — recommend, with rationale)
 These are softer and I did not change live copy unilaterally; flag for your decision:

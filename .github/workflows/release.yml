@@ -1,0 +1,180 @@
+name: trelyan-pq release (SLSA provenance + cosign keyless)
+
+# Supply-chain provenance for tagged releases of the `trelyan-pq` SDK.
+#
+# On a version tag (v*) this workflow:
+#   1. builds the sdist + wheel from sdk/ (hatchling),
+#   2. generates SLSA v1.0 / Build-L3 provenance via the official
+#      slsa-framework/slsa-github-generator generic (language-agnostic) reusable
+#      workflow — which Sigstore-signs the provenance keylessly and attaches the
+#      .intoto.jsonl to the GitHub Release,
+#   3. signs each artifact (wheel + sdist) with cosign keyless (Sigstore OIDC, no
+#      long-lived keys) and attaches the signature + certificate bundle to the Release.
+#
+# A verifier then proves the published artifact came from THIS repo at THIS tag —
+# see RELEASES.md for the exact slsa-verifier / cosign commands.
+#
+# PyPI publishing is intentionally NOT part of this workflow; it is a separate,
+# optional step (see the commented `pypi-publish` job at the bottom).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}   # manual dry-run (build only; provenance/release steps gate on a tag)
+
+# Least-privilege at the top; jobs that need more request it explicitly.
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Build the distribution artifacts and emit their sha256 hashes for SLSA.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build sdist + wheel
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      # base64( "sha256  <name>\n" ... ) — the subject set the SLSA generator signs.
+      hashes: ${{ steps.hash.outputs.hashes }}
+    steps:
+      - name: Checkout (pinned commit recorded in the run log)
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Build sdist + wheel (PEP 517, hatchling) from sdk/
+        working-directory: sdk
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --sdist --wheel --outdir "$GITHUB_WORKSPACE/dist"
+          ls -l "$GITHUB_WORKSPACE/dist"
+
+      - name: Compute base64-encoded sha256 subjects for SLSA provenance
+        id: hash
+        working-directory: dist
+        run: |
+          # sha256sum over the exact bytes that will be released; the generator
+          # binds these digests into the signed provenance statement.
+          echo "hashes=$(sha256sum -- * | base64 -w0)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload dist artifacts for downstream jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # 2. SLSA v3 (Build-L3) provenance. The reusable workflow runs on an isolated
+  #    runner, Sigstore-signs the provenance keylessly, and (upload-assets:true)
+  #    attaches <provenance>.intoto.jsonl to the Release for this tag.
+  #    Per SLSA's design, this MUST be referenced by an immutable semver tag.
+  # ---------------------------------------------------------------------------
+  provenance:
+    name: SLSA provenance (generic generator, keyless)
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      actions: read       # read the workflow run for the provenance materials
+      id-token: write     # OIDC token for keyless Sigstore signing
+      contents: write     # attach provenance to the GitHub Release
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: "${{ needs.build.outputs.hashes }}"
+      provenance-name: "trelyan-pq.intoto.jsonl"
+      upload-assets: true
+      upload-tag-name: "${{ github.ref_name }}"
+
+  # ---------------------------------------------------------------------------
+  # 3. cosign keyless signing (Sigstore OIDC) of each artifact, attached to the
+  #    Release. This is complementary to SLSA: SLSA attests HOW/WHERE the bytes
+  #    were built; the cosign blob signature lets a verifier check the bytes
+  #    against this repo's OIDC identity independently of the SLSA toolchain.
+  # ---------------------------------------------------------------------------
+  cosign-sign:
+    name: cosign keyless sign + attach to Release
+    needs: [build, provenance]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write     # OIDC token for keyless signing (Fulcio short-lived cert)
+      contents: write     # attach .sig / .pem / .bundle to the Release
+    steps:
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4.1.0
+        with:
+          cosign-release: "v2.6.0"
+
+      - name: "Sign each artifact keylessly (Sigstore bundle: cert + sig + Rekor)"
+        shell: bash
+        env:
+          COSIGN_YES: "true"   # non-interactive; OIDC comes from id-token, not a prompt
+        run: |
+          cd dist
+          for f in *.whl *.tar.gz; do
+            [ -e "$f" ] || continue
+            echo "::group::cosign sign-blob $f"
+            # --bundle is the self-contained, recommended verification artifact
+            # (it embeds the signing cert and the Rekor transparency-log entry).
+            cosign sign-blob "$f" \
+              --bundle "$f.cosign.bundle" \
+              --output-signature "$f.sig" \
+              --output-certificate "$f.pem"
+            echo "::endgroup::"
+          done
+          ls -l
+
+      - name: Attach artifacts + cosign material to the GitHub Release
+        uses: softprops/action-gh-release@v2.6.2
+        with:
+          tag_name: ${{ github.ref_name }}
+          fail_on_unmatched_files: true
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/*.cosign.bundle
+            dist/*.sig
+            dist/*.pem
+
+  # ---------------------------------------------------------------------------
+  # 4. OPTIONAL / SEPARATE: PyPI publish via Trusted Publishing (OIDC, no token).
+  #    Left disabled by default — publishing is a deliberate, separate decision
+  #    and requires a configured PyPI Trusted Publisher for this repo+workflow.
+  #    To enable: set repo variable ENABLE_PYPI_PUBLISH=true and configure the Trusted Publisher.
+  # ---------------------------------------------------------------------------
+  pypi-publish:
+    name: Publish to PyPI (optional, Trusted Publishing)
+    needs: [build, provenance, cosign-sign]
+    if: ${{ vars.ENABLE_PYPI_PUBLISH == 'true' }}   # set repo var ENABLE_PYPI_PUBLISH=true once a PyPI Trusted Publisher is configured
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/trelyan-pq
+    permissions:
+      id-token: write     # OIDC for PyPI Trusted Publishing (no API token stored)
+    steps:
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          attestations: true

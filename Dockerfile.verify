@@ -1,0 +1,21 @@
+# Hermetic, read-only reviewer check — runs the on-chain + offline verification from a clean,
+# version-pinned container. (See REVIEWER.md for what it proves and for the heavier offline
+# byte-identity KAT + pinned-source-digest checks, which additionally need the Falcon C build.)
+#
+#   docker build -f Dockerfile.verify -t trelyan-verify .
+#   docker run --rm trelyan-verify
+#
+# Needs network (read-only Algorand TestNet). Exit code is non-zero on any failed check.
+# Base image pinned by its multi-arch manifest-list (OCI index) digest — tag python:3.13-slim,
+# resolved 2026-06-18 — so the reviewer check runs in a reproducible environment, not a floating tag.
+FROM python:3.13-slim@sha256:c33f0bc4364a6881bed1ec0cc2665e6c53c87a43e774aaeab88e6f17af105e4f
+
+# Pin the published verification package (the only dependency; stdlib otherwise).
+RUN pip install --no-cache-dir "trelyan-pq==0.1.0"
+
+WORKDIR /trelyan
+COPY sdk/examples/verify_trelyan.py .
+
+# Read-only: package constants, offline golden vectors, live app 763809096 bytecode fingerprint
+# (asserted against the pinned value), on-chain boxes, and byte-exact message reconstruction.
+CMD ["python", "verify_trelyan.py"]

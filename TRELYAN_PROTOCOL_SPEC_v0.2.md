@@ -41,10 +41,11 @@ fixes adopted from the Council review are tagged **[FIX]** with attribution.
   (Aug 2024). Public docs MUST NOT say "FIPS 206 published."
 - Parameters: n = 1024, q = 12289, ring Z_q[x]/(x^n+1). Public key ≈ **1793 bytes**
   (1-byte header + 1792-byte encoded polynomial). Signature: **Golomb/Rice-style compressed
-  encoding** (not Huffman); variable length, **≈ 1280 bytes average**, padded to a fixed
-  length for constant-size transmission in some implementations. **[FIX/Gemini]** v0.1 called
-  1280 the "max"; it is the average/target — confirm the exact padded length the AVM opcode
-  expects (§8).
+  encoding** (not Huffman); variable length, **≈ 1262 bytes average** for Falcon-1024. The
+  **1280-byte** figure is the distinct *padded*, fixed-length encoding — not the compressed
+  average. The deployed Algorand deterministic variant (det1024) emits the **compressed** form:
+  typically **~1222–1233 bytes** on-chain (committed KAT goldens 1232–1233 B), bounded at
+  **≤1423 bytes**, which the contract asserts as a cheap pre-verify length cap (§8).
 - **Security goal:** EUF-CMA in the **(Q)ROM**; the GPV/Falcon QROM reduction is **non-tight**.
   SUF-CMA is plausibly also held (a 2nd valid signature for fixed (message,salt) reduces to
   SIS over the NTRU lattice) but TRELYAN claims only **EUF-CMA** absent a cited source.

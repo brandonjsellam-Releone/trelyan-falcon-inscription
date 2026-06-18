@@ -14,6 +14,25 @@ post‑quantum authorization in their own contract.
 **Status (honest):** validated **20/20 on localnet** and **deployed + verified on TestNet**. **Not yet
 externally audited; not on MainNet.** Treat as a reference, not production‑ready. MIT licensed.
 
+## Verify it yourself
+
+You don't have to trust us — **[`REVIEWER.md`](REVIEWER.md)** is a 5-minute, read-only independent
+verification guide. The short version:
+
+```
+pip install trelyan-pq && python3 sdk/examples/verify_trelyan.py        # live TestNet + pinned-bytecode assert
+docker build -f Dockerfile.repro -t trelyan-repro . \
+  && docker run --rm trelyan-repro sh scripts/verify_all.sh             # full hermetic rebuild, all axes
+```
+
+The hermetic build compiles the pinned Falcon source, asserts the source-tree digest, and reproduces the
+committed signatures **byte-for-byte**, then verifies the live deployment — read-only, from a clean container.
+
+**Validation:** SDK suite 34/34 (1 env-skip); byte-identity KAT green on Linux / macOS / Windows (3-OS CI);
+coverage-guided fuzzing of the encoder (atheris) and the C verifier (libFuzzer · ASan/UBSan) ran 13.8M +
+2.07M inputs with zero crashes. Audit scope: [`AUDIT_READINESS.md`](AUDIT_READINESS.md). Supply-chain
+provenance (SLSA + cosign) on tagged releases: [`RELEASES.md`](RELEASES.md).
+
 ## Why this exists — two integration traps, solved and documented
 Algorand ships `falcon_verify` as a live native AVM opcode, but two non‑obvious things will cost the
 next team a week. This repo solves both, with the reasoning written down:

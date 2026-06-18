@@ -1,0 +1,98 @@
+# Dockerfile.repro — FULL hermetic, from-clean-clone reproduction of TRELYAN's offline
+# verification axes, in one version-pinned container. This is the heavier companion to
+# Dockerfile.verify: where Dockerfile.verify runs only the read-only on-chain reviewer check
+# (no native build), THIS image additionally builds the deterministic Falcon-1024 shared
+# library from the PINNED source and runs the byte-identity KAT + pinned-source-digest gate.
+#
+#   docker build -f Dockerfile.repro -t trelyan-repro .
+#   docker run --rm trelyan-repro                 # offline axes (build + digest + byte-identity KAT)
+#   docker run --rm trelyan-repro scripts/verify_all.sh   # + the read-only on-chain check (needs network)
+#
+# It mirrors the sdk/ci/ci.yml `signature-kat` job step-for-step, with ONE deliberate
+# substitution: the compiler is `python -m ziglang cc` (a portable, pinned cross-compiler)
+# instead of the host `cc`, so the build is reproducible inside a minimal slim image that
+# ships no system C toolchain. The build FLAGS are byte-for-byte the ci.yml flags:
+#     -O3 -fPIC -DFALCON_UNALIGNED=0 -fno-strict-aliasing -shared
+# and the emulated FP backend (FALCON_FPEMU=1 / FALCON_FPNATIVE=0) is enforced by the pinned
+# config.h and asserted by ci/verify_pinned_digest.py — NOT by any flag here. No -ffast-math,
+# no -DFALCON_FPNATIVE: either would break the byte-identity the KAT asserts.
+#
+# UNAUDITED reference build on Algorand TestNet. Not mainnet/production. Falcon = signatures.
+# Base image pinned by its multi-arch manifest-list (OCI index) digest — tag python:3.13-slim,
+# resolved 2026-06-18 — so the build environment is reproducible over time, not a floating tag.
+# (The byte-identity of the signatures comes from the pinned ziglang toolchain + digest-gated
+# Falcon source below, not from this base; the pin closes the reproducibility gap regardless.)
+FROM python:3.13-slim@sha256:c33f0bc4364a6881bed1ec0cc2665e6c53c87a43e774aaeab88e6f17af105e4f
+
+# --- pinned build inputs (authoritative; keep in lockstep with ci.yml + verify_pinned_digest.py) ---
+ARG FALCON_COMMIT=ce15e75bceb372867daf6b8e81918ab6978686eb
+# Pinned toolchain versions (2026). ziglang wheel bundles clang+lld and needs no system cc.
+ARG ZIGLANG_VERSION=0.13.0
+ARG TRELYAN_PQ_VERSION=0.1.0
+
+# curl + tar to fetch the pinned source tarball; ca-certificates for the https fetch.
+# (No build-essential / gcc: we compile via `python -m ziglang cc`.)
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates tar \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN python -m pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir "ziglang==${ZIGLANG_VERSION}"
+
+WORKDIR /trelyan
+
+# Bring in exactly what the offline axes need from a clean checkout: the SDK (package + tests +
+# KAT fixture), the pinned-digest gate, and the read-only on-chain example. COPY-ing the repo
+# subtree (rather than git clone) is what makes this hermetic and clean-checkout-faithful.
+COPY sdk/ sdk/
+COPY scripts/ scripts/
+
+# --- 1. Fetch the pinned Falcon source via the GitHub TARBALL (NOT git clone) -----------------
+# A clone applies the runner's core.autocrlf, which can rewrite the C sources LF->CRLF and change
+# their bytes (deterministic.c -> e005ebda instead of the pinned 601390dc), failing the digest gate
+# for a non-substantive reason. The tarball is LF on every OS and is exactly what the pin was
+# computed from. Mirrors ci.yml "Fetch pinned Falcon source".
+RUN curl -sL "https://github.com/algorand/falcon/archive/${FALCON_COMMIT}.tar.gz" | tar xz \
+ && mv "falcon-${FALCON_COMMIT}" falcon-src
+
+# --- 2. Pinned-build digest + emulated-FP-backend gate (fail fast if upstream drifted) --------
+# Verifies tree digest c6adf48..., deterministic.c 601390dc..., AND that config.h pins
+# FALCON_FPEMU=1 / FALCON_FPNATIVE=0 — the precondition that makes byte-identity sound.
+# Mirrors ci.yml "Assert pinned-build digest + emulated FP backend".
+RUN python sdk/ci/verify_pinned_digest.py falcon-src
+
+# Record the toolchain for the build audit trail (mirrors ci.yml "Record toolchain").
+RUN echo "python: $(python --version)" \
+ && echo "zig cc: $(python -m ziglang version)"
+
+# --- 3. Build the deterministic Falcon-1024 shared library --------------------------------------
+# EXACT ci.yml flags: -O3 -fPIC -DFALCON_UNALIGNED=0 -fno-strict-aliasing -shared, over the EXACT
+# 11-file source list. -DFALCON_UNALIGNED=0 selects the portable byte-wise PRNG read (no misaligned
+# uint64 at inner.h:846); -fno-strict-aliasing keeps the FALCON_LE type-punning casts safe under TBAA.
+# Both are -D/-f flags, not source edits, so the pinned tree digest above is unchanged.
+# Output the .so OUTSIDE falcon-src so the pinned 27-file source tree stays pristine — Axis B of
+# scripts/verify_all.sh re-runs the digest gate AFTER the build, and a build artifact in the tree
+# would change its digest (28 files). The digest gate above already ran on the clean tree.
+RUN cd falcon-src \
+ && python -m ziglang cc -O3 -fPIC -DFALCON_UNALIGNED=0 -fno-strict-aliasing -shared \
+      -o /trelyan/libfalcondet1024.so \
+      codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c
+ENV FALCON_DET1024_LIB=/trelyan/libfalcondet1024.so
+
+# --- 4. Install the SDK (dev extra) -------------------------------------------------------------
+# Editable install from the in-tree source so the byte-identity KAT runs against THIS checkout.
+# (Dockerfile.verify pins trelyan-pq==0.1.0 from PyPI for the on-chain check; the version in-tree
+# is the same 0.1.0 — kept here as a label for parity.)
+LABEL trelyan.trelyan_pq_version="${TRELYAN_PQ_VERSION}"
+RUN python -m pip install --no-cache-dir -e "sdk[dev]"
+
+# --- 5. Byte-identity KAT vs the committed golden -----------------------------------------------
+# TRELYAN_REQUIRE_KAT=1 makes this FAIL (not skip) if the fixture is still the unpopulated sentinel,
+# so a green build can never silently mean the byte-identity KAT was skipped. Mirrors ci.yml
+# "Run the signature KAT". Runs at BUILD time so `docker build` itself proves the offline axes.
+ENV TRELYAN_REQUIRE_KAT=1
+RUN cd sdk && pytest tests/test_signature_kat.py -v
+
+# Default: re-run the offline byte-identity KAT (no network). For the full 3-axis run INCLUDING the
+# read-only on-chain check, run:  docker run --rm trelyan-repro scripts/verify_all.sh
+CMD ["sh", "-c", "cd sdk && pytest tests/test_signature_kat.py -v"]

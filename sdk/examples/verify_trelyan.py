@@ -11,6 +11,9 @@ Read-only. Only dependency: trelyan-pq (stdlib otherwise).
 import json, sys, base64, urllib.request
 
 APP_ID = 763809096
+# Approval-program fingerprint, pinned 2026-06-17 (660 B). The contract blocks Update/Delete
+# (invariants I1/I5), so the deployed bytecode is fixed — this is a stable attestation target.
+EXPECTED_APPROVAL_SHA512_256 = "d24d9071209f526a2075542d9408295d78f83ca5ed4c8cc233000130dcc97d44"
 ALGOD = "https://testnet-api.algonode.cloud"
 TESTNET_GENESIS_B64 = "SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI="
 PASS, FAIL = 0, 0
@@ -43,8 +46,10 @@ app = get(f"/v2/applications/{APP_ID}")
 check(f"app {APP_ID} exists", app.get("id") == APP_ID)
 ap = base64.b64decode(app["params"]["approval-program"])
 check("approval program fetched", len(ap) > 0, f"{len(ap)} bytes")
-print(f"        bytecode sha512_256: {t.sha512_256(ap).hex()}")
-print(f"        (diff this against the repo's compiled TEAL — bytecode attestation)")
+fp = t.sha512_256(ap).hex()
+check("approval bytecode matches pinned fingerprint", fp == EXPECTED_APPROVAL_SHA512_256, fp[:16] + "...")
+print(f"        bytecode sha512_256: {fp}")
+print(f"        (pinned target: {EXPECTED_APPROVAL_SHA512_256[:16]}... — diff against your compile of contracts/inscription.py)")
 
 print("== [4] on-chain boxes ==")
 boxes = get(f"/v2/applications/{APP_ID}/boxes")["boxes"]

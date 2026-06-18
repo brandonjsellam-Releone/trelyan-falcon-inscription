@@ -47,8 +47,9 @@ A runnable signer (`falcon_det1024.py`) and a round-trip self-test ship alongsid
 them into `test_inscription.py` (its `falcon_keypair`/`falcon_sign` stubs).
 
 ## Two small follow-ups this surfaced (optional, low-risk)
-1. **Website sig-size figure.** Public copy says "~1,280 B." The deterministic compressed sig is
-   **≈1.2 KB, ≤1423 B**. Either is defensible as "~1.2 KB"; tighten if you want precision.
+1. **Website sig-size figure (resolved).** Public copy now states **~1,222 B** (≤1423 B) for the
+   deterministic compressed signature — typically ~1,222–1,233 B (KAT goldens 1232–1233). The 1,280 B
+   figure is the distinct *padded* form, not the compressed size; ~1,262 B is the compressed average.
 2. **Optional contract hardening.** Before the (opcode-heavy) verify, you may add
    `assert falcon_sig.length <= UInt64(1423), "sig too large"` as a cheap upper bound — rejects an
    oversized blob before paying for `falcon_verify`. Not required for correctness; nice for budget
