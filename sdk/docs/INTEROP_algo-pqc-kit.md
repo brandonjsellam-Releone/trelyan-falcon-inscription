@@ -26,9 +26,20 @@ cell. No new trust assumptions — just two layers sharing one primitive.
 
 Reconcile the exact **deterministic compressed signature encoding** between the two signers:
 algo-pqc-kit's opcode signature is documented as `[1232]B`; trelyan-pq emits the `0xBA`
-deterministic-compressed form (≤1423 B). Once we align on the exact bytes `falcon_verify` accepts (a
-known-answer test in both directions), **one keypair signs for both layers**. Bonus: algo-pqc-kit's
-signer is **pure-Python**, so aligning could let trelyan-pq drop its `ctypes`/C-library dependency.
+deterministic-compressed form (≤1423 B). Note `1232 B` is the *typical* length and `1423 B` is the
+format **max** (`SIG_COMPRESSED_MAXSIZE(10) − 40 + 1`) — the on-chain bound must stay `≤1423`, since a
+hard `≤1232` cap would reject valid large signatures. Once we align on the exact bytes `falcon_verify`
+accepts (a known-answer test in both directions), **one keypair signs for both layers**. Bonus:
+algo-pqc-kit's signer is **pure-Python**, so aligning could let trelyan-pq drop its `ctypes`/C-library
+dependency.
+
+**The reconcile test is now scaffolded:** [`tests/test_interop_algo_pqc_kit_kat.py`](../tests/test_interop_algo_pqc_kit_kat.py)
+is a bidirectional KAT that (1) asserts algo-pqc-kit reproduces the committed goldens **byte-for-byte**
+(no C lib needed — the goldens are the exact bytes the live opcode accepts), (2) checks the same
+private key derives the same public key in both signers ("one keypair, both layers"), and (3) with the
+C lib present, cross-verifies the two signers. The full alignment contract (header `0xBA`, salt-version
+`0x00`, `≤1423 B`, M signed raw, FPEMU backend) is pinned at the top of that file. Wiring is a single
+`_ApkAdapter` class; until it's wired the tests skip with an actionable message.
 
 ## Demo sketch (post-reconcile)
 
