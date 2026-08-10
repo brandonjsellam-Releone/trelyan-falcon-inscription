@@ -4,8 +4,9 @@ All roadmap work ships as **FOSS (MIT)** in this repository. Dates are intent,
 not commitments.
 
 ## Done
-- Reference contract (`contracts/inscription.py`), AVM v12 — compiles, 20/20 on
-  localnet.
+- Reference contract (`contracts/inscription.py`), AVM v12 — compiles; 20/20 on
+  localnet as of 2026-06-01 (suite now 22 tests, not re-run on localnet since the
+  2026-06-16 contract change).
 - Deployed + verified on Algorand TestNet (app `763809096`).
 - Spec v0.2, threat model + invariant->test->code traceability, localnet
   validation record, Falcon encoding/budget notes.

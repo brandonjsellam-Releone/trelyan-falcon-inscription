@@ -6,8 +6,9 @@ and improve the pattern.
 
 ## Project status (honest)
 
-- **Reference implementation.** Validated 20/20 on localnet, deployed + verified
-  on Algorand TestNet. **Not externally audited; not on MainNet.**
+- **Reference implementation.** Last localnet validation 20/20 on 2026-06-01; the contract
+  changed 2026-06-16 and the suite is now 22 tests with no recorded localnet run. Deployed +
+  verified on Algorand TestNet. **Not externally audited; not on MainNet.**
 - **Currently solo-maintained** by Brandon J. Sellam. The project is actively
   **seeking a co-maintainer** (cryptography / Algorand smart-contract review).
   If that's you, open an issue or email **fondation@trelyan.ch**.

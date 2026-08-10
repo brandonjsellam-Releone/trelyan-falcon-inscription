@@ -1,7 +1,16 @@
 # TRELYAN — Localnet Validation & Council Hardening (1 June 2026)
 
-**Artifact under test:** `contracts/inscription.py`
-**Suite:** `contracts/test_inscription.py` — **20 / 20 passing** on Algorand localnet
+> [!IMPORTANT]
+> **This is a dated record of the 1 June 2026 run, not a statement about the current tree.**
+> On **2026-06-16** (`2ec798e`) `contracts/inscription.py` changed and the emitted TEAL was
+> regenerated, and the suite grew from **20 to 22 tests**. Those 22 tests have **no recorded
+> localnet run**; CI does not execute `contracts/test_inscription.py` (it has no localnet).
+> The weekly `verify-live` job checks the deployed app's **bytecode fingerprint**, which proves
+> the live app matches the committed TEAL — it does **not** re-run this functional suite.
+> Re-run on localnet and supersede this record before relying on it as current evidence.
+
+**Artifact under test:** `contracts/inscription.py` *(as of 1 June 2026 — since changed)*
+**Suite:** `contracts/test_inscription.py` — **20 / 20 passing** on Algorand localnet *(suite is now 22 tests)*
 **Toolchain:** algokit localnet · AVM target v12 · PuyaPy 5.8.1 · deterministic Falcon-1024
 (`contracts/falcon_det1024.py`, native `falcon_verify` opcode)
 
@@ -33,7 +42,7 @@ end-to-end against a live AVM, not just off-chain.
 
 ---
 
-## 2. The 20 tests (what each exercises)
+## 2. The 20 tests as of this run (what each exercises)
 
 *Each test exercises the listed path on a live AVM and rejects the exercised attack vector; this is
 evidence, not a proof over all histories.*

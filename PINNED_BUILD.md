@@ -3,7 +3,18 @@
 All TRELYAN signing (`trelyan_pq.falcon`) builds the deterministic Falcon-1024 library from exactly this source:
 
 **Repository:** https://github.com/algorand/falcon
-**Pinned commit:** `ce15e75bceb372867daf6b8e81918ab6978686eb` (committed 2023-06-08 — the upstream library has been frozen for three years; stability is a property, not an accident)
+**Pinned commit:** `ce15e75bceb372867daf6b8e81918ab6978686eb` (committed 2023-06-08)
+
+> [!NOTE]
+> **Upstream is no longer dormant.** `algorand/falcon` was quiet from 2023-06 to 2026-06, but
+> resumed in June–July 2026; the pin is now several commits behind `main`. The most
+> security-relevant delta is **PR #16** (merged 2026-07-01): `convert_compressed_to_ct` now rejects
+> inputs shorter than the header+salt-version and rejects **trailing bytes after the decoded
+> signature** (a malleability gap), and `verify_compressed` reorders the max-size check to avoid a
+> `size_t` overflow. On-chain this does not affect consensus — the AVM node enforces its own
+> validation — but TRELYAN's **off-chain** accept/reject decisions can diverge from what the chain
+> accepts. Any pin bump MUST be gated on re-running the byte-identity KAT: a silent sampler or
+> encoding change would be catastrophic for a deterministic signer.
 **Source-tree digest (sha512_256, 27 files):** `c6adf4871389dfdbf3ffbd853bd9e5ce15646b821d6dc84e327ab1b3d2adc980`
 **deterministic.c (sha512_256):** `601390dc53521fc1b00eb962ea63d64c2d65bfe774450cf4ec59a3478e0a54a4`
 
