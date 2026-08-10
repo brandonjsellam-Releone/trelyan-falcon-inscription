@@ -1,3 +1,10 @@
+# SECRETS — never commit. DEPLOYER_MNEMONIC is an Algorand mnemonic, i.e. a private key
+# that controls its account outright; a committed .env would publish it irrevocably in git
+# history. .env.example is the template and is intentionally NOT ignored.
+.env
+.env.*
+!.env.example
+
 # transient run logs / local state
 last_run.log
 *.log
