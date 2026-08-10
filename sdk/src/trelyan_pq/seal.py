@@ -247,9 +247,17 @@ def keygen_sign_seal_isolated(
     for _k in ("LD_PRELOAD", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH",
                "PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP"):
         env.pop(_k, None)
+    # `python -m` prepends the process cwd to sys.path[0], so a planted trelyan_pq/ package in the
+    # caller's cwd would be imported INSTEAD of the installed SDK — inside the process that generates
+    # the ephemeral private key, before _harden_process() runs. Parent re-verification below cannot
+    # detect that (a hijacked worker can return a genuine, verifying keypair and keep the private
+    # key). -P / PYTHONSAFEPATH drops the cwd entry; cwd= pins the child away from caller-controlled
+    # directories. Both are set: belt and braces on the one path whose purpose is a STRONGER boundary.
+    env["PYTHONSAFEPATH"] = "1"
     proc = subprocess.run(
-        [python_exe or sys.executable, "-m", "trelyan_pq._seal_worker"],
+        [python_exe or sys.executable, "-P", "-m", "trelyan_pq._seal_worker"],
         input=request, capture_output=True, timeout=timeout, env=env,
+        cwd=os.path.dirname(os.path.abspath(__file__)),
     )
     try:
         out = json.loads(proc.stdout.decode("utf-8") or "{}")
