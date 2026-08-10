@@ -10,6 +10,25 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    # .gitleaks.toml has existed since the repo was published but nothing ever ran it - no CI job,
+    # no pre-commit hook - so its rules (including the deliberate allow-list for the PUBLIC TEST
+    # VECTOR key in sdk/tests/vectors/) were configuration without enforcement. The repo's
+    # deployment path uses DEPLOYER_MNEMONIC, an Algorand mnemonic that controls its account
+    # outright, so an accidentally committed .env is an irrevocable key disclosure in git history.
+    # Full history is scanned, not just the diff, so a secret introduced earlier is still caught.
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          fetch-depth: 0   # gitleaks needs full history to scan past commits
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
   wire-format:
     name: Wire-format tests (no network, no native lib)
     runs-on: ubuntu-latest
