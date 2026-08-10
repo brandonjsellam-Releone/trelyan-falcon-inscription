@@ -11,8 +11,11 @@ post‑quantum authorization in their own contract.
 > deployment is a real, publicly verifiable post‑quantum inscription. Reproducible via
 > `contracts/deploy_testnet.py`.
 
-**Status (honest):** validated **20/20 on localnet** and **deployed + verified on TestNet**. **Not yet
-externally audited; not on MainNet.** Treat as a reference, not production‑ready. MIT licensed.
+**Status (honest):** last localnet validation was **20/20 on 2026-06-01**; the contract changed on
+2026-06-16 and the suite is now **22 tests with no recorded localnet run** (see
+[`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md)). **Deployed + verified on
+TestNet** — the weekly job checks the live app's bytecode fingerprint against the committed TEAL.
+**Not yet externally audited; not on MainNet.** Treat as a reference, not production‑ready. MIT licensed.
 
 ## Verify it yourself
 
