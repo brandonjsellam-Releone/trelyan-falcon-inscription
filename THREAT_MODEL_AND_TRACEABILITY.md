@@ -118,3 +118,101 @@ evaluating); lost-key cells irrecoverable by design (disclose to holders); admin
 *unregistered* cells (Stiftung multisig custody); committed pubkey + inscriber permanent on-chain
 (GDPR DPIA at the Foundation layer — the inscriber address is inherent to any Algorand transaction);
 1,024 cap left to static verification; OpUp fees drawn from the caller's own surplus.
+
+---
+
+## 7. Addendum (2026-08-10): deterministic-signing / signer key-extraction threat
+
+Everything in §§1–6 concerns the **on-chain** trust surface — forgery, replay, ownership, write-once.
+This section adds the one threat that lives entirely **off-chain in the signer** and is the first thing
+a cryptographic reviewer will raise about *any* derandomized Falcon deployment. It is a
+**private-key-confidentiality** threat, not an on-chain-authorization one, so none of the C1–C5 controls
+touch it.
+
+**The attack.** Lin, Tibouchi, Yu & Zhang, *"Do Not Disturb a Sleeping Falcon"*, EUROCRYPT 2025
+([eprint 2024/1709](https://eprint.iacr.org/2024/1709)). Falcon's lattice discrete-Gaussian sampler is
+sensitive to floating-point discrepancies: given **identical inputs twice**, with a small but
+significant probability it returns two **different** lattice points whose difference structurally
+exposes the secret key. Correctly-generated *randomized* Falcon includes a fresh per-signature salt, so
+sampler inputs never repeat — safe. *Derandomized* variants (like Algorand `det1024`) lack that
+protection and, if the two evaluations diverge, face **full private-key recovery**. No fault injection
+is needed; natural implementation variation (e.g. Falcon's "dynamic" vs "tree" signing procedures)
+suffices. NIST's own FIPS 206 (FN-DSA) status update states FN-DSA will **only allow randomized
+signing** precisely because *"Deterministic signing could be dangerous."*
+
+**Why TRELYAN is in this attack's scope at all.** `det1024` signatures are a pure function of
+`(key, message)` — the sampler RNG is `SHAKE256(logn ‖ privkey ‖ data)`, no salt. This is not a choice:
+Algorand's native `falcon_verify` opcode accepts **only** the deterministic, compressed, 0xBA-header
+form, so the on-chain path *cannot* use randomized Falcon. Precondition P1 (derandomized signing) is
+therefore met unavoidably.
+
+**Preconditions and current status** (calibrated from an internal adversarial
+prosecution/defense/neutral assessment; the paper's own preconditions, mapped onto this repo):
+
+| # | Precondition | Status in TRELYAN |
+| --- | --- | --- |
+| **P1** | Derandomized signing (reproducible sampler input) | **Met, unavoidably** — required by the AVM opcode. |
+| **P2** | The same `(key, message)` is signed twice | **Not met** in the sealed path (`seal.keygen_sign_seal` mints a fresh keypair per seal and signs once). **Met-capable** in the general retained-key API (`keygen()` → `sign(privkey, M)`). |
+| **P3** | The two evaluations actually diverge (FP or algorithmic) | **Not met** under the pinned build; **not enforced at runtime**. |
+| **P5** | Adversary obtains BOTH signatures | **Not met on-chain** (write-once ⇒ ≤1 signature per cell reaches the ledger); **partially met off-chain** (rejected `inscribe` app calls are still broadcast to relays). |
+
+**Controls, and their real strength — stated honestly because an auditor will test each:**
+
+1. **Fresh-key-per-seal (`seal.keygen_sign_seal`) — strongest, unconditional, but NOT the deployed
+   default.** It defeats P2 *structurally* (a re-seal re-keygens, so no `(key, M)` is ever signed
+   twice), and survives even a total tripwire-store bypass. **However, it currently has no call sites
+   outside `sdk/tests/`** — every example, tutorial, README snippet, and `contracts/deploy_testnet.py`
+   uses the retained-key general API. The strongest mitigation is the one users are not shown.
+   *Action: make the sealed path the documented default and move examples onto it.*
+2. **`FALCON_FPEMU=1` + pinned-tree digest — right target (P3), but the repo over-credits FPEMU
+   alone.** The paper is explicit that exposure is possible *even with* integer-emulated FP, because
+   its demonstrated discrepancy source is **algorithmic** (dynamic vs tree signing), not merely FP
+   rounding. What actually holds is the **conjunction**: emulated FP **+** only the dynamic signing
+   path being reachable **+** one digest-pinned source tree **+** the CI alignment/UBSan gate (which
+   attacks the *cause* — UB-driven compiler divergence — and is arguably the strongest single piece of
+   evidence here). Note also that this is a **build-time, CI-only** control: `FalconDet1024._load()`
+   performs no runtime digest or FPEMU attestation, and the seal's post-sign self-verification cannot
+   catch an off-pin signer (an off-pin signature is still a *valid* Falcon signature).
+3. **On-chain write-once — bounds observation (P5), not a signer mitigation.** ≤1 signature per cell
+   reaches the ledger. It does not stop off-chain repeated signing.
+
+**Scoping, to avoid overstatement.** Signing *different* messages under one retained key is **not** the
+attack (different M ⇒ different target/tape ⇒ no structured difference). Exposure requires re-signing an
+*identical* message under an identical key across two divergent evaluations — in TRELYAN terms,
+re-inscribing the identical artifact into the identical cell on the identical network.
+
+**Residual risk, ranked.** (a) **Caller-side retry of `inscribe()`.** This is the most *reachable*
+path, because it needs no deliberate re-inscription — only ordinary error handling.
+`TrelyanInscriptionClient.inscribe()` signs internally (`inscription.py:136`), so **every call
+re-signs**. A caller who wraps it in a retry loop for a network blip or a fee spike re-signs the
+identical `(privkey, cell_id, artifact_hash, genesis_hash)`, producing an identical M — precondition
+P2, met by accident. Nothing in the docstring warns against this.
+*Note the SDK's own two-strategy submit is NOT affected*: `sig` is computed once and the fallback at
+`inscription.py:149` re-sends the same `args` tuple rather than re-signing. The exposure is external
+retry, not internal fallback. **Fix: document that `inscribe()` must not be wrapped in a retry, and
+provide a sign-once/submit-many entry point that caches the signed args and re-submits those bytes.**
+(b) An operator who retains a key via the general API and re-signs the same M across two builds that
+diverge (different compiler/flags, a caller who built without the FPEMU config, or a future re-pin)
+→ key recovery. (c) A caller who loads an arbitrary `.so` at `FALCON_DET1024_LIB` that is not the
+pinned FPEMU build, since nothing checks it at runtime.
+
+**Recommended controls (constitution-compliant — Tier 3 SDK Python or the eventual Tier 1 Rust port;
+never a forbidden language), in order:** (1) make the sealed sign-once path the documented default and
+move all examples onto it; (2) add a fail-closed load-time self-KAT to the signer (sign a known vector,
+compare to a golden shipped as package data) so a non-pinned build cannot sign silently — noting the
+existing `test_kat_private_key_does_not_leak_into_source` guardrail means the vector must be package
+data, not embedded in source; (3) carry both natively into the recommended `trelyan-pq` Rust port
+(self-KAT at library init, `zeroize` + `subtle`, `#![forbid(unsafe_code)]` outside the FFI module).
+
+**Standards trajectory (a claims-accuracy consequence, not a bug).** Because FN-DSA will only permit
+randomized signing, **`det1024` can never be FIPS 206 conformant as specified.** Algorand owns the
+identical problem for its opcode, so any migration is coupled to Algorand's protocol roadmap and is not
+TRELYAN's to solve unilaterally. Public materials must therefore **not** claim FIPS 206 / FN-DSA
+conformance for the deterministic on-chain path (this repo's `PUBLIC_CLAIMS_HARDENING_2026-06-01.md`
+already flags the related "NIST FIPS 206 Falcon-1024" wording).
+
+**Honest limit of this analysis.** The eprint PDF body returns HTTP 403; the experimental section
+(which quantifies the per-call divergence probability) has **not** been read. The quantitative
+divergence rate is therefore unconfirmed here — which is *why* the 3-vector byte-identity KAT is
+corroboration, not proof, and why **no public claim should be made about that rate** until the section
+is read. This addendum makes no numeric claim about it.
