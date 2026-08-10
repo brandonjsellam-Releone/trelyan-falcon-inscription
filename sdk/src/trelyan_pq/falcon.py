@@ -46,7 +46,11 @@ PUBKEY_SIZE = PUBKEY_LEN          # 1793
 PRIVKEY_SIZE = 2305              # FALCON_PRIVKEY_SIZE(10)
 CURRENT_SALT_VERSION = 0
 
-_DEFAULT_LIB_PATH = os.environ.get("FALCON_DET1024_LIB", "./libfalcondet1024.so")
+# NO cwd-relative fallback: a dlopen path containing a slash resolves against the process cwd, so a
+# "./libfalcondet1024.so" default let anyone who can write to cwd (or lure the operator into running
+# from a shared directory) supply the keygen/sign implementation itself — CWE-426. Absent an explicit
+# FALCON_DET1024_LIB the load now fails closed with instructions rather than silently trusting cwd.
+_DEFAULT_LIB_PATH = os.environ.get("FALCON_DET1024_LIB", "")
 
 
 def _lock_pages(buf: "ctypes.Array") -> bool:
@@ -107,6 +111,13 @@ def _bind(lib: ctypes.CDLL) -> ctypes.CDLL:
 
 
 def _load(lib_path: str) -> ctypes.CDLL:
+    if not lib_path:
+        raise RuntimeError(
+            "FALCON_DET1024_LIB is not set. Build the deterministic Falcon-1024 shared library (see "
+            "this module's docstring) and set FALCON_DET1024_LIB to its ABSOLUTE path. There is no "
+            "current-directory fallback: loading the signing core from a relative path would let "
+            "anything writable in the working directory replace it."
+        )
     try:
         return _bind(ctypes.CDLL(lib_path))
     except OSError as e:
