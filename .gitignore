@@ -8,6 +8,14 @@ __pycache__/
 .venv/
 venv/
 
+# Build artifacts are NEVER committed. A checked-in wheel/sdist silently goes stale against the
+# source next to it while keeping the same version number, so `pip install sdk/dist/*.whl` and
+# `pip install trelyan-pq` can be different code under one version string. Releases are built and
+# signed in CI (.github/workflows/release.yml), which is the only provenance-bearing path.
+dist/
+build/
+*.egg-info/
+
 # native Falcon shared library (build locally per falcon_det1024.py header)
 *.so
 *.dylib
