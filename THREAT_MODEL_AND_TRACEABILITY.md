@@ -181,10 +181,20 @@ attack (different M ⇒ different target/tape ⇒ no structured difference). Exp
 *identical* message under an identical key across two divergent evaluations — in TRELYAN terms,
 re-inscribing the identical artifact into the identical cell on the identical network.
 
-**Residual risk, ranked.** (a) An operator who retains a key via the general API and re-signs the same
-M across two builds that diverge (different compiler/flags, a caller who built without the FPEMU
-config, or a future re-pin) → key recovery. (b) A caller who loads an arbitrary `.so` at
-`FALCON_DET1024_LIB` that is not the pinned FPEMU build, since nothing checks it at runtime.
+**Residual risk, ranked.** (a) **Caller-side retry of `inscribe()`.** This is the most *reachable*
+path, because it needs no deliberate re-inscription — only ordinary error handling.
+`TrelyanInscriptionClient.inscribe()` signs internally (`inscription.py:136`), so **every call
+re-signs**. A caller who wraps it in a retry loop for a network blip or a fee spike re-signs the
+identical `(privkey, cell_id, artifact_hash, genesis_hash)`, producing an identical M — precondition
+P2, met by accident. Nothing in the docstring warns against this.
+*Note the SDK's own two-strategy submit is NOT affected*: `sig` is computed once and the fallback at
+`inscription.py:149` re-sends the same `args` tuple rather than re-signing. The exposure is external
+retry, not internal fallback. **Fix: document that `inscribe()` must not be wrapped in a retry, and
+provide a sign-once/submit-many entry point that caches the signed args and re-submits those bytes.**
+(b) An operator who retains a key via the general API and re-signs the same M across two builds that
+diverge (different compiler/flags, a caller who built without the FPEMU config, or a future re-pin)
+→ key recovery. (c) A caller who loads an arbitrary `.so` at `FALCON_DET1024_LIB` that is not the
+pinned FPEMU build, since nothing checks it at runtime.
 
 **Recommended controls (constitution-compliant — Tier 3 SDK Python or the eventual Tier 1 Rust port;
 never a forbidden language), in order:** (1) make the sealed sign-once path the documented default and
