@@ -256,6 +256,51 @@ def test_flash_custody_rejected(algorand, deployed, accounts):
         do_inscribe(client, mallory, cell=cell, artifact_hash=artifact_hash, sig=falcon_sign(sk, m))
 
 
+def test_recorded_owner_who_no_longer_holds_is_rejected(algorand, deployed, accounts):
+    """C1(a): the OTHER conjunct. The recorded controlling owner who has parted with the ASA.
+
+    C1 is a conjunction - hold the Cell AND be the recorded controlling owner - but only (b) was
+    covered. test_flash_custody_rejected builds a holder who is not the owner; every other test
+    mints with `mint_cell(algorand, admin, admin)`, so the sender is always both. The state where
+    `assert exists and balance == UInt64(1)` is the DECIDING assert - recorded owner, no longer
+    holding - was never constructed, and deleting that line turned nothing red.
+
+    It is not a hypothetical state. `update_owner` is a separate, voluntary call, so a seller who
+    transfers the Cell ASA on a secondary market remains the recorded controlling owner until
+    someone calls it. Without (a), that seller could inscribe the buyer's cell - and C2 makes
+    inscription write-once while `update_owner` is blocked afterwards, so the buyer's cell would
+    be permanently consumed with the seller's artifact. That is the exact inverse of the
+    flash-custody vector, and it was the untested half.
+    """
+    client, app_id, admin = deployed
+    _, mallory = accounts
+    pk, sk = falcon_keypair()
+    cell = mint_cell(algorand, admin, admin)
+    artifact_hash = sha512_256(b"sold the cell, kept the record")
+    register(client, admin, cell, pk)
+
+    # Sell the ASA. Deliberately do NOT call update_owner: controlling_owner[cell] stays admin,
+    # which is precisely the configuration that isolates conjunct (a).
+    algorand.send.asset_opt_in(AssetOptInParams(sender=mallory.address, asset_id=cell))
+    algorand.send.asset_transfer(
+        AssetTransferParams(sender=admin.address, asset_id=cell, amount=1, receiver=mallory.address)
+    )
+
+    m = build_message(app_id, cell, artifact_hash, genesis())
+    with pytest.raises(Exception) as exc:
+        do_inscribe(client, admin, cell=cell, artifact_hash=artifact_hash, sig=falcon_sign(sk, m))
+
+    # Assert WHICH conjunct fired. A bare pytest.raises(Exception) here would pass even if the
+    # rejection came from (b), or from an unrelated failure, leaving (a) still untested.
+    detail = str(exc.value)
+    assert "sender does not hold the cell" in detail, (
+        "expected C1(a) - the balance check - to be the deciding assert, got: " + detail
+    )
+    assert "sender not controlling owner" not in detail, (
+        "C1(b) fired instead; admin should still BE the recorded owner in this scenario"
+    )
+
+
 # ---------------------------------------------------------------- A2: cross-cell replay
 def test_cross_cell_replay_rejected(algorand, deployed):
     """M binds cell_id, so a signature authorizing cell_a is invalid for cell_b -- even with the same
