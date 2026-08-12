@@ -40,7 +40,18 @@ SIG_COMPRESSED_MAXSIZE = 1423            # det = FALCON_SIG_COMPRESSED_MAXSIZE(1
 DET_COMPRESSED_HEADER = 0xBA             # 0x3A | 0x80  (deterministic compressed)
 CURRENT_SALT_VERSION = 0
 
-_LIB_PATH = os.environ.get("FALCON_DET1024_LIB", "./libfalcondet1024.so")
+# NO cwd-relative fallback. A dlopen path containing a slash resolves against the process
+# working directory, so a "./libfalcondet1024.so" default let anyone able to write to cwd - or
+# able to lure the operator into running from a shared or downloaded directory - supply the
+# keygen/sign implementation itself (CWE-426). Absent an explicit FALCON_DET1024_LIB the load
+# fails closed with instructions rather than silently trusting cwd.
+#
+# This is the same hardening applied to the SDK in eb67e4a (pre-audit findings TF-01/TF-02) on
+# 2026-08-10. That commit touched only sdk/, and THIS file - untouched since a806f63 - is the
+# copy that deploy_testnet.py and test_inscription.py actually import, so the fix landed
+# everywhere except the path that signs real inscriptions. `.gitignore` excludes *.so/*.dylib/
+# *.dll, so a planted library in the repo root does not appear in `git status` either.
+_LIB_PATH = os.environ.get("FALCON_DET1024_LIB", "")
 
 
 class _Shake256Context(ctypes.Structure):
@@ -49,6 +60,13 @@ class _Shake256Context(ctypes.Structure):
 
 
 def _load():
+    if not _LIB_PATH:
+        raise RuntimeError(
+            "FALCON_DET1024_LIB is not set. Build the deterministic Falcon-1024 shared library "
+            "(see this file's header) and set FALCON_DET1024_LIB to its ABSOLUTE path. There is "
+            "no current-directory fallback: loading the signing core from a relative path would "
+            "let anything writable in the working directory replace it."
+        )
     try:
         lib = ctypes.CDLL(_LIB_PATH)
     except OSError as e:
