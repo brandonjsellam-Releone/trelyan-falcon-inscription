@@ -207,6 +207,33 @@ jobs:
           TRELYAN_REQUIRE_KAT: "1"
         run: pytest tests/test_signature_kat.py -v
 
+      - name: Run the lib-gated security tests, and prove they were not skipped
+        working-directory: sdk
+        shell: bash
+        # Until 2026-08-12 these had NEVER executed in CI, on any event. `wire-format` runs the
+        # whole suite but does not build the library, so everything behind
+        # `skipif(not _lib_available())` skipped there; this job builds the library but ran only
+        # test_signature_kat.py. The intersection was empty, and the never-run set included the
+        # tests enforcing the constitution's two hardest crypto rules:
+        #   test_seal_wipes_private_key_buffer          - S2.3 zeroization
+        #   test_worker_stdout_carries_only_public_values - S2.3 no secrets in output
+        #   test_isolated_result_has_no_private_key
+        #   test_bad_build_fails_closed_without_consuming_cell
+        # plus isolated-signer containment and the signature fuzzers: 13 tests in total.
+        #
+        # The grep is the point. Without it a failed library build would put every one of those
+        # tests back to "skipped" and this job would go green again - reintroducing the exact
+        # defect, in the exact place it was just removed from. Passing must require that they RAN.
+        env:
+          TRELYAN_REQUIRE_KAT: "1"
+        run: |
+          set -o pipefail
+          pytest tests -v -rs 2>&1 | tee pytest-full.log
+          if grep -q "FALCON_DET1024_LIB not" pytest-full.log; then
+            echo "::error::lib-gated tests skipped in the one job that builds the library"
+            exit 1
+          fi
+
   testnet-e2e:
     name: TestNet end-to-end (manual; needs DEPLOYER_MNEMONIC secret + generated client)
     runs-on: ubuntu-latest
