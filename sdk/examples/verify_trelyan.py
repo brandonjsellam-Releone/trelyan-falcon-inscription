@@ -3,17 +3,26 @@
 TRELYAN reviewer verification — one command, no trust required.
   pip install trelyan-pq && python3 verify_trelyan.py
 Checks: [1] package constants  [2] pinned golden vectors (offline)
-        [3] live TestNet app 763809096 (bytecode fingerprint)
+        [3] live TestNet app 763809096 (bytecode fingerprint + source correspondence)
         [4] on-chain boxes (registered Falcon keys / inscription records)
         [5] message reconstruction for a live cell (byte-exact, recomputed locally)
 Read-only. Only dependency: trelyan-pq (stdlib otherwise).
 """
-import json, sys, base64, urllib.request
+import json, sys, base64, pathlib, urllib.request
 
 APP_ID = 763809096
-# Approval-program fingerprint, pinned 2026-06-17 (660 B). The contract blocks Update/Delete
-# (invariants I1/I5), so the deployed bytecode is fixed — this is a stable attestation target.
-EXPECTED_APPROVAL_SHA512_256 = "d24d9071209f526a2075542d9408295d78f83ca5ed4c8cc233000130dcc97d44"
+# The fingerprint of the program deployed on 2026-06-02, recorded here on 2026-06-17 (660 B).
+#
+# Read what this constant can and cannot tell you. Because the contract blocks Update and
+# Delete (invariants I1/I5) the deployed bytecode is immutable, so comparing it to this value
+# can only ever succeed. It is evidence that the application was not replaced; it is NOT
+# evidence that the deployment matches contracts/inscription.py, and it was previously
+# presented as though it were. Those are separate claims and only the second one matters to a
+# reviewer. The second is checked below, and needs the committed artifact to answer.
+PINNED_ON_CHAIN_SHA512_256 = "d24d9071209f526a2075542d9408295d78f83ca5ed4c8cc233000130dcc97d44"
+# Committed build artifact, when this script is run from a repo clone rather than downloaded
+# on its own. sdk/examples/ -> repo root -> contracts/out/.
+COMMITTED_TEAL = pathlib.Path(__file__).resolve().parents[2] / "contracts" / "out" / "TrelyanInscription.approval.teal"
 ALGOD = "https://testnet-api.algonode.cloud"
 TESTNET_GENESIS_B64 = "SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI="
 PASS, FAIL = 0, 0
@@ -47,9 +56,29 @@ check(f"app {APP_ID} exists", app.get("id") == APP_ID)
 ap = base64.b64decode(app["params"]["approval-program"])
 check("approval program fetched", len(ap) > 0, f"{len(ap)} bytes")
 fp = t.sha512_256(ap).hex()
-check("approval bytecode matches pinned fingerprint", fp == EXPECTED_APPROVAL_SHA512_256, fp[:16] + "...")
+check("deployed app not replaced since 2026-06-17 pin", fp == PINNED_ON_CHAIN_SHA512_256, fp[:16] + "...")
 print(f"        bytecode sha512_256: {fp}")
-print(f"        (pinned target: {EXPECTED_APPROVAL_SHA512_256[:16]}... — diff against your compile of contracts/inscription.py)")
+
+# The claim that actually matters: is the deployed program what the committed contract builds?
+# Answering it requires assembling the committed TEAL, so it is only possible from a repo
+# clone. When it cannot be answered it is reported as NOT CHECKED and counted as neither a
+# pass nor a failure - silently omitting it is how the weaker check above came to stand in for
+# this one.
+if COMMITTED_TEAL.exists():
+    _req = urllib.request.Request(ALGOD + "/v2/teal/compile", data=COMMITTED_TEAL.read_bytes(),
+                                  headers={"Content-Type": "text/plain"})
+    with urllib.request.urlopen(_req, timeout=20) as _r:
+        _built = base64.b64decode(json.load(_r)["result"])
+    _built_fp = t.sha512_256(_built).hex()
+    check("deployed bytecode matches the committed contract", _built_fp == fp, f"source builds to {_built_fp[:16]}...")
+    if _built_fp != fp:
+        print(f"        committed source builds to : {_built_fp}  ({len(_built)} B)")
+        print(f"        chain is actually serving  : {fp}  ({len(ap)} B)")
+        print("        -> the deployment predates the committed contract; see contracts/verify_deployment.py")
+else:
+    print("        source correspondence: NOT CHECKED (no committed artifact next to this script).")
+    print("        Run contracts/verify_deployment.py from a repo clone to compare the deployed")
+    print("        program against a fresh assembly of contracts/out/*.teal.")
 
 print("== [4] on-chain boxes ==")
 boxes = get(f"/v2/applications/{APP_ID}/boxes")["boxes"]

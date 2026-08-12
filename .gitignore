@@ -13,6 +13,7 @@ last_run.log
 __pycache__/
 *.pyc
 .venv/
+.venv-contracts/
 venv/
 
 # Build artifacts are NEVER committed. A checked-in wheel/sdist silently goes stale against the
