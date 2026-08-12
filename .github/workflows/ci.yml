@@ -93,7 +93,15 @@ jobs:
         # the digest gate below for a non-substantive reason. The tarball is LF on every OS
         # and is exactly what the pin (and verify.html) were computed from.
         run: |
-          curl -sL https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz | tar xz
+          # Download and extract as SEPARATE steps, with -f and retries. Piping `curl -sL` into
+          # `tar xz` had three problems, all seen in run 31626290777 (windows leg): without -f,
+          # curl exits 0 on an HTTP error and pipes the error PAGE into tar; without pipefail the
+          # pipeline's status is tar's anyway; and with no retry a transient blip fails the build.
+          # The observable result was "tar: Error is not recoverable: exiting now", which names
+          # the wrong component - the download failed, not the archive.
+          set -o pipefail
+          curl -sfL --retry 3 --retry-delay 2 --retry-all-errors             https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz             -o falcon-src.tar.gz
+          tar xzf falcon-src.tar.gz
           mv falcon-ce15e75bceb372867daf6b8e81918ab6978686eb falcon-src
 
       - name: Assert pinned-build digest + emulated FP backend (fail fast if upstream drifted)
@@ -273,7 +281,15 @@ jobs:
       # matching the signature-kat job above.
       - name: Fetch pinned Falcon source (commit ce15e75, tarball = byte-exact to the pin)
         run: |
-          curl -sL https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz | tar xz
+          # Download and extract as SEPARATE steps, with -f and retries. Piping `curl -sL` into
+          # `tar xz` had three problems, all seen in run 31626290777 (windows leg): without -f,
+          # curl exits 0 on an HTTP error and pipes the error PAGE into tar; without pipefail the
+          # pipeline's status is tar's anyway; and with no retry a transient blip fails the build.
+          # The observable result was "tar: Error is not recoverable: exiting now", which names
+          # the wrong component - the download failed, not the archive.
+          set -o pipefail
+          curl -sfL --retry 3 --retry-delay 2 --retry-all-errors             https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz             -o falcon-src.tar.gz
+          tar xzf falcon-src.tar.gz
           mv falcon-ce15e75bceb372867daf6b8e81918ab6978686eb falcon-src
 
       - name: Assert pinned-build digest + emulated FP backend (fail fast if upstream drifted)
