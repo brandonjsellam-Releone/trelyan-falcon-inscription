@@ -98,13 +98,39 @@ if iss:
     n = iss[0]; cell = int.from_bytes(n[2:], "big")
     bx = get(f"/v2/applications/{APP_ID}/box?name=" + urllib.parse.quote("b64:" + base64.b64encode(n).decode()))
     rec = base64.b64decode(bx["value"])
-    check(f"cell {cell}: inscription record read", len(rec) >= 32, f"{len(rec)} B")
-    # rebuild the message this cell's signature must have signed (byte-exact, locally):
+    # InscriptionRecord is an arc4.Struct, so the artifact hash is NOT at offset 0. The ARC4
+    # head packs the fixed-size fields in declaration order (contracts/inscription.py):
+    #   version         arc4.UInt8                  rec[0:1]
+    #   cell_id         arc4.UInt64                 rec[1:9]
+    #   artifact_hash   StaticArray[Byte, 32]       rec[9:41]   <- the 32 bytes that were signed
+    #   inscribed_round arc4.UInt64                 rec[41:49]
+    #   inscriber       arc4.Address                rec[49:81]
+    #   payload_uri     arc4.DynamicBytes           rec[81:83] offset -> tail
+    # This previously read rec[0:32], i.e. version || cell_id || the first 23 bytes of the hash,
+    # so M was rebuilt from bytes no signature ever covered. It went unnoticed because the only
+    # assertion was len(M) == 102, and build_message either raises or returns exactly 102 bytes
+    # - it cannot report the wrong hash. The checks below are chosen so they CAN fail.
+    check(f"cell {cell}: inscription record read", len(rec) >= 83, f"{len(rec)} B")
     gh = base64.b64decode(TESTNET_GENESIS_B64)
-    art32 = rec[:32] if len(rec) >= 32 else None
+    check("record version == 1", rec[0] == 1, f"0x{rec[0]:02x}")
+    # Independent cross-check, and the one that actually validates the offsets above: the cell id
+    # inside the record must equal the one in the box NAME. Two sources, one claim. (Note that
+    # comparing M's embedded hash against art32 would NOT have caught the old bug - both sides
+    # shift together - which is why the layout is pinned by this comparison instead.)
+    rec_cell = int.from_bytes(rec[1:9], "big")
+    check("record cell_id matches its box name", rec_cell == cell, f"record {rec_cell} vs box {cell}")
+    art32 = rec[9:41]
     M_live = t.build_message(APP_ID, cell, art32, gh)
-    check("domain-separated M rebuilt locally", len(M_live) == 102, "tag|app|cell|hash|genesis")
+    # Cross-check the SDK's message layout against the spec offsets derived here, so a drift in
+    # build_message shows up rather than being absorbed: tag(22)|app(8)|cell(8)|hash(32)|genesis(32).
+    check("M matches the spec layout at every field offset",
+          M_live[:22] == t.DOMAIN_TAG and M_live[22:30] == APP_ID.to_bytes(8, "big")
+          and M_live[38:70] == art32 and M_live[70:] == gh,
+          "tag|app|cell|hash|genesis")
+    print(f"        artifact_hash (on-chain) = {art32.hex()}")
     print(f"        M = {M_live.hex()[:64]}...")
+    print("        note: the signature is not stored on-chain (it is a call argument the AVM")
+    print("        verifies), so M is reconstructed here, not checked against a signature.")
 else:
     print("        (no inscription boxes yet on this app — registration-stage deployment)")
 try:
