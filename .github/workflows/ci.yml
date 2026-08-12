@@ -185,10 +185,31 @@ jobs:
         if: runner.os == 'Windows'
         shell: cmd
         # /fp:precise is MSVC's default (NOT /fp:fast) — keep it so FP semantics match.
+        # /EXPORT is load-bearing, not tidiness. MSVC exports NOTHING from a DLL without
+        # __declspec(dllexport) or explicit /EXPORT, whereas ELF and Mach-O export every
+        # non-static symbol. The upstream Falcon sources carry no dllexport annotations, and
+        # S2.6 forbids editing the audited reference to add them - so the exports are declared
+        # here, at link time, instead.
+        #
+        # Without this the DLL built, linked, and loaded, and had an EMPTY export table: every
+        # ctypes lookup raised, _lib_available() caught it, and all thirteen lib-gated tests
+        # "skipped" with the reason "FALCON_DET1024_LIB not built/set" - which was false, since
+        # the variable was set correctly to a real file. The Windows leg of this 3-OS
+        # byte-identity matrix therefore verified NOTHING from the day it was written, while
+        # reporting green, and the cross-platform reproducibility claim it exists to support
+        # (reviewer Q11/Q7) held only on Linux and macOS.
+        #
+        # The four names are exactly the SDK's audited binding surface, so the Windows export
+        # table is the allowlist: adding a binding without exporting it fails loudly here.
         run: |
           cd falcon-src
           cl /O2 /LD /DFALCON_UNALIGNED=0 /Fe:falcondet1024.dll ^
-            codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c
+            codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c ^
+            /link ^
+            /EXPORT:shake256_init_prng_from_system ^
+            /EXPORT:falcon_det1024_keygen ^
+            /EXPORT:falcon_det1024_sign_compressed ^
+            /EXPORT:falcon_det1024_verify_compressed
           echo FALCON_DET1024_LIB=%CD%\falcondet1024.dll>> %GITHUB_ENV%
 
       - name: Install SDK (dev extra)
