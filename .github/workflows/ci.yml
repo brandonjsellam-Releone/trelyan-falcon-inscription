@@ -17,9 +17,26 @@ jobs:
     # VECTOR key in sdk/tests/vectors/) were configuration without enforcement. The repo's
     # deployment path uses DEPLOYER_MNEMONIC, an Algorand mnemonic that controls its account
     # outright, so an accidentally committed .env is an irrevocable key disclosure in git history.
-    # Full history is scanned, not just the diff, so a secret introduced earlier is still caught.
+    #
+    # WHICH COMMITS ACTUALLY GET SCANNED, because it is not the same on every trigger and the
+    # difference is the whole value of this job. From gitleaks-action v2 at the pinned SHA,
+    # src/gitleaks.js:103-115: `push` and `pull_request` are given
+    #   --log-opts=--no-merges --first-parent <base>^..<head>
+    # i.e. ONLY the commits in that push or PR. Every other supported event (src/index.js:176 -
+    # `schedule`, `workflow_dispatch`) is run with no --log-opts at all, which is what makes
+    # gitleaks walk the entire history.
+    #
+    # This job previously carried `if: github.event_name != 'schedule'`, which excluded the one
+    # automatic trigger that scans everything. Verified on scheduled run 31368848691: the job
+    # does not appear at all. So push and PR each scanned a handful of commits, the weekly run
+    # scanned nothing, and full history was never covered on any automatic path - while the
+    # comment here claimed it was. A secret committed before the range being pushed was not
+    # caught by anything.
+    #
+    # Removing the condition is the fix: the Monday schedule now performs the full-history scan
+    # that makes the claim above true. fetch-depth: 0 below is what makes that possible, and was
+    # already correct - it was the trigger that was missing, not the checkout.
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
         with:
