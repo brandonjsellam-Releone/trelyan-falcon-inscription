@@ -34,3 +34,6 @@ build/
 
 # OS
 .DS_Store
+
+# local contract-test virtualenv (algokit-utils + pytest); never committed
+.venv-contracts/
