@@ -102,6 +102,28 @@ jobs:
         with:
           python-version: "3.13"
 
+      # The tag and the packaged version are two independent claims about which release this is,
+      # and nothing bound them. Tags v0.2.0 and v0.2.1 both carry `version = "0.1.0"` in
+      # sdk/pyproject.toml - so the first real run of this workflow would have built
+      # trelyan_pq-0.1.0-*.whl, then SLSA-attested and Sigstore-signed those bytes under a v0.2.2
+      # tag. The attestation would have been perfectly valid and described the wrong release.
+      #
+      # (Neither existing tag actually shipped an artifact: this workflow was first committed
+      # 2026-06-18, after both, and has never run. The mislabelling was latent, not published.)
+      - name: Tag must match the packaged version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(python -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('sdk/pyproject.toml').read_text())['project']['version'])")"
+          echo "tag=${tag}  pyproject=${pkg}"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match sdk/pyproject.toml version ${pkg}."
+            echo "::error::Bump the version and re-tag; do not sign artifacts that name a different release."
+            exit 1
+          fi
+
       - name: Build sdist + wheel (PEP 517, hatchling) from sdk/
         working-directory: sdk
         run: |

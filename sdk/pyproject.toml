@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "trelyan-pq"
-version = "0.1.0"
+version = "0.2.2"
 description = "Post-quantum (Falcon-1024) inscription tooling for Algorand: a deterministic signer in the exact encoding the native falcon_verify opcode accepts, on-chain message construction, and the pubkey-box-commit / 2048-byte arg-cap helpers."
 readme = "README.md"
 requires-python = ">=3.10"
