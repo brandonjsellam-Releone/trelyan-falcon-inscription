@@ -43,9 +43,12 @@ def sha512_256(data: bytes) -> bytes:
     return h.digest()
 
 
-def build_message(app_id: int, cell_id: int, artifact_hash: bytes, genesis: bytes) -> bytes:
-    # MUST byte-match the contract's _build_message (DOMAIN_TAG ‖ app_id ‖ cell_id ‖ hash ‖ genesis).
-    return DOMAIN_TAG + app_id.to_bytes(8, "big") + cell_id.to_bytes(8, "big") + artifact_hash + genesis
+# build_message is NOT redefined here. This file used to carry its own copy, which differed from
+# the canonical one in falcon_det1024.py by omitting the length checks - so a 31- or 33-byte
+# artifact hash produced a 101- or 103-byte M and was signed without complaint. This is the
+# script that signs REAL TestNet inscriptions, so it is the worst possible place for the lenient
+# copy to live. One definition, in the module this file already imports.
+build_message = falcon_det1024.build_message
 
 
 def box_refs(cell_id: int):

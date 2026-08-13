@@ -66,15 +66,10 @@ def box_refs(cell_id: int):
     return [b"k_" + k, b"o_" + k, b"i_" + k]
 
 
-def build_message(app_id: int, cell_id: int, artifact_hash: bytes, genesis_id_hash: bytes) -> bytes:
-    assert len(artifact_hash) == 32 and len(genesis_id_hash) == 32
-    return (
-        DOMAIN_TAG
-        + app_id.to_bytes(8, "big")
-        + cell_id.to_bytes(8, "big")
-        + artifact_hash
-        + genesis_id_hash
-    )
+# One definition, imported rather than restated. A test that reimplements the thing it is
+# testing agrees with itself by construction; this one now exercises the same function the
+# deploy script and the SDK use.
+build_message = falcon_det1024.build_message
 
 
 def sha512_256(data: bytes) -> bytes:
