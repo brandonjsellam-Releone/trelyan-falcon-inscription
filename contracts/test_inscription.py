@@ -326,6 +326,52 @@ def test_register_rejects_clawback_cell(algorand, deployed):
         register(client, admin, res.asset_id, pk)
 
 
+def test_register_rejects_freeze_cell(algorand, deployed):
+    """The freeze guard (inscription.py:206), which no test reached.
+
+    test_register_rejects_clawback_cell's docstring claims to cover "clawback (or freeze/manager)"
+    but sets only `clawback`, so it trips :205 and :206 is never evaluated. The three asserts are
+    sequential, so one fixture can only ever exercise the first one it violates.
+
+    A live freeze address is not cosmetic: it can freeze the holder AFTER registration, which is
+    the AssetHoldingGet timing vector the hardening closed at the source.
+    """
+    client, app_id, admin = deployed
+    pk, _ = falcon_keypair()
+    res = algorand.send.asset_create(
+        AssetCreateParams(sender=admin.address, total=1, decimals=0, unit_name="FRZ",
+                          asset_name="freezable", freeze=admin.address, note=_next_note("trelyan-frz"))
+    )
+    with pytest.raises(Exception) as exc:
+        register(client, admin, res.asset_id, pk)
+    detail = str(exc.value)
+    assert "cell must have no freeze" in detail, (
+        "expected the freeze guard to be the deciding assert, got: " + detail
+    )
+
+
+def test_register_rejects_manager_cell(algorand, deployed):
+    """The manager guard (inscription.py:207), which no test reached.
+
+    The most consequential of the three: a live manager can RE-ADD clawback and freeze after
+    registration, so leaving it set restores both vectors the other two guards close. The cell's
+    configuration has to be immutable, not merely clean at registration time.
+    """
+    client, app_id, admin = deployed
+    pk, _ = falcon_keypair()
+    res = algorand.send.asset_create(
+        AssetCreateParams(sender=admin.address, total=1, decimals=0, unit_name="MGR",
+                          asset_name="mutable-config", manager=admin.address,
+                          note=_next_note("trelyan-mgr"))
+    )
+    with pytest.raises(Exception) as exc:
+        register(client, admin, res.asset_id, pk)
+    detail = str(exc.value)
+    assert "cell manager must be cleared" in detail, (
+        "expected the manager guard to be the deciding assert, got: " + detail
+    )
+
+
 def test_register_rejects_bad_pubkey_length(algorand, deployed):
     """A9 hardening: committed key length validated at register (the only entry point)."""
     client, app_id, admin = deployed
