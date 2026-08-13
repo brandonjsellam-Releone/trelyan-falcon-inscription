@@ -132,12 +132,21 @@ if iss:
     print("        note: the signature is not stored on-chain (it is a call argument the AVM")
     print("        verifies), so M is reconstructed here, not checked against a signature.")
 else:
-    print("        (no inscription boxes yet on this app — registration-stage deployment)")
+    print("        (no inscription boxes yet on this app - registration-stage deployment)")
+# Whether a full local signature verification is possible depends on the C LIBRARY loading, not
+# on the import succeeding. `verify` is re-exported from trelyan_pq/__init__.py, so the import
+# always succeeds and the except below was unreachable: this printed "available locally: YES" on
+# machines with no library at all. Force the load and report what actually happened.
 try:
-    from trelyan_pq import verify as falcon_verify  # needs compiled deterministic-falcon lib
-    print("        full falcon verify available locally: YES (run verify(M, sig, pk))")
+    from trelyan_pq import falcon as _falcon
+    _falcon.default_signer()._lib_ref()   # private on purpose: the public API is lazy, and a lazy
+                                          # probe answers "did the import work", not "is the
+                                          # signer usable", which is the question being asked
+    print("        full falcon verify available locally: YES")
+    print("        (signature order is verify(sig, pubkey, message) - sig FIRST, not the message)")
 except Exception as e:
-    print(f"        full local falcon verify: optional C lib not built ({type(e).__name__}) — structural checks above stand")
+    print(f"        full local falcon verify: NOT available ({type(e).__name__}: {str(e).splitlines()[0][:90]})")
+    print("        the structural checks above stand on their own; they do not need the C library")
 
 print(f"\n== RESULT: {PASS} passed, {FAIL} failed ==")
 sys.exit(1 if FAIL else 0)
