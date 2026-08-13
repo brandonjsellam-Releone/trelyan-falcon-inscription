@@ -9,6 +9,31 @@ authorize a TRELYAN inscription ("no Ed25519 anywhere in the authorization path"
 `sdk/docs/INTEROP_algo-pqc-kit.md` and upstream `quantachain/algo-pqc-kit` issue #1.
 
 ────────────────────────────────────────────────────────────────────────────────────────────────
+STATUS — READ BEFORE CITING THIS FILE AS EVIDENCE (TCE-28)
+
+**This KAT has produced ZERO comparisons to date.** Everything below describes what it will check
+once it can run; none of it has run. Do not read the alignment spec as a verified property.
+
+Two independent reasons, and the first is the one people assume is the only one:
+
+  1. Nothing installs `algo-pqc-kit`. `sdk/pyproject.toml:28-31` declares only `algorand` and
+     `dev = ["pytest>=8"]`; both CI test jobs run `pip install -e ".[dev]"`. All three differential
+     tests carry `@requires_apk` and skip on every run.
+  2. **Installing the package is necessary but NOT sufficient.** `_ApkAdapter`'s two methods are
+     wired to a *guessed* upstream API shape (`algo_pqc_kit.account.FalconAccount.from_private_key`
+     / `.public_key` / `.sign`) and raise `NotImplementedError` -> skip if that shape differs. The
+     upstream API still has to be confirmed with the maintainer (issue #1).
+
+The golden fixture IS populated (1793-byte pubkey, 2305-byte privkey, 3 vectors), so this is a
+working test wired to a dependency no environment provides — which is exactly why it reads green.
+
+Contrast worth noting: `test_signature_kat.py` is armed with `TRELYAN_REQUIRE_KAT=1` in CI, so a
+skip there fails the job. The equivalent guard here is `TRELYAN_REQUIRE_INTEROP=1` (see the bottom
+of this file). **CI does not set it**, because the dependency genuinely is not available yet — it
+exists so that the day upstream is pinned, one environment variable turns "silently inert" into
+"loudly broken", and so that the inertness is testable on demand rather than taken on trust.
+
+────────────────────────────────────────────────────────────────────────────────────────────────
 THE ALIGNMENT SPEC — what BOTH signers must emit, byte-for-byte (this is the reconcile contract):
   * Variant : Deterministic Falcon-1024 (`falcon_det1024`), COMPRESSED encoding.
   * Header  : sig[0] == 0xBA  (== 0x3A | 0x80, the deterministic-mode marker — NOT standard 0x3A).
@@ -205,3 +230,37 @@ def test_cross_verify_and_determinism_between_signers():
             assert signer.sign(privkey, m) == apk_sig, f"{v['name']}: C signer != algo-pqc-kit signer"
     except NotImplementedError as e:
         pytest.skip(f"_ApkAdapter not wired yet (issue #1): {e}")
+
+
+# --- Guard: make the inertness detectable on demand (TCE-28) ------------------------------------
+# Mirrors `TRELYAN_REQUIRE_KAT` in test_signature_kat.py. CI does NOT set TRELYAN_REQUIRE_INTEROP,
+# because algo-pqc-kit genuinely is not installable into the test environment yet. The value is
+# that "has this ever actually run?" becomes a question you can answer by running something,
+# instead of one you answer by reading three skip decorators and hoping.
+def test_interop_kat_actually_runs_when_required():
+    if os.environ.get("TRELYAN_REQUIRE_INTEROP") != "1":
+        pytest.skip(
+            "set TRELYAN_REQUIRE_INTEROP=1 to require a LIVE algo-pqc-kit differential. "
+            "Unset, this KAT contributes zero comparisons — see the STATUS block at the top."
+        )
+    assert _APK.available, (
+        "algo-pqc-kit is not installed, so all three differential tests skip. Add an "
+        "`interop = [\"algo-pqc-kit\"]` extra to sdk/pyproject.toml once the upstream API is "
+        "pinned (quantachain/algo-pqc-kit issue #1)."
+    )
+    assert _populated(), "det1024_kat.json is the unpopulated sentinel — nothing to compare against"
+
+    # Installed is not the same as wired: _ApkAdapter is written against a GUESSED upstream API
+    # and degrades to NotImplementedError -> skip if that guess is wrong. Prove it resolves.
+    privkey = bytes.fromhex(_FIX["privkey_hex"])
+    try:
+        derived = _APK.pubkey_from_privkey(privkey)
+    except NotImplementedError as exc:
+        raise AssertionError(
+            f"algo-pqc-kit is installed but _ApkAdapter is not wired to its real API: {exc}. "
+            f"Installing the package is necessary but not sufficient (see STATUS item 2)."
+        ) from exc
+    assert derived == bytes.fromhex(_FIX["pubkey_hex"]), (
+        "algo-pqc-kit derives a DIFFERENT public key from the committed private key — the two "
+        "layers do not share a keypair, which is the premise this whole KAT rests on"
+    )
