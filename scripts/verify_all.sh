@@ -7,7 +7,7 @@
 #   Axis C  byte-identity KAT vs the committed golden         (tests/test_signature_kat.py)
 #   Axis D  read-only on-chain verify of the deployed app     (examples/verify_trelyan.py) [needs network]
 #
-# Mirrors the sdk/ci/ci.yml `signature-kat` job recipe EXACTLY: tarball fetch of commit
+# Mirrors the .github/workflows/ci.yml `signature-kat` job recipe EXACTLY: tarball fetch of commit
 # ce15e75b... (NOT git clone — autocrlf would corrupt the digest), the digest+FP gate, the
 # build flags `-O3 -fPIC -DFALCON_UNALIGNED=0 -fno-strict-aliasing -shared` over the exact
 # 11-file source list, and TRELYAN_REQUIRE_KAT=1 so the KAT fails (not skips) if unpopulated.
