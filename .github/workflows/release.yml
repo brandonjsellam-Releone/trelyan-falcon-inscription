@@ -29,10 +29,62 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # 0. The tests must pass before anything is built, signed or attested.
+  #
+  # This job did not exist. The graph was build -> provenance -> cosign-sign ->
+  # pypi-publish, with `build`'s only substantive step being `python -m build`, and no
+  # occurrence of `pytest` anywhere in this file. A tag therefore produced a signed,
+  # SLSA-attested, Rekor-logged artifact without one test having run.
+  #
+  # The attestations were never wrong about this - SLSA provenance attests to BUILD
+  # provenance and does not claim tests passed, and RELEASES.md's verify commands say
+  # exactly that. The gap is that "signed and attested" reads as "vouched for" to almost
+  # every downstream consumer, and here it vouched only for where the bytes came from.
+  #
+  # Cross-workflow `needs:` does not exist in GitHub Actions, so ci.yml cannot gate this
+  # one; the check has to be duplicated here. That is why it is a small, fast job rather
+  # than the full 3-OS matrix - it must be cheap enough that nobody is tempted to skip it.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Suite must pass before anything is signed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout (pinned commit recorded in the run log)
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Run the SDK suite
+        working-directory: sdk
+        run: |
+          set -o pipefail
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pytest tests -v 2>&1 | tee pytest.log
+          # Assert the suite actually EXERCISED something. pytest exits 5 on "no tests
+          # collected", but a suite that silently shrank still exits 0 - and a release gate
+          # that passes because nothing ran is worse than no gate, since it carries a
+          # signature saying otherwise.
+          executed=$(grep -cE "^tests/.* (PASSED|FAILED)" pytest.log || true)
+          echo "tests executed: $executed"
+          if [ "$executed" -lt 15 ]; then
+            echo "::error::only $executed tests executed before a signed release; expected 15+"
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
   # 1. Build the distribution artifacts and emit their sha256 hashes for SLSA.
   # ---------------------------------------------------------------------------
   build:
     name: Build sdist + wheel
+    needs: [test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
