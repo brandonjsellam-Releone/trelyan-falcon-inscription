@@ -93,7 +93,15 @@ jobs:
         # the digest gate below for a non-substantive reason. The tarball is LF on every OS
         # and is exactly what the pin (and verify.html) were computed from.
         run: |
-          curl -sL https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz | tar xz
+          # Download and extract as SEPARATE steps, with -f and retries. Piping `curl -sL` into
+          # `tar xz` had three problems, all seen in run 31626290777 (windows leg): without -f,
+          # curl exits 0 on an HTTP error and pipes the error PAGE into tar; without pipefail the
+          # pipeline's status is tar's anyway; and with no retry a transient blip fails the build.
+          # The observable result was "tar: Error is not recoverable: exiting now", which names
+          # the wrong component - the download failed, not the archive.
+          set -o pipefail
+          curl -sfL --retry 3 --retry-delay 2 --retry-all-errors             https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz             -o falcon-src.tar.gz
+          tar xzf falcon-src.tar.gz
           mv falcon-ce15e75bceb372867daf6b8e81918ab6978686eb falcon-src
 
       - name: Assert pinned-build digest + emulated FP backend (fail fast if upstream drifted)
@@ -185,10 +193,31 @@ jobs:
         if: runner.os == 'Windows'
         shell: cmd
         # /fp:precise is MSVC's default (NOT /fp:fast) — keep it so FP semantics match.
+        # /EXPORT is load-bearing, not tidiness. MSVC exports NOTHING from a DLL without
+        # __declspec(dllexport) or explicit /EXPORT, whereas ELF and Mach-O export every
+        # non-static symbol. The upstream Falcon sources carry no dllexport annotations, and
+        # S2.6 forbids editing the audited reference to add them - so the exports are declared
+        # here, at link time, instead.
+        #
+        # Without this the DLL built, linked, and loaded, and had an EMPTY export table: every
+        # ctypes lookup raised, _lib_available() caught it, and all thirteen lib-gated tests
+        # "skipped" with the reason "FALCON_DET1024_LIB not built/set" - which was false, since
+        # the variable was set correctly to a real file. The Windows leg of this 3-OS
+        # byte-identity matrix therefore verified NOTHING from the day it was written, while
+        # reporting green, and the cross-platform reproducibility claim it exists to support
+        # (reviewer Q11/Q7) held only on Linux and macOS.
+        #
+        # The four names are exactly the SDK's audited binding surface, so the Windows export
+        # table is the allowlist: adding a binding without exporting it fails loudly here.
         run: |
           cd falcon-src
           cl /O2 /LD /DFALCON_UNALIGNED=0 /Fe:falcondet1024.dll ^
-            codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c
+            codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c ^
+            /link ^
+            /EXPORT:shake256_init_prng_from_system ^
+            /EXPORT:falcon_det1024_keygen ^
+            /EXPORT:falcon_det1024_sign_compressed ^
+            /EXPORT:falcon_det1024_verify_compressed
           echo FALCON_DET1024_LIB=%CD%\falcondet1024.dll>> %GITHUB_ENV%
 
       - name: Install SDK (dev extra)
@@ -206,6 +235,33 @@ jobs:
         env:
           TRELYAN_REQUIRE_KAT: "1"
         run: pytest tests/test_signature_kat.py -v
+
+      - name: Run the lib-gated security tests, and prove they were not skipped
+        working-directory: sdk
+        shell: bash
+        # Until 2026-08-12 these had NEVER executed in CI, on any event. `wire-format` runs the
+        # whole suite but does not build the library, so everything behind
+        # `skipif(not _lib_available())` skipped there; this job builds the library but ran only
+        # test_signature_kat.py. The intersection was empty, and the never-run set included the
+        # tests enforcing the constitution's two hardest crypto rules:
+        #   test_seal_wipes_private_key_buffer          - S2.3 zeroization
+        #   test_worker_stdout_carries_only_public_values - S2.3 no secrets in output
+        #   test_isolated_result_has_no_private_key
+        #   test_bad_build_fails_closed_without_consuming_cell
+        # plus isolated-signer containment and the signature fuzzers: 13 tests in total.
+        #
+        # The grep is the point. Without it a failed library build would put every one of those
+        # tests back to "skipped" and this job would go green again - reintroducing the exact
+        # defect, in the exact place it was just removed from. Passing must require that they RAN.
+        env:
+          TRELYAN_REQUIRE_KAT: "1"
+        run: |
+          set -o pipefail
+          pytest tests -v -rs 2>&1 | tee pytest-full.log
+          if grep -q "FALCON_DET1024_LIB not" pytest-full.log; then
+            echo "::error::lib-gated tests skipped in the one job that builds the library"
+            exit 1
+          fi
 
   testnet-e2e:
     name: TestNet end-to-end (manual; needs DEPLOYER_MNEMONIC secret + generated client)
@@ -225,7 +281,15 @@ jobs:
       # matching the signature-kat job above.
       - name: Fetch pinned Falcon source (commit ce15e75, tarball = byte-exact to the pin)
         run: |
-          curl -sL https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz | tar xz
+          # Download and extract as SEPARATE steps, with -f and retries. Piping `curl -sL` into
+          # `tar xz` had three problems, all seen in run 31626290777 (windows leg): without -f,
+          # curl exits 0 on an HTTP error and pipes the error PAGE into tar; without pipefail the
+          # pipeline's status is tar's anyway; and with no retry a transient blip fails the build.
+          # The observable result was "tar: Error is not recoverable: exiting now", which names
+          # the wrong component - the download failed, not the archive.
+          set -o pipefail
+          curl -sfL --retry 3 --retry-delay 2 --retry-all-errors             https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz             -o falcon-src.tar.gz
+          tar xzf falcon-src.tar.gz
           mv falcon-ce15e75bceb372867daf6b8e81918ab6978686eb falcon-src
 
       - name: Assert pinned-build digest + emulated FP backend (fail fast if upstream drifted)
