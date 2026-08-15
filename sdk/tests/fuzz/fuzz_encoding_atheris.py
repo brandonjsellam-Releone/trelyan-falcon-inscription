@@ -145,9 +145,23 @@ def _fuzz_verify(fdp: "atheris.FuzzedDataProvider") -> None:
     pubkey = fdp.ConsumeBytes(fdp.ConsumeIntInRange(0, trelyan_pq.PUBKEY_LEN + 4))
     message = fdp.ConsumeBytes(fdp.ConsumeIntInRange(0, 256))
 
+    # A wrong-length pubkey is a CALLER ERROR, not a verification failure, and verify() now
+    # rejects it before the FFI call. That guard is the fix for a real out-of-bounds read: the C
+    # function takes no pubkey length and reads 1793 bytes unconditionally, so this harness was
+    # feeding it short buffers and asserting "must not crash" — while the crash was exactly what
+    # the code did. (It never ran: this file is referenced by no workflow.)
+    #
+    # So a ValueError on a mis-sized pubkey is the EXPECTED result and must not be reported as a
+    # finding. Every other exception still is.
     try:
         result = _SIGNER.verify(bytes(sig), pubkey, message)
-    except Exception as exc:  # noqa: BLE001 — any raise from verify() is the finding
+    except ValueError as exc:
+        if len(pubkey) != trelyan_pq.PUBKEY_LEN:
+            return  # correct rejection of a mis-sized key — nothing further to assert
+        raise AssertionError(
+            f"verify() raised ValueError on a CORRECTLY sized pubkey: {exc}"
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — any other raise from verify() is the finding
         raise AssertionError(
             f"verify() raised {type(exc).__name__} on fuzz input (must return False, not raise)"
         ) from exc
