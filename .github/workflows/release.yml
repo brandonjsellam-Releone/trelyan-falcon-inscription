@@ -61,21 +61,60 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Run the SDK suite
+      # The pinned Falcon source, byte-exact to the commit go-algorand vendors. Without this the
+      # release gate ran `pytest` with no shared library, every lib-gated test SKIPPED, and the
+      # 15-test floor was satisfied entirely by tests that touch no cryptography — after which the
+      # artifact was signed and SLSA-attested. Locally that is 59 passed, 19 skipped: the gate goes
+      # green while the 19 tests it exists to protect never execute.
+      #
+      # Mirrors ci.yml's signature-kat job deliberately. A release must not be held to a WEAKER
+      # standard than a pull request.
+      - name: Fetch pinned Falcon source (commit ce15e75…)
+        shell: bash
+        run: |
+          set -o pipefail
+          curl -sfL --retry 3 --retry-delay 2 --retry-all-errors             https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz             -o falcon-src.tar.gz
+          tar xzf falcon-src.tar.gz
+          mv falcon-ce15e75bceb372867daf6b8e81918ab6978686eb falcon-src
+
+      - name: Assert pinned-build digest + emulated FP backend
+        run: python sdk/ci/verify_pinned_digest.py falcon-src
+
+      - name: Build the deterministic Falcon-1024 shared library
+        shell: bash
+        run: |
+          cd falcon-src
+          EXT=so; [ "$(uname)" = "Darwin" ] && EXT=dylib
+          cc -O3 -fPIC -DFALCON_UNALIGNED=0 -fno-strict-aliasing -shared -o "libfalcondet1024.$EXT"             codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c
+          echo "FALCON_DET1024_LIB=$PWD/libfalcondet1024.$EXT" >> "$GITHUB_ENV"
+
+      - name: Run the SDK suite — and prove the crypto tests were not skipped
         working-directory: sdk
+        shell: bash
+        env:
+          # Makes a still-unpopulated KAT fixture FAIL rather than skip.
+          TRELYAN_REQUIRE_KAT: "1"
         run: |
           set -o pipefail
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-          pytest tests -v 2>&1 | tee pytest.log
-          # Assert the suite actually EXERCISED something. pytest exits 5 on "no tests
-          # collected", but a suite that silently shrank still exits 0 - and a release gate
-          # that passes because nothing ran is worse than no gate, since it carries a
-          # signature saying otherwise.
+          pytest tests -v -rs 2>&1 | tee pytest.log
+
+          # Assert the suite actually EXERCISED something. pytest exits 5 on "no tests collected",
+          # but a suite that silently shrank still exits 0 — and a release gate that passes on a
+          # shrunken suite is not a gate.
           executed=$(grep -cE "^tests/.* (PASSED|FAILED)" pytest.log || true)
           echo "tests executed: $executed"
           if [ "$executed" -lt 15 ]; then
             echo "::error::only $executed tests executed before a signed release; expected 15+"
+            exit 1
+          fi
+
+          # The floor above counts tests, not COVERAGE. A run with the library missing satisfies it
+          # comfortably while every Falcon test skips, which is exactly the state this job was in.
+          # This grep is what makes the floor mean something.
+          if grep -q "FALCON_DET1024_LIB not" pytest.log; then
+            echo "::error::lib-gated crypto tests skipped in a job that builds the library — refusing to sign"
             exit 1
           fi
 
