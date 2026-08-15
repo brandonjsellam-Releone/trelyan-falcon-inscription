@@ -11,6 +11,17 @@
 FROM python:3.13-slim@sha256:c33f0bc4364a6881bed1ec0cc2665e6c53c87a43e774aaeab88e6f17af105e4f
 
 # Pin the published verification package (the only dependency; stdlib otherwise).
+# Pins the latest PUBLISHED release, which is deliberately NOT the version in sdk/pyproject.toml.
+#
+# This image installs from PyPI, so it can only pin something that exists there. As of 2026-08-15
+# PyPI has exactly one release, 0.1.0, while the source tree declares 0.2.2 — a tree ahead of its
+# last release is normal, and a hermetic checker is right to verify a real published artifact
+# rather than an unreleased number.
+#
+# The hazard is drift in the other direction: when a new version ships, this pin must move with it,
+# or an auditor runs a checker for a different release from the one they are reading. release.yml
+# enforces that at tag time; sdk/tests/test_version_is_single_sourced.py requires this note to
+# exist while the two differ, so the divergence cannot become silent.
 RUN pip install --no-cache-dir "trelyan-pq==0.1.0"
 
 WORKDIR /trelyan

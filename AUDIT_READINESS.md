@@ -16,7 +16,10 @@ start on day one without reconstructing the trust surface.
 > **Relationship to existing docs.** This file is the *security-audit* scope sheet (what an external
 > firm should attack and confirm). It does **not** replace:
 > - `AUDIT_READINESS_PACK.md` / `AUDITOR_HANDOFF.md` — the *formal-verification* brief (the I1–I5 /
->   C1–C5 proof obligations and the A1–A9 known-items ledger). Read that for the proof-of-invariants ask.
+>   C1–C5 proof obligations and the A1–A9 known-items ledger).
+>   **NOT YET WRITTEN — neither file exists in this repository.** The I1–I5 / C1–C5 obligations are
+>   stated in `TRELYAN_PROTOCOL_SPEC_v0.2.md` and exercised by `contracts/test_inscription.py`;
+>   the A1–A9 ledger lives in `THREAT_MODEL_AND_TRACEABILITY.md` §6. Read those instead.
 > - `THREAT_MODEL_AND_TRACEABILITY.md` — actors, trust boundaries, and the invariant→test→code matrix.
 > - `SECURITY.md` — disclosure policy and the in/out-of-scope statement this sheet refines.
 > - `REVIEWER.md` — the 5-minute, read-only reproduction (the **reproduction entry**, below).
@@ -89,10 +92,15 @@ histories — that gap is exactly the engagement.
 
 - **Commit-at-mint, fixed:** the full 1793-byte Falcon public key is written once at
   `register_cell` and never rewritten; length (`PUBKEY_LEN = 1793`) and header byte (`0x0A`, logn=10)
-  are validated at the **only** point a key enters state (≈L210–215). Evidence: `contracts/inscription.py`,
-  `CELL_MINT_SPEC.md`.
-- **No rotation / loss is irrecoverable by design** (intentional per I4/I5); disclosed to holders in
-  `GOVERNANCE_AND_LIFECYCLE_POLICY.md`.
+  are validated at the **only** point a key enters state (≈L210–215). Evidence:
+  `contracts/inscription.py` and its tests. (`CELL_MINT_SPEC.md` was cited here and **does not
+  exist**; the mint semantics are specified in `TRELYAN_PROTOCOL_SPEC_v0.2.md` §4–§5.)
+- **No rotation / loss is irrecoverable by design** (intentional per I4/I5).
+  **The claim that this is "disclosed to holders in `GOVERNANCE_AND_LIFECYCLE_POLICY.md`" was
+  removed: that document does not exist.** This is the one missing-document citation that mattered,
+  because it asserted a disclosure had been made to cell holders. Irrecoverability is a real
+  property of the design and holders should be told about it — writing that policy is outstanding
+  work, not something this file can point at.
 - **Sign-once-destroy (off-chain, defense-in-depth):** `sdk/src/trelyan_pq/seal.py` generates a
   keypair, signs the one message, and wipes the private-key buffer best-effort. **In scope:** the
   fail-closed ordering (tripwire before keygen; wipe in `finally`; record after self-verify). **Out
@@ -172,7 +180,7 @@ auditor spends week one on the real surface, not rediscovery.
 | CI | `.github/workflows/ci.yml` | wire-format / verify-live / signature-kat (3-OS) / testnet-e2e + a sanitizer (alignment/UBSan) gate. |
 | Encoding / budget / arg-order memos | `contracts/FALCON_ENCODING_2026-06-01.md`, `contracts/FALCON_BUDGET_2026-06-01.md`, `contracts/A1_RESOLUTION_2026-06-01.md` | How encoding, opcode cost, and argument order were pinned, with sources. |
 | Threat model & traceability | `THREAT_MODEL_AND_TRACEABILITY.md` | Actors, boundaries, invariant→test→code matrix, reproduction, TestNet checklist. |
-| Formal-verification brief | `AUDIT_READINESS_PACK.md`, `AUDITOR_HANDOFF.md` | The I1–I5 / C1–C5 proof obligations + A1–A9 ledger. |
+| Formal-verification brief | **not yet written** (`AUDIT_READINESS_PACK.md` / `AUDITOR_HANDOFF.md` are cited elsewhere but do not exist) | Obligations are in `TRELYAN_PROTOCOL_SPEC_v0.2.md`; the A1–A9 ledger is in `THREAT_MODEL_AND_TRACEABILITY.md` §6. |
 | Spec | `TRELYAN_PROTOCOL_SPEC_v0.2.md` | Message (§4), checks (§5), threat model (§6), honesty ledger. |
 | Disclosure policy | `SECURITY.md` | Private reporting + the test-vector-key note. |
 
