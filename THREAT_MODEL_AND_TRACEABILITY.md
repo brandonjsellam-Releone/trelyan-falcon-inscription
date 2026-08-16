@@ -80,17 +80,25 @@ C library (`libfalcondet1024.so`, built with `cc`), AVM target **v12**.
 # 1. Build the deterministic Falcon lib (once, Linux/WSL) and self-test the off-chain signer (A8):
 cc -O3 -fPIC -shared -o libfalcondet1024.so codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c
 export FALCON_DET1024_LIB="$PWD/libfalcondet1024.so"
-python crypto/contracts/falcon_det1024.py        # keygen -> sign -> verify round-trip
+python contracts/falcon_det1024.py        # keygen -> sign -> verify round-trip
 
-# 2. Compile the contract (Python 3.13 venv), targeting AVM v12:
-puyapy crypto/contracts/inscription.py --out-dir crypto/contracts/out --target-avm-version 12
+# 2. Compile the contract, targeting AVM v12, with the PINNED toolchain:
+#      pip install -r contracts/requirements-compile.txt   (puyapy==5.8.1, algorand-python==3.5.0)
+#
+#    Run from contracts/ with the BARE filename. This is part of the artifact, not a
+#    preference: puya writes the source path exactly as typed into the emitted TEAL comments,
+#    and records it relative to the out-dir in the .puya.map. Compiling from the repository
+#    root yields `// contracts/inscription.py:156` where the committed artifact carries
+#    `// inscription.py:156` — 124 differing lines, all cosmetic. Every one of the five
+#    committed artifacts then reproduces byte-for-byte.
+(cd contracts && puyapy inscription.py --out-dir out --target-avm-version 12)
 
 # 3. Generate the typed client from the ARC-56 spec (re-run after every recompile):
-algokit generate client crypto/contracts/out/TrelyanInscription.arc56.json --output crypto/contracts/trelyan_client.py
+algokit generate client contracts/out/TrelyanInscription.arc56.json --output contracts/trelyan_client.py
 
 # 4. Start localnet and run the suite:
 algokit localnet start
-python -m pytest crypto/contracts/test_inscription.py -v     # expect 20 passed
+python -m pytest contracts/test_inscription.py -v     # expect 20 passed
 ```
 
 (The repo ships `compile_contract.ps1` which builds the isolated 3.13 venv and runs step 2 on

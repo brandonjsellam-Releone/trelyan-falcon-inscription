@@ -64,8 +64,13 @@ object; AVM target **v12**. Full pinned steps are in `THREAT_MODEL_AND_TRACEABIL
 ```
 # build the deterministic Falcon lib, then self-test the off-chain signer:
 python contracts/falcon_det1024.py
-# compile the contract + generate the typed client:
-puyapy contracts/inscription.py --out-dir contracts/out --target-avm-version 12
+# compile the contract + generate the typed client.
+# Run from contracts/ with the BARE filename: puya writes the source path as typed into the
+# emitted TEAL comments, so compiling from the repo root produces `// contracts/inscription.py`
+# instead of the committed `// inscription.py` — 124 differing lines, none of them a real
+# change. The out-dir must also sit beside inscription.py (as out/ does), because the .puya.map
+# records the source path relative to it. contracts/verify_teal_matches_source.py enforces both.
+(cd contracts && puyapy inscription.py --out-dir out --target-avm-version 12)
 algokit generate client contracts/out/TrelyanInscription.arc56.json --output contracts/trelyan_client.py
 # run the suite (localnet) or deploy to TestNet:
 python -m pytest contracts/test_inscription.py -v          # 20 passed

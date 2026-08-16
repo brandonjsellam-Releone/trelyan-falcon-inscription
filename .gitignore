@@ -38,3 +38,6 @@ build/
 
 # local contract-test virtualenv (algokit-utils + pytest); never committed
 .venv-contracts/
+
+# scratch out-dir used by contracts/verify_teal_matches_source.py; never committed
+contracts/.teal-check-*/

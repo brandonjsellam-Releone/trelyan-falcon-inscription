@@ -89,6 +89,36 @@ jobs:
         # byte-exact local rebuild of the domain-separated message. Exits non-zero
         # on any failure. No account, no mnemonic, no secrets.
 
+  teal-matches-source:
+    name: Committed TEAL is what the source compiles to
+    # Closes the FIRST link of the derivation chain, which nothing checked.
+    #
+    # contract-drift (below) starts at the committed artifact and works down to the chain.
+    # Nothing worked UPWARD from inscription.py to the artifact: verify_deployment.py has a
+    # --recompile flag for exactly that, and no workflow ever passed it. So the one
+    # human-readable file in the chain - the source a reviewer reads and an auditor is handed -
+    # was not verified to correspond to anything. A behaviour-changing edit committed without
+    # regenerating contracts/out/ passed every gate green.
+    #
+    # This job needs the PINNED compiler (contracts/requirements-compile.txt): comparing bytes
+    # against a committed artifact is only meaningful against a fixed puya version, since a
+    # different version may emit different but equally valid TEAL.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"   # puya tracks <=3.13; 3.12 matches the documented build venv
+      - name: Install the pinned compile toolchain
+        run: python -m pip install -r contracts/requirements-compile.txt
+      - name: Recompile inscription.py and compare against the committed artifacts
+        run: python contracts/verify_teal_matches_source.py
+        # Exit 1 = drift, and the output distinguishes two kinds that need different responses:
+        #          BEHAVIOURAL (instruction streams differ - the artifact does not implement the
+        #          source) from STALE (identical instructions, stale '// inscription.py:NNN'
+        #          references - bytecode unaffected, traceability broken).
+        # Exit 2 = could not check (toolchain or artifact missing). Never reported as agreement.
+
   contract-drift:
     name: Deployed app matches the committed contract (non-circular)
     # verify_trelyan.py pins EXPECTED_APPROVAL_SHA512_256, a constant copied from the DEPLOYED
