@@ -82,8 +82,19 @@
 #       confirm sufficiency (a re-deployed app reusing app_id on a fork with identical genesis is the
 #       only residual) [Grok]; (ii) key loss is irrecoverable by design (immutable commitment, no
 #       rotation) — intentional per I4/I5 but a documented, accepted lifecycle fact [Grok/watsonx];
-#       (iii) committed-key box min-balance ~0.72 ALGO/cell (~737 ALGO across all 1024 cells) — an
-#       accepted Foundation cost [watsonx]; (iv) the controlling public key is visible on-chain from
+#       (iii) box min-balance is an accepted Foundation cost [watsonx]. Corrected 2026-08-15 —
+#       the previous figure, "~0.72 ALGO/cell (~737 ALGO across all 1024 cells)", was a rounded
+#       per-cell number multiplied up (0.72 x 1024 = 737.28) AND counted only one of the three
+#       boxes a cell uses. Algorand charges 2500 + 400*(name+value) microAlgos per box, and a
+#       BoxMap name here is a 2-byte prefix plus a uint64 key = 10 bytes:
+#           committed_pubkey  10 + 1793 -> 723_700 uA = 0.7237 ALGO   (x1024 = 741.1 ALGO)
+#           controlling_owner 10 +   32 ->  19_300 uA = 0.0193 ALGO
+#           inscriptions      10 + ~83..147 -> ~40_500-66_100 uA = ~0.041-0.066 ALGO
+#                             (InscriptionRecord is 81 bytes fixed plus the arc4 offset/length
+#                              words and a variable payload_uri, so this one is a range)
+#       Per fully-inscribed cell that is ~0.78-0.81 ALGO, and across 1024 cells ~802-829 ALGO --
+#       not 737. deploy_testnet.py's own "~0.9 ALGO" per-deployment estimate was already right;
+#       it is this total that was low. (iv) the controlling public key is visible on-chain from
 #       mint — a public key, not PII, but noted in the threat model [Mistral].
 # =========================================================================
 
