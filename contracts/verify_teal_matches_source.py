@@ -11,9 +11,15 @@ than stored:
         |  puya                                   <-- THIS ARROW
         v
     contracts/out/TrelyanInscription.*            [committed artifacts]
-        |  algod /v2/teal/compile
-        v
-    expected bytecode --sha512_256--> fingerprint  ==?  deployed program
+        |  algod /v2/teal/compile                      |  algokit generate client
+        v                                              v
+    expected bytecode --sha512_256--> fingerprint   contracts/trelyan_client.py
+                    ==?  deployed program                  <-- AND THIS ONE
+
+Two arrows out of the committed artifact, and neither was checked. The client branch is
+the one the tests actually run against: the LocalNet suite deploys the committed TEAL and
+drives it through the generated typed client, so a contract whose ABI moved without the
+client being regenerated would be exercised by a suite talking to the old interface.
 
 CI only ever ran the part BELOW the committed artifact. The `--recompile` flag that covers
 the top arrow exists, but no workflow passed it - verified by grep across
@@ -96,7 +102,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -221,6 +229,63 @@ def _assert_pragma_matches(committed: pathlib.Path) -> None:
         )
 
 
+def _client_spec_matches(client: pathlib.Path, spec_path: pathlib.Path) -> str | None:
+    """The generated typed client must embed the SAME ARC-56 spec that is committed.
+
+    One more link in the same chain, and the one the tests actually run against. The
+    LocalNet suite deploys the committed TEAL and drives it through
+    `contracts/trelyan_client.py` - an 89 KB generated file stamped "DO NOT MODIFY IT BY
+    HAND". CI only ever CONSUMES it; nothing regenerated it and compared. So a contract
+    whose ABI moved without the client being regenerated would be exercised by a suite
+    talking to the old interface.
+
+    Checked WITHOUT running the generator, deliberately. `algokit generate client` needs
+    `algokitgen-py`, which pins the check to a generator version whose formatting churn is
+    not a finding - and which is, on the machine this was written on, blocked outright by a
+    Windows Application Control policy (os error 4551). The client happens to EMBED the
+    full spec it was generated from, in `_APP_SPEC_JSON`, so the meaningful comparison
+    needs nothing but the two committed files.
+
+    The comparison is on PARSED JSON, not bytes: the client embeds the spec minified while
+    arc56.json is pretty-printed, so a byte comparison would fail always and mean nothing.
+
+    Returns None when in step, or a description of the divergence.
+    """
+    if not client.exists():
+        return f"typed client not found: {client}"
+    src = client.read_text(encoding="utf-8", errors="replace")
+    match = re.search(r'_APP_SPEC_JSON\s*=\s*r?"""(.*?)"""', src, re.S)
+    if match is None:
+        return (
+            f"{client.name} has no _APP_SPEC_JSON block. The generator's output shape has "
+            f"changed, so this check no longer reads what it thinks it reads - repair the "
+            f"check rather than deleting it."
+        )
+    try:
+        embedded = json.loads(match.group(1))
+    except json.JSONDecodeError as exc:
+        return f"the spec embedded in {client.name} is not valid JSON: {exc}"
+
+    committed = json.loads(spec_path.read_text(encoding="utf-8"))
+    if embedded == committed:
+        return None
+
+    embedded_methods = [m.get("name") for m in embedded.get("methods", [])]
+    committed_methods = [m.get("name") for m in committed.get("methods", [])]
+    if embedded_methods != committed_methods:
+        return (
+            f"ABI METHODS DIFFER. client: {embedded_methods}; contract: {committed_methods}. "
+            f"The LocalNet suite drives the contract through this client, so it is testing a "
+            f"different interface from the one committed."
+        )
+    differing = sorted(k for k in set(embedded) | set(committed)
+                       if embedded.get(k) != committed.get(k))
+    return (
+        f"the embedded spec differs from {spec_path.name} at: {', '.join(differing)}. "
+        f"Method names agree, so this is a signature, struct or metadata change."
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Verify the committed artifacts are what inscription.py compiles to.",
@@ -229,6 +294,7 @@ def main() -> int:
     here = pathlib.Path(__file__).resolve().parent
     parser.add_argument("--source", type=pathlib.Path, default=here / "inscription.py")
     parser.add_argument("--out", type=pathlib.Path, default=here / "out")
+    parser.add_argument("--client", type=pathlib.Path, default=here / "trelyan_client.py")
     args = parser.parse_args()
 
     source = args.source.resolve()
@@ -274,7 +340,14 @@ def main() -> int:
                 traceability.append(name)
                 print(f"    STALE {name}  (non-executable content differs)")
 
-    if not behavioural and not traceability:
+    client_problem = _client_spec_matches(args.client.resolve(),
+                                          committed_dir / "TrelyanInscription.arc56.json")
+    if client_problem is None:
+        print(f"    ok    {args.client.name}  (embedded ARC-56 spec matches the committed one)")
+    else:
+        print(f"    DRIFT {args.client.name}  (embedded ARC-56 spec does NOT match)")
+
+    if not behavioural and not traceability and client_problem is None:
         print("\nOK: the committed artifacts are exactly what the source compiles to.")
         return 0
 
@@ -294,6 +367,16 @@ def main() -> int:
         print("  Assembled bytecode is unaffected, so nothing deployed is wrong. But puya emits")
         print("  '// inscription.py:NNN' references into these files, and they now point at the")
         print("  wrong lines, so an auditor tracing TEAL back to source is misled.")
+    if client_problem is not None:
+        if behavioural or traceability:
+            print()
+        print("CLIENT DRIFT - the typed client does not match the committed ARC-56 spec.")
+        print(f"  {client_problem}")
+        print("  Regenerate it (the docs say to, after every recompile):")
+        print("    algokit generate client contracts/out/TrelyanInscription.arc56.json \\")
+        print("      --output contracts/trelyan_client.py")
+    if not behavioural and not traceability:
+        return 1
     print()
     print("  Regenerate with EXACTLY this invocation - the working directory and the out-dir")
     print("  location are both part of the artifact (see this file's docstring):")
