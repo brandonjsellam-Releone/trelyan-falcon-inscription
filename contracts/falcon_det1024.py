@@ -141,6 +141,13 @@ DOMAIN_TAG = b"TRELYAN-INSCRIPTION-v1"
 
 def build_message(app_id: int, cell_id: int, artifact_hash: bytes, genesis_hash: bytes) -> bytes:
     """M = DOMAIN_TAG ‖ app_id(8, big) ‖ cell_id(8, big) ‖ artifact_hash(32) ‖ genesis_hash(32)."""
+    # Mirrors trelyan_pq.message.build_message exactly. `.to_bytes()` already raises on a float
+    # or str, but silently accepts `True` as 1 because bool subclasses int — so the check is
+    # explicit here too, rather than relying on a coincidence of the encoder.
+    if isinstance(app_id, bool) or not isinstance(app_id, int) or not 0 <= app_id <= 0xFFFFFFFFFFFFFFFF:
+        raise ValueError("app_id must be a uint64 (0 .. 2**64-1)")
+    if isinstance(cell_id, bool) or not isinstance(cell_id, int) or not 0 <= cell_id <= 0xFFFFFFFFFFFFFFFF:
+        raise ValueError("cell_id must be a uint64 (0 .. 2**64-1)")
     if len(artifact_hash) != 32:
         raise ValueError("artifact_hash must be 32 bytes (sha512_256)")
     if len(genesis_hash) != 32:

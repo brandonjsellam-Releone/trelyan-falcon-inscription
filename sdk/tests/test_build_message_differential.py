@@ -36,6 +36,7 @@ import pytest
 _ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "contracts"))
 
+from trelyan_pq import DOMAIN_TAG  # noqa: E402
 from trelyan_pq import build_message as sdk_build_message  # noqa: E402
 
 try:
@@ -129,3 +130,62 @@ def test_the_comparison_is_not_vacuous():
     assert sdk_build_message is not contracts_build_message, (
         "both names resolve to the same function; this file would be comparing it to itself"
     )
+
+# ---------------------------------------------------------------------------------------------
+# app_id was COERCED, not validated (found 2026-08-15)
+# ---------------------------------------------------------------------------------------------
+#
+# `build_message` used `int(app_id).to_bytes(8, "big")`. Measured before the fix:
+#
+#     float 1001.9  -> encoded as 1001   <- silent truncation, inside a message that gets SIGNED
+#     str  "1001"   -> encoded as 1001
+#     bool True     -> encoded as 1
+#
+# The contracts-side copy called `app_id.to_bytes()` directly and therefore RAISED on a float or
+# a str — so the two implementations that must agree byte-for-byte disagreed on the same input.
+# `cell_id`, encoded two fields along, was strictly validated the whole time.
+#
+# Fail-closed in the end (a wrong app_id yields a signature the chain rejects), but a signing path
+# that silently truncates its input is not something to leave standing in an audit-bound repo.
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [1001.0, 1001.9, "1001", True, False, -1, 2**64, None],
+    ids=["float-exact", "float-truncating", "str", "bool-true", "bool-false", "negative", "over-uint64", "none"],
+)
+def test_app_id_is_validated_not_coerced(bad) -> None:
+    with pytest.raises(ValueError, match=r"app_id must be a uint64"):
+        sdk_build_message(bad, 1, bytes(32), bytes(32))
+
+
+def test_bool_is_rejected_even_though_it_is_an_int_subclass() -> None:
+    """`isinstance(True, int)` is True in Python, so a bare isinstance check lets True through.
+
+    Called out separately because it is the case a reasonable guard misses: `True` would have been
+    encoded as app_id 1, which is a real application ID.
+    """
+    assert isinstance(True, int), "premise: bool subclasses int"
+    with pytest.raises(ValueError):
+        sdk_build_message(True, 1, bytes(32), bytes(32))
+
+
+def test_a_valid_uint64_app_id_still_works_at_both_boundaries() -> None:
+    """Redaction must not become rejection: the whole legal range still builds."""
+    for ok in (0, 1, 763809096, 2**64 - 1):
+        m = sdk_build_message(ok, 1, bytes(32), bytes(32))
+        assert int.from_bytes(m[len(DOMAIN_TAG) : len(DOMAIN_TAG) + 8], "big") == ok
+
+
+@pytest.mark.parametrize("bad", [1001.9, "1001", True], ids=["float", "str", "bool"])
+def test_both_implementations_reject_the_same_bad_app_id(bad) -> None:
+    """The point of this file: they must AGREE, including on what they refuse.
+
+    Before the fix they did not. The SDK coerced (1001.9 -> 1001) while the contracts copy raised
+    AttributeError on a float — two implementations of one signed message format disagreeing about
+    whether an input is even legal.
+    """
+    with pytest.raises(ValueError, match=r"app_id must be a uint64"):
+        sdk_build_message(bad, 1, bytes(32), bytes(32))
+    with pytest.raises(ValueError, match=r"app_id must be a uint64"):
+        contracts_build_message(bad, 1, bytes(32), bytes(32))
