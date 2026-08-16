@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import pathlib
 import re
-import tomllib
+import sys
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
@@ -42,6 +42,24 @@ _PYPROJECT = pathlib.Path(__file__).resolve().parents[1] / "pyproject.toml"
 
 
 def _declared_version() -> str:
+    # The TOML parser is imported HERE rather than at module scope, for two distinct reasons.
+    #
+    # 1. `tomllib` is stdlib only from 3.11, and this package supports 3.10
+    #    (`requires-python = ">=3.10"`, and the CI matrix tests it). On 3.10 the parser is the
+    #    `tomli` backport. pytest itself already requires `tomli` there -- it needs it to read
+    #    pyproject.toml config -- so it is present in practice; the `dev` extra declares it
+    #    anyway rather than resting on a transitive dependency of the test runner.
+    #
+    # 2. A module-scope import that raises aborts pytest's ENTIRE collection, not just this
+    #    file. The first version of this test imported `tomllib` at the top and took all 69
+    #    wire-format tests down with it on the 3.10 leg -- "Interrupted: 1 error during
+    #    collection", surfacing as a single red check rather than "68 tests never ran".
+    #    Verified by breaking this import deliberately: 2 failed, 51 passed, no Interrupt.
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        import tomli as tomllib
+
     data = tomllib.loads(_PYPROJECT.read_text(encoding="utf-8"))
     return str(data["project"]["version"])
 
