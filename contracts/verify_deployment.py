@@ -39,6 +39,7 @@ import hashlib
 import json
 import pathlib
 import subprocess
+import tempfile
 import sys
 import urllib.error
 import urllib.request
@@ -95,19 +96,59 @@ def fetch_deployed(app_id: int, algod: str, timeout: int) -> bytes:
     return base64.b64decode(program)
 
 
-def recompile_from_source(source: pathlib.Path, out_dir: pathlib.Path) -> None:
+def _committed_avm_version(teal: pathlib.Path) -> str:
+    """Read the AVM target out of the committed artifact's own `#pragma version` line.
+
+    Derived rather than hard-coded on purpose. A literal here could drift from the artifact it is
+    meant to reproduce, and a recompile check whose target disagrees with its subject compares two
+    different things — which is the defect class this whole script exists to catch.
+    """
+    first = teal.read_text(encoding="utf-8", errors="replace").splitlines()[:1]
+    if not first or not first[0].startswith("#pragma version "):
+        raise CheckError(
+            f"{teal} does not begin with a '#pragma version' line, so the AVM target cannot be "
+            f"derived; refusing to guess"
+        )
+    return first[0].removeprefix("#pragma version ").strip()
+
+
+def recompile_from_source(source: pathlib.Path, out_dir: pathlib.Path,
+                          avm_version: str) -> None:
     """Re-derive the committed TEAL from inscription.py, so the artifact is not
-    trusted either. Requires puya; callers treat absence as 'could not check'."""
+    trusted either. Requires puya; callers treat absence as 'could not check'.
+
+    `--target-avm-version` is REQUIRED, not optional. The contract calls `op.falcon_verify`, which
+    is an AVM 12 opcode; puyapy's default target is lower, so without the flag compilation FAILS
+    outright:
+
+        assert op.falcon_verify(m, falcon_sig.native, pubkey), "falcon signature invalid"
+               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    This function omitted it, so `--recompile` could never complete — the branch that exists to
+    prove the committed artifact was not trusted has never once run to completion.
+    `contracts/requirements.txt` documented the correct invocation the whole time.
+    """
     try:
         subprocess.run(
-            [sys.executable, "-m", "puyapy", str(source), "--out-dir", str(out_dir)],
+            [sys.executable, "-m", "puyapy", str(source),
+             "--out-dir", str(out_dir),
+             "--target-avm-version", avm_version],
             check=True,
             capture_output=True,
         )
     except FileNotFoundError as exc:
         raise CheckError("puya not available; omit --recompile or install contracts/requirements.txt") from exc
     except subprocess.CalledProcessError as exc:
-        raise CheckError(f"puya failed: {exc.stderr.decode(errors='replace')[:500]}") from exc
+        # puyapy writes its diagnostics to STDOUT, not stderr — measured: on a failing compile
+        # stderr is 0 bytes and stdout carries all 848. Reporting only stderr produced the
+        # message "puya failed:" with nothing after it, so an operator hitting the bug above got
+        # a failure with no reason at all. Prefer stdout, fall back to stderr.
+        detail = (exc.stdout or b"").decode(errors="replace").strip()
+        if not detail:
+            detail = (exc.stderr or b"").decode(errors="replace").strip()
+        raise CheckError(
+            f"puya failed (exit {exc.returncode}): {detail[:800] or '<no output on either stream>'}"
+        ) from exc
 
 
 def main() -> int:
@@ -129,13 +170,44 @@ def main() -> int:
     try:
         if args.recompile:
             print(f"[0] re-deriving TEAL from {args.source.name} via puya")
-            before = args.teal.read_bytes() if args.teal.exists() else None
-            recompile_from_source(args.source, args.teal.parent)
-            after = args.teal.read_bytes()
-            if before is not None and before != after:
-                print("    FAIL  committed TEAL artifact is stale with respect to inscription.py")
+            if not args.teal.exists():
+                raise CheckError(f"committed artifact not found: {args.teal}")
+
+            # Compile into a TEMPORARY directory, never over the committed artifacts.
+            #
+            # This previously passed `args.teal.parent`, i.e. contracts/out/, so a tool whose whole
+            # job is to VERIFY the committed artifacts silently rewrote five of them (both .teal,
+            # both .puya.map, and the .arc56.json) as a side effect of being run. A verifier that
+            # mutates its subject cannot be run safely on a clean tree, and its second run compares
+            # the output against itself.
+            with tempfile.TemporaryDirectory(prefix="trelyan-recompile-") as tmp:
+                recompile_from_source(args.source, pathlib.Path(tmp),
+                                      _committed_avm_version(args.teal))
+                fresh = (pathlib.Path(tmp) / args.teal.name).read_bytes()
+
+            committed = args.teal.read_bytes()
+
+            # Compare ASSEMBLED BYTECODE, not TEAL text.
+            #
+            # Text comparison reported "stale" on a contract that is in fact perfectly reproducible.
+            # Measured against puyapy 5.8.1 / algorand-python 3.5.0 at AVM 12: the committed TEAL is
+            # 17,559 bytes and a fresh compile is 18,179 — 620 bytes apart, and NOT a line-ending
+            # artifact (LF-normalising both does not close the gap). Yet both assemble to the same
+            # 667-byte program, sha256 308cfa75…. The difference is comment and source-map
+            # formatting emitted by a different compiler build.
+            #
+            # Bytecode is what gets deployed and what the drift check further down compares, so it
+            # is the only comparison that answers the question being asked. Comparing text made the
+            # check fail on compiler-version noise while claiming the source and artifact disagreed.
+            if assemble(committed, compile_url, args.timeout) != assemble(fresh, compile_url, args.timeout):
+                print("    FAIL  committed TEAL does not assemble to the same program as a fresh compile")
                 return 1
-            print("    ok    committed TEAL matches a fresh compile of the source")
+            if committed != fresh:
+                print("    ok    committed TEAL assembles identically to a fresh compile")
+                print("          (the TEAL TEXT differs — comment/source-map formatting from a "
+                      "different puyapy build; the program bytes are the same)")
+            else:
+                print("    ok    committed TEAL matches a fresh compile of the source, byte for byte")
 
         if not args.teal.exists():
             raise CheckError(f"committed artifact not found: {args.teal}")
