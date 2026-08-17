@@ -11,12 +11,17 @@ audit test needs: keygen(), sign_compressed(privkey, data), verify_compressed(si
 --------------------------------------------------------------------------------------------------
 BUILD THE SHARED LIBRARY (one-time, on your machine — the sandbox VM here can't compile it):
 
-    git clone https://github.com/algorand/falcon
-    cd falcon
+    # PINNED tarball, not `git clone` of the default branch: a clone applies the local
+    # core.autocrlf and on Windows rewrites the C sources, changing deterministic.c's digest.
+    # See PINNED_BUILD.md.
+    curl -sfL https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz -o falcon-src.tar.gz
+    tar xzf falcon-src.tar.gz && cd falcon-ce15e75bceb372867daf6b8e81918ab6978686eb
     # Compile ALL library .c sources into one shared object. Include every .c EXCEPT
     # test/benchmark mains (e.g. exclude test_falcon.c / speed.c / nist KAT harnesses).
-    # The deterministic API lives in deterministic.c and depends on the core sources:
-    cc -O3 -fPIC -shared -o libfalcondet1024.so \
+    # The deterministic API lives in deterministic.c and depends on the core sources.
+    # -DFALCON_UNALIGNED=0 -fno-strict-aliasing are MANDATORY, not tuning: CI's own sanitizer
+    # gate proves the DEFAULT autodetected build traps on a misaligned uint64 load.
+    cc -O3 -fPIC -DFALCON_UNALIGNED=0 -fno-strict-aliasing -shared -o libfalcondet1024.so \
         codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c
     #   (file list can vary by repo revision — if the link errors on a missing symbol,
     #    add the .c that defines it; if it errors on a duplicate main(), you included a test file.)
