@@ -89,6 +89,30 @@ jobs:
         # byte-exact local rebuild of the domain-separated message. Exits non-zero
         # on any failure. No account, no mnemonic, no secrets.
 
+  contract-drift:
+    name: Deployed app matches the committed contract (non-circular)
+    # verify_trelyan.py pins EXPECTED_APPROVAL_SHA512_256, a constant copied from the DEPLOYED
+    # program, and compares it to the chain. Because the contract blocks Update and Delete
+    # (invariants I1/I5) the deployed bytecode is immutable, so that comparison cannot fail -
+    # including when contracts/ diverges from the deployment, which it has since 2ec798e. The
+    # weekly schedule below has therefore been re-proving a tautology, not the deployment.
+    #
+    # This job derives the expected bytecode from the committed artifact instead, so it CAN
+    # fail. It is expected to fail until the committed contract is redeployed; that red is the
+    # finding, not a broken job. Do not add continue-on-error here - a gate that cannot fail is
+    # the exact defect being corrected.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - name: Assemble the committed TEAL and compare it to the deployed program
+        run: python contracts/verify_deployment.py
+        # Exit 1 = drift: the deployment is not what the committed source builds.
+        # Exit 2 = could not check (network, missing artifact). Distinct on purpose: an
+        # unreachable node must never be reported as agreement, nor as drift.
+
   reviewer-containers:
     name: The reviewer-facing containers actually run
     # NOTHING in CI ran either Dockerfile, or scripts/verify_all.sh, or any Makefile target:
@@ -174,30 +198,6 @@ jobs:
           # sdk/tests/test_signature_kat.py::test_the_library_is_available_when_required.
           grep -q "TRELYAN_REQUIRE_KAT=1" scripts/verify_all.sh
           echo "verify_all.sh parses and arms the KAT gate"
-
-  contract-drift:
-    name: Deployed app matches the committed contract (non-circular)
-    # verify_trelyan.py pins EXPECTED_APPROVAL_SHA512_256, a constant copied from the DEPLOYED
-    # program, and compares it to the chain. Because the contract blocks Update and Delete
-    # (invariants I1/I5) the deployed bytecode is immutable, so that comparison cannot fail -
-    # including when contracts/ diverges from the deployment, which it has since 2ec798e. The
-    # weekly schedule below has therefore been re-proving a tautology, not the deployment.
-    #
-    # This job derives the expected bytecode from the committed artifact instead, so it CAN
-    # fail. It is expected to fail until the committed contract is redeployed; that red is the
-    # finding, not a broken job. Do not add continue-on-error here - a gate that cannot fail is
-    # the exact defect being corrected.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        with:
-          python-version: "3.13"
-      - name: Assemble the committed TEAL and compare it to the deployed program
-        run: python contracts/verify_deployment.py
-        # Exit 1 = drift: the deployment is not what the committed source builds.
-        # Exit 2 = could not check (network, missing artifact). Distinct on purpose: an
-        # unreachable node must never be reported as agreement, nor as drift.
 
   signature-kat:
     name: Signature byte-identity KAT (pinned Falcon build, 3 OSes)
