@@ -73,18 +73,125 @@ jobs:
           # that passes because nothing ran is worse than no gate, since it carries a
           # signature saying otherwise.
           executed=$(grep -cE "^tests/.* (PASSED|FAILED)" pytest.log || true)
-          echo "tests executed: $executed"
+          skipped=$(grep -cE "^tests/.* SKIPPED" pytest.log || true)
+          echo "tests executed: $executed   skipped: $skipped"
           if [ "$executed" -lt 15 ]; then
             echo "::error::only $executed tests executed before a signed release; expected 15+"
             exit 1
           fi
+          # WHAT THIS COUNTER CANNOT SEE, stated so nobody mistakes it for full coverage.
+          #
+          # The pattern above matches PASSED|FAILED and therefore CANNOT COUNT SKIPPED. This job
+          # installs dev = ["pytest>=8"]; it does not build the pinned Falcon library, does not
+          # set FALCON_DET1024_LIB, and does not set TRELYAN_REQUIRE_KAT. So every lib-gated test
+          # skips here, and the ~50 lib-independent tests clear the floor of 15 on their own.
+          # Measured in exactly this environment: 50 passed, 19 skipped, counter = 50.
+          #
+          # The counter is therefore blind in both directions: DELETING the 13 lib-gated tests
+          # outright would not change it. What went unverified before signing was signature
+          # byte-identity against the on-chain-accepted goldens, runtime private-key
+          # zeroization, and worker-stdout containment.
+          #
+          # That assurance is NOT provided here - deliberately, because building the pinned
+          # library on 3 OSes is what ci.yml's signature-kat job already does and duplicating it
+          # would be both slow and a second thing to drift. It is provided by the
+          # require-signature-kat job below, which refuses to let the release proceed unless that
+          # job went GREEN for this exact tag SHA. The skipped count is printed above so the log
+          # shows how much of the suite this job did not exercise.
+          echo "note: $skipped tests skipped here; byte-identity assurance comes from the"
+          echo "      require-signature-kat job, not from this one."
 
   # ---------------------------------------------------------------------------
   # 1. Build the distribution artifacts and emit their sha256 hashes for SLSA.
   # ---------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
+  # The assurance the `test` job above structurally cannot provide.
+  #
+  # `test` runs without the Falcon library, so every byte-identity test skips there and its
+  # PASSED|FAILED counter cannot notice. Signature byte-identity to the on-chain-accepted
+  # goldens is the single most important property of a release of this package, and before this
+  # job NOTHING checked it between the tag and the cosign signature.
+  #
+  # Cross-workflow `needs:` does not exist, so this asks the checks API directly: did ci.yml's
+  # signature-kat job - which builds the PINNED Falcon source and re-signs the committed goldens
+  # on Linux, macOS and Windows - succeed for THIS EXACT COMMIT?
+  #
+  # Scoped to signature-kat on purpose, rather than "every check green". contract-drift is red
+  # by design until the committed contract is redeployed, and coupling releases to that is a
+  # policy decision for the maintainer, not something to smuggle in through a gate. If you DO
+  # want that coupling, widen the filter below deliberately.
+  # ---------------------------------------------------------------------------
+  require-signature-kat:
+    name: ci.yml signature-KAT must be green for this tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+    steps:
+      - name: Require a green byte-identity KAT on this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "commit under release: $SHA"
+
+          # Emit one row per signature-KAT check-run, newest-first, then reduce to the latest per leg.
+          #
+          # `--paginate` WITHOUT `--slurp`, because gh rejects `--slurp` together with `--jq`. That means the
+          # jq filter runs once per page, so it must not try to group - grouping across pages is done below
+          # with sort+awk, which also keeps this dependent on nothing but coreutils and gh's built-in jq.
+          #
+          # ISO-8601 timestamps sort lexicographically, so `sort -r` on the first column is a true
+          # newest-first ordering rather than a reliance on the endpoint's (undocumented) response order.
+          gh api --paginate "repos/$REPO/commits/$SHA/check-runs" --jq '
+            .check_runs[]
+            | select(.name | startswith("Signature byte-identity KAT"))
+            | [.started_at, .name, (.conclusion // "pending")]
+            | @tsv
+          ' | sort -r > all_kat.tsv
+
+          # LATEST result per leg. This is deliberate, and was chosen after looking at real data rather than
+          # assumed: a commit that is both pushed and open in a PR gets TWO workflow runs, so a 3-OS matrix
+          # appears SIX times. On the commit this gate was tested against, an earlier macos-latest leg had
+          # conclusion "failure" while the later one succeeded. A naive "any non-success blocks" would have
+          # refused a release over a stale result - as wrong as passing on nothing.
+          awk -F'\t' '!seen[$2]++ { print $2 "\t" $3 }' all_kat.tsv > kat.tsv
+
+          echo "--- latest signature-KAT result per leg ---"
+          cat kat.tsv
+
+          legs=$(wc -l < kat.tsv | tr -d ' ')
+          if [ "$legs" -eq 0 ]; then
+            echo "::error::no signature-KAT check-run exists for $SHA. ci.yml has not run on this commit, so"
+            echo "::error::the byte-identity KAT has not been executed for what is about to be signed."
+            echo "::error::Push the commit, let CI finish, then tag."
+            exit 1
+          fi
+
+          # All three OSes must be PRESENT. A matrix leg that was never scheduled is not a pass, and counting
+          # rows alone would accept one green leg as though it were three - which is the shape of defect this
+          # whole gate exists to remove.
+          for os in ubuntu-latest macos-latest windows-latest; do
+            if ! grep -q "($os)" kat.tsv; then
+              echo "::error::no signature-KAT leg for $os on $SHA. The 3-OS build-divergence control did not"
+              echo "::error::run on every platform, so cross-platform byte-identity is unproven."
+              exit 1
+            fi
+          done
+
+          bad=$(awk -F'\t' '$2 != "success"' kat.tsv || true)
+          if [ -n "$bad" ]; then
+            echo "::error::the byte-identity KAT is not green on every OS for $SHA:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "byte-identity KAT green on all $legs leg(s) for $SHA"
+
   build:
     name: Build sdist + wheel
-    needs: [test]
+    needs: [test, require-signature-kat]
     runs-on: ubuntu-latest
     permissions:
       contents: read
