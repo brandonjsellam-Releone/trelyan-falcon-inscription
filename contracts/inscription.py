@@ -342,6 +342,17 @@ class TrelyanInscription(ARC4Contract):
         # OTHER field committed at mint; the owner pointer was simply missed.
         # Reachable by griefing AND by accident — algosdk encodes a default-constructed
         # arc4.Address as 32 zero bytes, which satisfied the only check present (ARC-4 len == 32).
+        # SCOPE, because this guard is narrower than it looks and an auditor will ask.
+        # On Algorand the address IS the ed25519 public key, so what makes a destination
+        # absorbing is "no known scalar" -- not the bit pattern. Any 32 bytes with no known
+        # key is equally terminal: 0x00..01, a hash-derived burn address, an always-reject
+        # LogicSig address, an immutable app account that cannot inner-call here. This
+        # guard closes ONE member of that family. It is worth having because that member is
+        # the one reached BY ACCIDENT -- algosdk encodes a default-constructed arc4.Address
+        # as 32 zero bytes -- but it does NOT establish "the owner can always sign".
+        # Closing the family needs a holder check on the destination (balance == 1), which
+        # changes what controlling_owner MEANS (no delegate who does not hold the NFT), so
+        # it is a design decision, not a bug fix. Tracked separately in the risk register.
         assert new_owner.bytes != Global.zero_address.bytes, "new owner cannot be the zero address"
         self.controlling_owner[cid] = new_owner.bytes
 

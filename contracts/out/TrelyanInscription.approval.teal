@@ -51,20 +51,20 @@ main_bare_routing@15:
     err
 
 main_on_delete@17:
-    // inscription.py:370
+    // inscription.py:381
     // @arc4.baremethod(allow_actions=["DeleteApplication"])
     txn ApplicationID
     assert
-    // inscription.py:373
+    // inscription.py:384
     // assert False, "contract is non-deletable (I1/I5)"  # noqa: B011
     err // contract is non-deletable (I1/I5)
 
 main_on_update@16:
-    // inscription.py:365
+    // inscription.py:376
     // @arc4.baremethod(allow_actions=["UpdateApplication"])
     txn ApplicationID
     assert
-    // inscription.py:368
+    // inscription.py:379
     // assert False, "contract is non-upgradable (I5)"  # noqa: B011
     err // contract is non-upgradable (I5)
 
@@ -583,7 +583,7 @@ update_owner:
     bury 1
     !
     assert // already inscribed; owner frozen
-    // inscription.py:334-345
+    // inscription.py:334-356
     // # The DESTINATION was previously unvalidated: any 32 bytes were written. The zero
     // # address is an absorbing state — both remaining movers (inscribe C1 and this method)
     // # require controlling_owner[cid] == Txn.sender.bytes, which no key can ever satisfy for
@@ -595,12 +595,23 @@ update_owner:
     // # OTHER field committed at mint; the owner pointer was simply missed.
     // # Reachable by griefing AND by accident — algosdk encodes a default-constructed
     // # arc4.Address as 32 zero bytes, which satisfied the only check present (ARC-4 len == 32).
+    // # SCOPE, because this guard is narrower than it looks and an auditor will ask.
+    // # On Algorand the address IS the ed25519 public key, so what makes a destination
+    // # absorbing is "no known scalar" -- not the bit pattern. Any 32 bytes with no known
+    // # key is equally terminal: 0x00..01, a hash-derived burn address, an always-reject
+    // # LogicSig address, an immutable app account that cannot inner-call here. This
+    // # guard closes ONE member of that family. It is worth having because that member is
+    // # the one reached BY ACCIDENT -- algosdk encodes a default-constructed arc4.Address
+    // # as 32 zero bytes -- but it does NOT establish "the owner can always sign".
+    // # Closing the family needs a holder check on the destination (balance == 1), which
+    // # changes what controlling_owner MEANS (no delegate who does not hold the NFT), so
+    // # it is a design decision, not a bug fix. Tracked separately in the risk register.
     // assert new_owner.bytes != Global.zero_address.bytes, "new owner cannot be the zero address"
     dig 1
     global ZeroAddress
     !=
     assert // new owner cannot be the zero address
-    // inscription.py:346
+    // inscription.py:357
     // self.controlling_owner[cid] = new_owner.bytes
     dup
     box_del
@@ -615,7 +626,7 @@ update_owner:
 
 // inscription.TrelyanInscription.get_inscription[routing]() -> void:
 get_inscription:
-    // inscription.py:352
+    // inscription.py:363
     // @arc4.abimethod(readonly=True)
     txna ApplicationArgs 1
     dup
@@ -623,7 +634,7 @@ get_inscription:
     intc_2 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // inscription.py:359
+    // inscription.py:370
     // return self.inscriptions[cell_id.native]
     btoi
     itob
@@ -632,7 +643,7 @@ get_inscription:
     concat
     box_get
     assert // check self.inscriptions entry exists
-    // inscription.py:352
+    // inscription.py:363
     // @arc4.abimethod(readonly=True)
     pushbytes 0x151f7c75
     swap
