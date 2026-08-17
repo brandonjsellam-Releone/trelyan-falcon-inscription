@@ -486,6 +486,39 @@ def test_update_owner_only_owner(algorand, deployed, accounts):
 ZERO_ADDRESS = algo_encoding.encode_address(bytes(32))
 
 
+def test_update_owner_requires_the_caller_to_still_hold_the_cell(algorand, deployed, accounts):
+    """TCE-76: a seller who transferred the ASA must not keep the power to brick the cell.
+
+    The recorded controlling_owner and the ASA holder can diverge - this suite already documents
+    that in test_recorded_owner_who_no_longer_holds_is_rejected, for inscribe. update_owner had no
+    such requirement, so a seller who had handed over the NFT could still reassign control of the
+    buyer's cell, including to an address with no known key, permanently bricking it.
+
+    The zero-address guard closes only the member of that family reached BY ACCIDENT. This closes
+    the deliberate path, by requiring the mover to have something to lose.
+    """
+    client, app_id, admin = deployed
+    _, mallory = accounts
+    pk, _ = falcon_keypair()
+    cell = mint_cell(algorand, admin, admin)
+    register(client, admin, cell, pk)
+
+    # Admin holds the cell, so reassigning control to mallory is allowed.
+    client.send.update_owner(args=(cell, mallory.address),
+                             params=CommonAppCallParams(sender=admin.address))
+
+    # Admin is no longer the controlling owner, so this must fail on the OWNER check regardless.
+    with pytest.raises(Exception):
+        client.send.update_owner(args=(cell, admin.address),
+                                 params=CommonAppCallParams(sender=admin.address))
+
+    # mallory IS the recorded owner but does NOT hold the ASA (admin still does), so the new
+    # holder check must reject her even though the owner check passes.
+    with pytest.raises(Exception):
+        client.send.update_owner(args=(cell, mallory.address),
+                                 params=CommonAppCallParams(sender=mallory.address))
+
+
 def test_update_owner_rejects_the_zero_address(algorand, deployed, accounts):
     """The zero address is an ABSORBING state, so writing it destroys the cell permanently.
 

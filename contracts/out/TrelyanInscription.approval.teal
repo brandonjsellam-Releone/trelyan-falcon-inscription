@@ -51,20 +51,20 @@ main_bare_routing@15:
     err
 
 main_on_delete@17:
-    // inscription.py:381
+    // inscription.py:398
     // @arc4.baremethod(allow_actions=["DeleteApplication"])
     txn ApplicationID
     assert
-    // inscription.py:384
+    // inscription.py:401
     // assert False, "contract is non-deletable (I1/I5)"  # noqa: B011
     err // contract is non-deletable (I1/I5)
 
 main_on_update@16:
-    // inscription.py:376
+    // inscription.py:393
     // @arc4.baremethod(allow_actions=["UpdateApplication"])
     txn ApplicationID
     assert
-    // inscription.py:379
+    // inscription.py:396
     // assert False, "contract is non-upgradable (I5)"  # noqa: B011
     err // contract is non-upgradable (I5)
 
@@ -551,24 +551,26 @@ update_owner:
     btoi
     txna ApplicationArgs 2
     dup
+    cover 2
     len
     intc_3 // 32
     ==
     assert // invalid number of bytes for arc4.static_array<arc4.uint8, 32>
     // inscription.py:331
     // assert cid in self.controlling_owner, "cell not registered"
-    swap
+    dup
     itob
     bytec_2 // 0x6f5f
     dig 1
     concat
+    dup
+    cover 3
     dup
     box_len
     bury 1
     assert // cell not registered
     // inscription.py:332
     // assert self.controlling_owner[cid] == Txn.sender.bytes, "only controlling owner"
-    dup
     box_get
     pop
     txn Sender
@@ -577,13 +579,46 @@ update_owner:
     // inscription.py:333
     // assert cid not in self.inscriptions, "already inscribed; owner frozen"
     bytec_3 // 0x695f
-    uncover 2
+    swap
     concat
     box_len
     bury 1
     !
     assert // already inscribed; owner frozen
-    // inscription.py:334-356
+    // inscription.py:334-349
+    // # TCE-76: the CALLER must still hold the cell ASA.
+    // #
+    // # Without this, a seller who transferred the Cell ASA but remained the recorded
+    // # controlling_owner could still reassign control of a cell someone else now holds --
+    // # including to an address with no known key, permanently bricking it. The zero-address
+    // # guard below closes only the member of that family reached by accident; this closes
+    // # the deliberate path at its source, by requiring the mover to have something to lose.
+    // #
+    // # Chosen over a check on the DESTINATION (balance(new_owner) == 1) deliberately: that
+    // # would close the whole unsignable family but redefine controlling_owner as "must be
+    // # the current holder", forbidding a delegate, an escrow, or assigning control before
+    // # the NFT moves. This constrains WHO MAY MOVE control, not WHERE it may point.
+    // #
+    // # Same operand order and idiom as C1 in inscribe (see there for why clawback/freeze
+    // # being cleared at register_cell is what makes a balance check trustworthy at all).
+    // _bal, _held = op.AssetHoldingGet.asset_balance(Txn.sender, cell)
+    txn Sender
+    swap
+    asset_holding_get AssetBalance
+    // inscription.py:350
+    // assert _held and _bal == UInt64(1), "caller does not hold the cell"
+    bz update_owner_bool_false@4
+    dup
+    intc_1 // 1
+    ==
+    bz update_owner_bool_false@4
+    intc_1 // 1
+
+update_owner_bool_merge@5:
+    // inscription.py:350
+    // assert _held and _bal == UInt64(1), "caller does not hold the cell"
+    assert // caller does not hold the cell
+    // inscription.py:351-373
     // # The DESTINATION was previously unvalidated: any 32 bytes were written. The zero
     // # address is an absorbing state — both remaining movers (inscribe C1 and this method)
     // # require controlling_owner[cid] == Txn.sender.bytes, which no key can ever satisfy for
@@ -607,12 +642,15 @@ update_owner:
     // # changes what controlling_owner MEANS (no delegate who does not hold the NFT), so
     // # it is a design decision, not a bug fix. Tracked separately in the risk register.
     // assert new_owner.bytes != Global.zero_address.bytes, "new owner cannot be the zero address"
-    dig 1
     global ZeroAddress
+    dig 3
+    dup
+    uncover 2
     !=
     assert // new owner cannot be the zero address
-    // inscription.py:357
+    // inscription.py:374
     // self.controlling_owner[cid] = new_owner.bytes
+    dig 2
     dup
     box_del
     pop
@@ -623,10 +661,14 @@ update_owner:
     intc_1 // 1
     return
 
+update_owner_bool_false@4:
+    intc_0 // 0
+    b update_owner_bool_merge@5
+
 
 // inscription.TrelyanInscription.get_inscription[routing]() -> void:
 get_inscription:
-    // inscription.py:363
+    // inscription.py:380
     // @arc4.abimethod(readonly=True)
     txna ApplicationArgs 1
     dup
@@ -634,7 +676,7 @@ get_inscription:
     intc_2 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // inscription.py:370
+    // inscription.py:387
     // return self.inscriptions[cell_id.native]
     btoi
     itob
@@ -643,7 +685,7 @@ get_inscription:
     concat
     box_get
     assert // check self.inscriptions entry exists
-    // inscription.py:363
+    // inscription.py:380
     // @arc4.abimethod(readonly=True)
     pushbytes 0x151f7c75
     swap

@@ -3,7 +3,7 @@
   "sources": [
     "../inscription.py"
   ],
-  "mappings": "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",
+  "mappings": "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",
   "op_pc_offset": 0,
   "pc_events": {
     "1": {
@@ -5599,30 +5599,33 @@
       ]
     },
     "607": {
-      "op": "txna ApplicationArgs 2",
-      "defined_out": [
-        "cell#0",
-        "new_owner#0"
-      ],
-      "stack_out": [
-        "cell#0",
-        "new_owner#0"
-      ]
+      "op": "txna ApplicationArgs 2"
     },
     "610": {
       "op": "dup",
       "defined_out": [
         "cell#0",
-        "new_owner#0",
-        "new_owner#0 (copy)"
+        "new_owner#0"
       ],
       "stack_out": [
         "cell#0",
         "new_owner#0",
-        "new_owner#0 (copy)"
+        "new_owner#0"
       ]
     },
     "611": {
+      "op": "cover 2",
+      "defined_out": [
+        "cell#0",
+        "new_owner#0"
+      ],
+      "stack_out": [
+        "new_owner#0",
+        "cell#0",
+        "new_owner#0"
+      ]
+    },
+    "613": {
       "op": "len",
       "defined_out": [
         "cell#0",
@@ -5630,12 +5633,12 @@
         "new_owner#0"
       ],
       "stack_out": [
-        "cell#0",
         "new_owner#0",
+        "cell#0",
         "len%1#0"
       ]
     },
-    "612": {
+    "614": {
       "op": "intc_3 // 32",
       "defined_out": [
         "32",
@@ -5644,13 +5647,13 @@
         "new_owner#0"
       ],
       "stack_out": [
-        "cell#0",
         "new_owner#0",
+        "cell#0",
         "len%1#0",
         "32"
       ]
     },
-    "613": {
+    "615": {
       "op": "==",
       "defined_out": [
         "cell#0",
@@ -5658,81 +5661,122 @@
         "new_owner#0"
       ],
       "stack_out": [
-        "cell#0",
         "new_owner#0",
+        "cell#0",
         "eq%1#0"
       ]
     },
-    "614": {
+    "616": {
       "error": "invalid number of bytes for arc4.static_array<arc4.uint8, 32>",
       "op": "assert // invalid number of bytes for arc4.static_array<arc4.uint8, 32>",
-      "stack_out": [
-        "cell#0",
-        "new_owner#0"
-      ]
-    },
-    "615": {
-      "op": "swap",
       "stack_out": [
         "new_owner#0",
         "cell#0"
       ]
     },
-    "616": {
+    "617": {
+      "op": "dup",
+      "defined_out": [
+        "cell#0",
+        "cell#0 (copy)",
+        "new_owner#0"
+      ],
+      "stack_out": [
+        "new_owner#0",
+        "cell#0",
+        "cell#0 (copy)"
+      ]
+    },
+    "618": {
       "op": "itob",
       "defined_out": [
+        "cell#0",
         "encoded_value%0#0",
         "new_owner#0"
       ],
       "stack_out": [
         "new_owner#0",
+        "cell#0",
         "encoded_value%0#0"
       ]
     },
-    "617": {
+    "619": {
       "op": "bytec_2 // 0x6f5f",
       "defined_out": [
         "0x6f5f",
+        "cell#0",
         "encoded_value%0#0",
         "new_owner#0"
       ],
       "stack_out": [
         "new_owner#0",
+        "cell#0",
         "encoded_value%0#0",
         "0x6f5f"
       ]
     },
-    "618": {
+    "620": {
       "op": "dig 1",
       "defined_out": [
         "0x6f5f",
+        "cell#0",
         "encoded_value%0#0",
         "encoded_value%0#0 (copy)",
         "new_owner#0"
       ],
       "stack_out": [
         "new_owner#0",
+        "cell#0",
         "encoded_value%0#0",
         "0x6f5f",
         "encoded_value%0#0 (copy)"
       ]
     },
-    "620": {
+    "622": {
       "op": "concat",
       "defined_out": [
+        "cell#0",
         "encoded_value%0#0",
         "map_prefixed_key%0#0",
         "new_owner#0"
       ],
       "stack_out": [
         "new_owner#0",
+        "cell#0",
         "encoded_value%0#0",
         "map_prefixed_key%0#0"
       ]
     },
-    "621": {
+    "623": {
+      "op": "dup",
+      "stack_out": [
+        "new_owner#0",
+        "cell#0",
+        "encoded_value%0#0",
+        "map_prefixed_key%0#0",
+        "map_prefixed_key%0#0"
+      ]
+    },
+    "624": {
+      "op": "cover 3",
+      "defined_out": [
+        "cell#0",
+        "encoded_value%0#0",
+        "map_prefixed_key%0#0",
+        "new_owner#0"
+      ],
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "cell#0",
+        "encoded_value%0#0",
+        "map_prefixed_key%0#0"
+      ]
+    },
+    "626": {
       "op": "dup",
       "defined_out": [
+        "cell#0",
         "encoded_value%0#0",
         "map_prefixed_key%0#0",
         "map_prefixed_key%0#0 (copy)",
@@ -5740,15 +5784,18 @@
       ],
       "stack_out": [
         "new_owner#0",
+        "map_prefixed_key%0#0",
+        "cell#0",
         "encoded_value%0#0",
         "map_prefixed_key%0#0",
         "map_prefixed_key%0#0 (copy)"
       ]
     },
-    "622": {
+    "627": {
       "op": "box_len",
       "defined_out": [
         "_%0#0",
+        "cell#0",
         "encoded_value%0#0",
         "map_prefixed_key%0#0",
         "maybe_exists%0#0",
@@ -5756,69 +5803,70 @@
       ],
       "stack_out": [
         "new_owner#0",
+        "map_prefixed_key%0#0",
+        "cell#0",
         "encoded_value%0#0",
         "map_prefixed_key%0#0",
         "_%0#0",
         "maybe_exists%0#0"
       ]
     },
-    "623": {
+    "628": {
       "op": "bury 1",
       "stack_out": [
         "new_owner#0",
+        "map_prefixed_key%0#0",
+        "cell#0",
         "encoded_value%0#0",
         "map_prefixed_key%0#0",
         "maybe_exists%0#0"
       ]
     },
-    "625": {
+    "630": {
       "error": "cell not registered",
       "op": "assert // cell not registered",
       "stack_out": [
         "new_owner#0",
+        "map_prefixed_key%0#0",
+        "cell#0",
         "encoded_value%0#0",
         "map_prefixed_key%0#0"
       ]
     },
-    "626": {
-      "op": "dup",
-      "stack_out": [
-        "new_owner#0",
-        "encoded_value%0#0",
-        "map_prefixed_key%0#0",
-        "map_prefixed_key%0#0 (copy)"
-      ]
-    },
-    "627": {
+    "631": {
       "op": "box_get",
       "defined_out": [
         "aggregate%box_get%0#0",
         "aggregate%box_get%1#0",
+        "cell#0",
         "encoded_value%0#0",
         "map_prefixed_key%0#0",
         "new_owner#0"
       ],
       "stack_out": [
         "new_owner#0",
-        "encoded_value%0#0",
         "map_prefixed_key%0#0",
+        "cell#0",
+        "encoded_value%0#0",
         "aggregate%box_get%0#0",
         "aggregate%box_get%1#0"
       ]
     },
-    "628": {
+    "632": {
       "op": "pop",
       "stack_out": [
         "new_owner#0",
-        "encoded_value%0#0",
         "map_prefixed_key%0#0",
+        "cell#0",
+        "encoded_value%0#0",
         "aggregate%box_get%0#0"
       ]
     },
-    "629": {
+    "633": {
       "op": "txn Sender",
       "defined_out": [
         "aggregate%box_get%0#0",
+        "cell#0",
         "encoded_value%0#0",
         "map_prefixed_key%0#0",
         "new_owner#0",
@@ -5826,15 +5874,17 @@
       ],
       "stack_out": [
         "new_owner#0",
-        "encoded_value%0#0",
         "map_prefixed_key%0#0",
+        "cell#0",
+        "encoded_value%0#0",
         "aggregate%box_get%0#0",
         "tmp%0#1"
       ]
     },
-    "631": {
+    "635": {
       "op": "==",
       "defined_out": [
+        "cell#0",
         "encoded_value%0#0",
         "map_prefixed_key%0#0",
         "new_owner#0",
@@ -5842,47 +5892,53 @@
       ],
       "stack_out": [
         "new_owner#0",
-        "encoded_value%0#0",
         "map_prefixed_key%0#0",
+        "cell#0",
+        "encoded_value%0#0",
         "tmp%1#1"
       ]
     },
-    "632": {
+    "636": {
       "error": "only controlling owner",
       "op": "assert // only controlling owner",
       "stack_out": [
         "new_owner#0",
-        "encoded_value%0#0",
-        "map_prefixed_key%0#0"
+        "map_prefixed_key%0#0",
+        "cell#0",
+        "encoded_value%0#0"
       ]
     },
-    "633": {
+    "637": {
       "op": "bytec_3 // 0x695f",
       "defined_out": [
         "0x695f",
+        "cell#0",
         "encoded_value%0#0",
         "map_prefixed_key%0#0",
         "new_owner#0"
       ],
       "stack_out": [
         "new_owner#0",
-        "encoded_value%0#0",
         "map_prefixed_key%0#0",
+        "cell#0",
+        "encoded_value%0#0",
         "0x695f"
       ]
     },
-    "634": {
-      "op": "uncover 2",
+    "638": {
+      "op": "swap",
       "stack_out": [
         "new_owner#0",
         "map_prefixed_key%0#0",
+        "cell#0",
         "0x695f",
         "encoded_value%0#0"
       ]
     },
-    "636": {
+    "639": {
       "op": "concat",
       "defined_out": [
+        "cell#0",
         "map_prefixed_key%0#0",
         "map_prefixed_key%2#0",
         "new_owner#0"
@@ -5890,13 +5946,15 @@
       "stack_out": [
         "new_owner#0",
         "map_prefixed_key%0#0",
+        "cell#0",
         "map_prefixed_key%2#0"
       ]
     },
-    "637": {
+    "640": {
       "op": "box_len",
       "defined_out": [
         "_%1#0",
+        "cell#0",
         "map_prefixed_key%0#0",
         "maybe_exists%1#0",
         "new_owner#0"
@@ -5904,21 +5962,24 @@
       "stack_out": [
         "new_owner#0",
         "map_prefixed_key%0#0",
+        "cell#0",
         "_%1#0",
         "maybe_exists%1#0"
       ]
     },
-    "638": {
+    "641": {
       "op": "bury 1",
       "stack_out": [
         "new_owner#0",
         "map_prefixed_key%0#0",
+        "cell#0",
         "maybe_exists%1#0"
       ]
     },
-    "640": {
+    "643": {
       "op": "!",
       "defined_out": [
+        "cell#0",
         "map_prefixed_key%0#0",
         "new_owner#0",
         "tmp%2#1"
@@ -5926,70 +5987,246 @@
       "stack_out": [
         "new_owner#0",
         "map_prefixed_key%0#0",
+        "cell#0",
         "tmp%2#1"
       ]
     },
-    "641": {
+    "644": {
       "error": "already inscribed; owner frozen",
       "op": "assert // already inscribed; owner frozen",
       "stack_out": [
         "new_owner#0",
-        "map_prefixed_key%0#0"
-      ]
-    },
-    "642": {
-      "op": "dig 1",
-      "stack_out": [
-        "new_owner#0",
         "map_prefixed_key%0#0",
-        "new_owner#0 (copy)"
+        "cell#0"
       ]
     },
-    "644": {
-      "op": "global ZeroAddress",
+    "645": {
+      "op": "txn Sender",
       "defined_out": [
+        "cell#0",
         "map_prefixed_key%0#0",
         "new_owner#0",
-        "new_owner#0 (copy)",
         "tmp%3#0"
       ],
       "stack_out": [
         "new_owner#0",
         "map_prefixed_key%0#0",
-        "new_owner#0 (copy)",
+        "cell#0",
         "tmp%3#0"
-      ]
-    },
-    "646": {
-      "op": "!=",
-      "defined_out": [
-        "map_prefixed_key%0#0",
-        "new_owner#0",
-        "tmp%4#0"
-      ],
-      "stack_out": [
-        "new_owner#0",
-        "map_prefixed_key%0#0",
-        "tmp%4#0"
       ]
     },
     "647": {
+      "op": "swap",
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "tmp%3#0",
+        "cell#0"
+      ]
+    },
+    "648": {
+      "op": "asset_holding_get AssetBalance",
+      "defined_out": [
+        "_bal#0",
+        "_held#0",
+        "map_prefixed_key%0#0",
+        "new_owner#0"
+      ],
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
+        "_held#0"
+      ]
+    },
+    "650": {
+      "op": "bz update_owner_bool_false@4",
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0"
+      ]
+    },
+    "653": {
+      "op": "dup",
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
+        "_bal#0"
+      ]
+    },
+    "654": {
+      "op": "intc_1 // 1",
+      "defined_out": [
+        "1",
+        "_bal#0",
+        "map_prefixed_key%0#0",
+        "new_owner#0"
+      ],
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
+        "_bal#0",
+        "1"
+      ]
+    },
+    "655": {
+      "op": "==",
+      "defined_out": [
+        "_bal#0",
+        "map_prefixed_key%0#0",
+        "new_owner#0",
+        "tmp%6#0"
+      ],
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
+        "tmp%6#0"
+      ]
+    },
+    "656": {
+      "op": "bz update_owner_bool_false@4",
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0"
+      ]
+    },
+    "659": {
+      "op": "intc_1 // 1",
+      "defined_out": [
+        "_bal#0",
+        "and_result%0#0",
+        "map_prefixed_key%0#0",
+        "new_owner#0"
+      ],
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
+        "and_result%0#0"
+      ]
+    },
+    "660": {
+      "error": "caller does not hold the cell",
+      "block": "update_owner_bool_merge@5",
+      "stack_in": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
+        "and_result%0#0"
+      ],
+      "op": "assert // caller does not hold the cell",
+      "defined_out": [],
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0"
+      ]
+    },
+    "661": {
+      "op": "global ZeroAddress",
+      "defined_out": [
+        "tmp%7#0"
+      ],
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
+        "tmp%7#0"
+      ]
+    },
+    "663": {
+      "op": "dig 3",
+      "defined_out": [
+        "new_owner#0",
+        "tmp%7#0"
+      ],
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
+        "tmp%7#0",
+        "new_owner#0"
+      ]
+    },
+    "665": {
+      "op": "dup"
+    },
+    "666": {
+      "op": "uncover 2",
+      "defined_out": [
+        "new_owner#0",
+        "new_owner#0 (copy)",
+        "tmp%7#0"
+      ],
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
+        "new_owner#0",
+        "new_owner#0 (copy)",
+        "tmp%7#0"
+      ]
+    },
+    "668": {
+      "op": "!=",
+      "defined_out": [
+        "new_owner#0",
+        "tmp%8#0"
+      ],
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
+        "new_owner#0",
+        "tmp%8#0"
+      ]
+    },
+    "669": {
       "error": "new owner cannot be the zero address",
       "op": "assert // new owner cannot be the zero address",
       "stack_out": [
         "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
+        "new_owner#0"
+      ]
+    },
+    "670": {
+      "op": "dig 2",
+      "defined_out": [
+        "map_prefixed_key%0#0",
+        "new_owner#0"
+      ],
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
+        "new_owner#0",
         "map_prefixed_key%0#0"
       ]
     },
-    "648": {
+    "672": {
       "op": "dup",
+      "defined_out": [
+        "map_prefixed_key%0#0",
+        "map_prefixed_key%0#0 (copy)",
+        "new_owner#0"
+      ],
       "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
         "new_owner#0",
         "map_prefixed_key%0#0",
         "map_prefixed_key%0#0 (copy)"
       ]
     },
-    "649": {
+    "673": {
       "op": "box_del",
       "defined_out": [
         "map_prefixed_key%0#0",
@@ -5999,41 +6236,84 @@
       "stack_out": [
         "new_owner#0",
         "map_prefixed_key%0#0",
+        "_bal#0",
+        "new_owner#0",
+        "map_prefixed_key%0#0",
         "{box_del}"
       ]
     },
-    "650": {
+    "674": {
       "op": "pop",
       "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
         "new_owner#0",
         "map_prefixed_key%0#0"
       ]
     },
-    "651": {
+    "675": {
       "op": "swap",
       "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
         "map_prefixed_key%0#0",
         "new_owner#0"
       ]
     },
-    "652": {
+    "676": {
       "op": "box_put",
-      "stack_out": []
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0"
+      ]
     },
-    "653": {
+    "677": {
       "op": "intc_1 // 1",
       "defined_out": [
-        "1"
+        "1",
+        "map_prefixed_key%0#0",
+        "new_owner#0"
       ],
       "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
         "1"
       ]
     },
-    "654": {
+    "678": {
       "op": "return",
-      "stack_out": []
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0"
+      ]
     },
-    "655": {
+    "679": {
+      "block": "update_owner_bool_false@4",
+      "stack_in": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0"
+      ],
+      "op": "intc_0 // 0",
+      "defined_out": [
+        "and_result%0#0"
+      ],
+      "stack_out": [
+        "new_owner#0",
+        "map_prefixed_key%0#0",
+        "_bal#0",
+        "and_result%0#0"
+      ]
+    },
+    "680": {
+      "op": "b update_owner_bool_merge@5"
+    },
+    "683": {
       "subroutine": "inscription.TrelyanInscription.get_inscription[routing]",
       "params": {},
       "block": "get_inscription",
@@ -6046,7 +6326,7 @@
         "cell_id#0"
       ]
     },
-    "658": {
+    "686": {
       "op": "dup",
       "defined_out": [
         "cell_id#0",
@@ -6057,7 +6337,7 @@
         "cell_id#0 (copy)"
       ]
     },
-    "659": {
+    "687": {
       "op": "len",
       "defined_out": [
         "cell_id#0",
@@ -6068,7 +6348,7 @@
         "len%0#0"
       ]
     },
-    "660": {
+    "688": {
       "op": "intc_2 // 8",
       "defined_out": [
         "8",
@@ -6081,7 +6361,7 @@
         "8"
       ]
     },
-    "661": {
+    "689": {
       "op": "==",
       "defined_out": [
         "cell_id#0",
@@ -6092,14 +6372,14 @@
         "eq%0#0"
       ]
     },
-    "662": {
+    "690": {
       "error": "invalid number of bytes for arc4.uint64",
       "op": "assert // invalid number of bytes for arc4.uint64",
       "stack_out": [
         "cell_id#0"
       ]
     },
-    "663": {
+    "691": {
       "op": "btoi",
       "defined_out": [
         "materialized_values%0#0"
@@ -6108,7 +6388,7 @@
         "materialized_values%0#0"
       ]
     },
-    "664": {
+    "692": {
       "op": "itob",
       "defined_out": [
         "encoded_value%0#0"
@@ -6117,7 +6397,7 @@
         "encoded_value%0#0"
       ]
     },
-    "665": {
+    "693": {
       "op": "bytec_3 // 0x695f",
       "defined_out": [
         "0x695f",
@@ -6128,14 +6408,14 @@
         "0x695f"
       ]
     },
-    "666": {
+    "694": {
       "op": "swap",
       "stack_out": [
         "0x695f",
         "encoded_value%0#0"
       ]
     },
-    "667": {
+    "695": {
       "op": "concat",
       "defined_out": [
         "map_prefixed_key%0#0"
@@ -6144,7 +6424,7 @@
         "map_prefixed_key%0#0"
       ]
     },
-    "668": {
+    "696": {
       "op": "box_get",
       "defined_out": [
         "aggregate%box_get%0#0",
@@ -6155,14 +6435,14 @@
         "aggregate%box_get%1#0"
       ]
     },
-    "669": {
+    "697": {
       "error": "check self.inscriptions entry exists",
       "op": "assert // check self.inscriptions entry exists",
       "stack_out": [
         "aggregate%box_get%0#0"
       ]
     },
-    "670": {
+    "698": {
       "op": "pushbytes 0x151f7c75",
       "defined_out": [
         "0x151f7c75",
@@ -6173,14 +6453,14 @@
         "0x151f7c75"
       ]
     },
-    "676": {
+    "704": {
       "op": "swap",
       "stack_out": [
         "0x151f7c75",
         "aggregate%box_get%0#0"
       ]
     },
-    "677": {
+    "705": {
       "op": "concat",
       "defined_out": [
         "tmp%2#0"
@@ -6189,11 +6469,11 @@
         "tmp%2#0"
       ]
     },
-    "678": {
+    "706": {
       "op": "log",
       "stack_out": []
     },
-    "679": {
+    "707": {
       "op": "intc_1 // 1",
       "defined_out": [
         "1"
@@ -6202,7 +6482,7 @@
         "1"
       ]
     },
-    "680": {
+    "708": {
       "op": "return",
       "stack_out": []
     }

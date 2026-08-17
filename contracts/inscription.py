@@ -331,6 +331,23 @@ class TrelyanInscription(ARC4Contract):
         assert cid in self.controlling_owner, "cell not registered"
         assert self.controlling_owner[cid] == Txn.sender.bytes, "only controlling owner"
         assert cid not in self.inscriptions, "already inscribed; owner frozen"
+        # TCE-76: the CALLER must still hold the cell ASA.
+        #
+        # Without this, a seller who transferred the Cell ASA but remained the recorded
+        # controlling_owner could still reassign control of a cell someone else now holds --
+        # including to an address with no known key, permanently bricking it. The zero-address
+        # guard below closes only the member of that family reached by accident; this closes
+        # the deliberate path at its source, by requiring the mover to have something to lose.
+        #
+        # Chosen over a check on the DESTINATION (balance(new_owner) == 1) deliberately: that
+        # would close the whole unsignable family but redefine controlling_owner as "must be
+        # the current holder", forbidding a delegate, an escrow, or assigning control before
+        # the NFT moves. This constrains WHO MAY MOVE control, not WHERE it may point.
+        #
+        # Same operand order and idiom as C1 in inscribe (see there for why clawback/freeze
+        # being cleared at register_cell is what makes a balance check trustworthy at all).
+        _bal, _held = op.AssetHoldingGet.asset_balance(Txn.sender, cell)
+        assert _held and _bal == UInt64(1), "caller does not hold the cell"
         # The DESTINATION was previously unvalidated: any 32 bytes were written. The zero
         # address is an absorbing state — both remaining movers (inscribe C1 and this method)
         # require controlling_owner[cid] == Txn.sender.bytes, which no key can ever satisfy for
