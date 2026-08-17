@@ -46,6 +46,14 @@ WORKDIR /trelyan
 # subtree (rather than git clone) is what makes this hermetic and clean-checkout-faithful.
 COPY sdk/ sdk/
 COPY scripts/ scripts/
+# contracts/ was OMITTED, and the omission was invisible. verify_trelyan.py resolves
+# COMMITTED_TEAL to <root>/contracts/out/TrelyanInscription.approval.teal; without it the
+# source-correspondence check silently did not run, and because a skipped check counted as
+# neither pass nor fail the PASS COUNT WAS IDENTICAL either way. From a clone the same script
+# reported 17 passed / 1 failed (with "deployed bytecode matches the committed contract"
+# FAILING); from this container, 17 passed / 0 failed. The advertised hermetic path returned
+# clean green on precisely the divergence the contract-drift CI job exists to catch.
+COPY contracts/ contracts/
 
 # --- 1. Fetch the pinned Falcon source via the GitHub TARBALL (NOT git clone) -----------------
 # A clone applies the runner's core.autocrlf, which can rewrite the C sources LF->CRLF and change

@@ -14,8 +14,21 @@ FROM python:3.13-slim@sha256:c33f0bc4364a6881bed1ec0cc2665e6c53c87a43e774aaeab88
 RUN pip install --no-cache-dir "trelyan-pq==0.1.0"
 
 WORKDIR /trelyan
-COPY sdk/examples/verify_trelyan.py .
+# Copy the script AT ITS REPO PATH, and bring the committed artifact with it.
+#
+# This previously did `COPY sdk/examples/verify_trelyan.py .`, putting the script at
+# /trelyan/verify_trelyan.py. The script resolved the committed TEAL relative to its own
+# location, so `parents[2]` on a two-deep path raised IndexError at MODULE LEVEL - before the
+# first print - and the documented command (REVIEWER.md, AUDIT_READINESS.md) produced a
+# traceback and ran zero checks. The script is defensive about that now, but the layout is
+# fixed here as well so the source-correspondence check actually RUNS rather than being
+# skipped: a hermetic reviewer container that cannot compare the deployment against the
+# committed source is not doing the job the docs claim for it.
+COPY sdk/examples/verify_trelyan.py sdk/examples/
+COPY contracts/out/ contracts/out/
 
 # Read-only: package constants, offline golden vectors, live app 763809096 bytecode fingerprint
-# (asserted against the pinned value), on-chain boxes, and byte-exact message reconstruction.
-CMD ["python", "verify_trelyan.py"]
+# (asserted against the pinned value), source correspondence against the committed TEAL,
+# on-chain boxes, and byte-exact message reconstruction.
+# Exit 0 = all checks passed. 1 = a check FAILED. 2 = a check could not run (see the SKIP lines).
+CMD ["python", "sdk/examples/verify_trelyan.py"]

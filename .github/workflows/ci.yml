@@ -89,6 +89,92 @@ jobs:
         # byte-exact local rebuild of the domain-separated message. Exits non-zero
         # on any failure. No account, no mnemonic, no secrets.
 
+  reviewer-containers:
+    name: The reviewer-facing containers actually run
+    # NOTHING in CI ran either Dockerfile, or scripts/verify_all.sh, or any Makefile target:
+    # `grep -rniE docker .github/` returned nothing. So every entry point REVIEWER.md and
+    # AUDIT_READINESS.md hand to an external auditor was unexercised, and two of them were broken:
+    #
+    #   * Dockerfile.verify copied the script bare into WORKDIR /trelyan, so its `parents[2]`
+    #     resolution of the committed TEAL raised IndexError at MODULE LEVEL - before the first
+    #     print. The documented command produced a traceback and ran zero checks. Failed closed.
+    #   * Dockerfile.repro omitted contracts/ entirely, so the source-correspondence check
+    #     silently did not run. Because a skipped check counted as neither pass nor fail, the PASS
+    #     COUNT WAS IDENTICAL either way: 17 passed / 1 failed from a clone, 17 passed / 0 failed
+    #     from the container. It returned clean green on the exact divergence contract-drift is
+    #     red on, and nothing signalled the dropped check.
+    #
+    # WHAT THIS JOB ASSERTS, and deliberately what it does NOT.
+    #
+    # It asserts the containers BUILD, RUN, and report "0 not checked" - i.e. every check they
+    # claim to perform actually executed. It does NOT assert a particular verdict: whether the
+    # deployment matches the committed contract is contract-drift's job, and encoding today's
+    # known drift here would make this job wrong the moment the redeploy lands.
+    #
+    # So this job stays valid across the redeploy, and it CAN fail: it goes red if a container
+    # stops building, if the script crashes again, or if any check silently stops running.
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+
+      - name: Build both reviewer images
+        run: |
+          docker build -f Dockerfile.verify -t trelyan-verify .
+          docker build -f Dockerfile.repro  -t trelyan-repro  .
+
+      - name: Dockerfile.verify runs every check it claims (exit 0/1/2, never a traceback)
+        run: |
+          set +e
+          docker run --rm trelyan-verify > verify.log 2>&1
+          rc=$?
+          set -e
+          echo "exit=$rc"; cat verify.log
+
+          # A traceback means the script died before reporting - the TCE-71 regression.
+          if grep -q "Traceback (most recent call last)" verify.log; then
+            echo "::error::verify_trelyan.py crashed inside the container instead of reporting checks"
+            exit 1
+          fi
+          # No RESULT line means it never got to the end.
+          if ! grep -qE "^== RESULT: " verify.log; then
+            echo "::error::no RESULT line - the script did not complete"
+            exit 1
+          fi
+          # "not checked" > 0 means a check the docs advertise silently did not run. This is the
+          # assertion that would have caught TCE-70, and it does not depend on the drift verdict.
+          if ! grep -qE "^== RESULT: .* 0 not checked ==" verify.log; then
+            echo "::error::a check did not run - see the SKIP lines above. A skipped check is not a pass."
+            grep -E "^  SKIP  " verify.log || true
+            exit 1
+          fi
+          # rc 2 is reserved for "could not check", which the line above has already ruled out.
+          if [ "$rc" = "2" ]; then
+            echo "::error::exit 2 (could not check) with 0 not-checked reported - inconsistent"
+            exit 1
+          fi
+          echo "verify container ran every check it claims (exit $rc; 1 = a check FAILED, which is contract-drift's finding, not this job's)"
+
+      - name: Dockerfile.repro carries contracts/ so source correspondence can be checked
+        run: |
+          # Direct assertion on the image contents, independent of the script's own reporting.
+          # The COPY was missing for long enough to ship a falsely-green hermetic verifier;
+          # asserting the file is present is cheap and cannot be satisfied by accident.
+          docker run --rm trelyan-repro test -f contracts/out/TrelyanInscription.approval.teal
+          echo "committed TEAL is present in the repro image"
+
+      - name: scripts/verify_all.sh is syntactically sound and its KAT axis cannot silently skip
+        run: |
+          # The full run needs the pinned Falcon build and network, which signature-kat and
+          # verify-live already cover. What was never checked is that this script PARSES - it is
+          # handed to reviewers and had never been executed by CI in any form.
+          sh -n scripts/verify_all.sh
+          # And that Axis C arms the library, not just the fixture. Grepping the source is weaker
+          # than running it, and is honest about being a tripwire: the real assertion lives in
+          # sdk/tests/test_signature_kat.py::test_the_library_is_available_when_required.
+          grep -q "TRELYAN_REQUIRE_KAT=1" scripts/verify_all.sh
+          echo "verify_all.sh parses and arms the KAT gate"
+
   contract-drift:
     name: Deployed app matches the committed contract (non-circular)
     # verify_trelyan.py pins EXPECTED_APPROVAL_SHA512_256, a constant copied from the DEPLOYED

@@ -8,7 +8,7 @@ Checks: [1] package constants  [2] pinned golden vectors (offline)
         [5] message reconstruction for a live cell (byte-exact, recomputed locally)
 Read-only. Only dependency: trelyan-pq (stdlib otherwise).
 """
-import json, sys, base64, pathlib, urllib.request
+import json, os, sys, base64, pathlib, urllib.request
 
 APP_ID = 763809096
 # The fingerprint of the program deployed on 2026-06-02, recorded here on 2026-06-17 (660 B).
@@ -22,14 +22,47 @@ APP_ID = 763809096
 PINNED_ON_CHAIN_SHA512_256 = "d24d9071209f526a2075542d9408295d78f83ca5ed4c8cc233000130dcc97d44"
 # Committed build artifact, when this script is run from a repo clone rather than downloaded
 # on its own. sdk/examples/ -> repo root -> contracts/out/.
-COMMITTED_TEAL = pathlib.Path(__file__).resolve().parents[2] / "contracts" / "out" / "TrelyanInscription.approval.teal"
+# Resolved DEFENSIVELY, and it must never raise. `parents[2]` assumed this file sits at
+# <repo>/sdk/examples/, which is true in a clone and false in Dockerfile.verify, where the script
+# was copied bare into WORKDIR /trelyan. There `parents` is ['/trelyan', '/'] and `parents[2]`
+# raised IndexError at MODULE LEVEL - before the first print - so the documented hermetic
+# reviewer command (REVIEWER.md, AUDIT_READINESS.md) produced a traceback and ran no checks at
+# all. It failed closed, so there was no false assurance, but the docs promise 15/15.
+def _find_committed_teal():
+    env = os.environ.get("TRELYAN_COMMITTED_TEAL")
+    if env:
+        return pathlib.Path(env)
+    rel = pathlib.Path("contracts") / "out" / "TrelyanInscription.approval.teal"
+    here = pathlib.Path(__file__).resolve()
+    for base in [here.parent, *here.parents]:
+        cand = base / rel
+        if cand.exists():
+            return cand
+    return here.parent / rel          # non-existent path; .exists() is False, which is handled
+
+
+COMMITTED_TEAL = _find_committed_teal()
 ALGOD = "https://testnet-api.algonode.cloud"
 TESTNET_GENESIS_B64 = "SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI="
-PASS, FAIL = 0, 0
+PASS, FAIL, NOT_CHECKED = 0, 0, 0
 def check(name, ok, detail=""):
     global PASS, FAIL
     PASS, FAIL = PASS + (1 if ok else 0), FAIL + (0 if ok else 1)
     print(("  PASS  " if ok else "  FAIL  ") + name + (f"  [{detail}]" if detail else ""))
+
+def not_checked(name, why):
+    """A check that did not run is neither a pass nor a failure, and must not be silent.
+
+    Added 2026-08-16. Skipped checks were previously printed as prose and counted as NOTHING,
+    so the pass count was IDENTICAL whether or not they ran: from a repo clone this script
+    reported 17 passed / 1 failed, and from the advertised hermetic container 17 passed /
+    0 failed - green, on the exact divergence the contract-drift CI job is red on, with no
+    signal that a check had been dropped. Counting them and exiting 2 mirrors
+    contracts/verify_deployment.py, which already separates "could not check" from "agreed".
+    """
+    global NOT_CHECKED
+    NOT_CHECKED += 1
+    print("  SKIP  " + name + f"  [{why}]")
 
 def get(path):
     with urllib.request.urlopen(ALGOD + path, timeout=20) as r:
@@ -37,7 +70,13 @@ def get(path):
 
 print("== [1] package ==")
 import trelyan_pq as t
-check("trelyan-pq import", True, f"v{t.__version__} (PyPI)")
+# Was `check("trelyan-pq import", True, ...)` - a literal True, so it could not fail. The import
+# on the line above already succeeded or this file would have raised, so assert something the
+# import does NOT guarantee: that the package reports a real released version rather than the
+# source-tree fallback.
+check("trelyan-pq import",
+      bool(getattr(t, "__version__", "")) and not t.__version__.endswith("+source"),
+      f"v{t.__version__}")
 check("DOMAIN_TAG", t.DOMAIN_TAG == b"TRELYAN-INSCRIPTION-v1")
 check("MESSAGE_LEN == 102", t.MESSAGE_LEN == 102)
 check("det1024 header 0xBA", t.DET_COMPRESSED_HEADER == 0xBA)
@@ -76,7 +115,9 @@ if COMMITTED_TEAL.exists():
         print(f"        chain is actually serving  : {fp}  ({len(ap)} B)")
         print("        -> the deployment predates the committed contract; see contracts/verify_deployment.py")
 else:
-    print("        source correspondence: NOT CHECKED (no committed artifact next to this script).")
+    not_checked("deployed bytecode matches the committed contract",
+                f"no committed artifact found at {COMMITTED_TEAL} "
+                f"(set TRELYAN_COMMITTED_TEAL to override)")
     print("        Run contracts/verify_deployment.py from a repo clone to compare the deployed")
     print("        program against a fresh assembly of contracts/out/*.teal.")
 
@@ -86,6 +127,9 @@ names = [base64.b64decode(b["name"]) for b in boxes]
 ks = [n for n in names if n[:2] == b"k_"]; iss = [n for n in names if n[:2] == b"i_"]
 check("boxes present", len(names) > 0, f"{len(names)} total: {len(ks)} pubkey, {len(iss)} inscription")
 ver_target = None
+if not ks:
+    # A loop over an empty list asserts nothing and printed nothing - the vacuous-domain shape.
+    not_checked("registered Falcon public keys on-chain", "no k_ boxes returned by algod")
 for n in ks[:3]:
     cell = int.from_bytes(n[2:], "big")
     bx = get(f"/v2/applications/{APP_ID}/box?name=" + urllib.parse.quote("b64:" + base64.b64encode(n).decode()))
@@ -148,5 +192,12 @@ except Exception as e:
     print(f"        full local falcon verify: NOT available ({type(e).__name__}: {str(e).splitlines()[0][:90]})")
     print("        the structural checks above stand on their own; they do not need the C library")
 
-print(f"\n== RESULT: {PASS} passed, {FAIL} failed ==")
-sys.exit(1 if FAIL else 0)
+print(f"\n== RESULT: {PASS} passed, {FAIL} failed, {NOT_CHECKED} not checked ==")
+if FAIL:
+    sys.exit(1)
+if NOT_CHECKED:
+    # Exit 2, not 0. "I could not check that" is not "that is fine", and the pass count alone
+    # cannot tell them apart - which is exactly how the hermetic container reported green.
+    print("   NOT ALL CHECKS RAN. This is not a pass. See the SKIP lines above.")
+    sys.exit(2)
+sys.exit(0)
