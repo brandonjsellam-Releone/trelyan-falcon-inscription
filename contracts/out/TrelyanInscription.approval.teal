@@ -51,20 +51,20 @@ main_bare_routing@15:
     err
 
 main_on_delete@17:
-    // inscription.py:353
+    // inscription.py:370
     // @arc4.baremethod(allow_actions=["DeleteApplication"])
     txn ApplicationID
     assert
-    // inscription.py:356
+    // inscription.py:373
     // assert False, "contract is non-deletable (I1/I5)"  # noqa: B011
     err // contract is non-deletable (I1/I5)
 
 main_on_update@16:
-    // inscription.py:348
+    // inscription.py:365
     // @arc4.baremethod(allow_actions=["UpdateApplication"])
     txn ApplicationID
     assert
-    // inscription.py:351
+    // inscription.py:368
     // assert False, "contract is non-upgradable (I5)"  # noqa: B011
     err // contract is non-upgradable (I5)
 
@@ -216,10 +216,22 @@ register_cell_bool_merge@5:
     pushint 1024
     <
     assert // all 1024 cells registered
-    // inscription.py:218-219
+    // inscription.py:218-222
+    // # Same absorbing-state guard as update_owner, at the OTHER point an owner enters state.
+    // # Minting straight to the zero address would brick the cell at registration, before any
+    // # owner ever holds it. Both writers are covered so the invariant is "no cell is ever
+    // # owned by the zero address", not "one path happens to check".
+    // assert controlling_owner.bytes != Global.zero_address.bytes, "controlling owner cannot be the zero address"
+    global ZeroAddress
+    dig 5
+    dup
+    uncover 2
+    !=
+    assert // controlling owner cannot be the zero address
+    // inscription.py:223-224
     // # register-once: committed key and owner must not already exist
     // assert cid not in self.committed_pubkey, "cell already registered"
-    uncover 2
+    uncover 3
     itob
     bytec 4 // 0x6b5f
     dig 1
@@ -229,7 +241,7 @@ register_cell_bool_merge@5:
     bury 1
     !
     assert // cell already registered
-    // inscription.py:220
+    // inscription.py:225
     // assert cid not in self.controlling_owner, "cell already registered (owner)"
     bytec_2 // 0x6f5f
     uncover 2
@@ -239,23 +251,23 @@ register_cell_bool_merge@5:
     bury 1
     !
     assert // cell already registered (owner)
-    // inscription.py:222-223
+    // inscription.py:227-228
     // # write immutable commitments atomically
     // self.committed_pubkey[cid] = committed_pubkey.native   # store the raw 1793 B key, NOT the ARC4-prefixed encoding
     dig 1
     box_del
     pop
     swap
-    uncover 3
+    uncover 4
     box_put
-    // inscription.py:224
+    // inscription.py:229
     // self.controlling_owner[cid] = controlling_owner.bytes
     dup
     box_del
     pop
-    dig 3
+    swap
     box_put
-    // inscription.py:225
+    // inscription.py:230
     // self.cells_registered += UInt64(1)
     intc_1 // 1
     +
@@ -276,7 +288,7 @@ register_cell_bool_false@4:
 inscribe:
     intc_0 // 0
     dupn 2
-    // inscription.py:231
+    // inscription.py:236
     // @arc4.abimethod
     txna ApplicationArgs 1
     dupn 2
@@ -314,7 +326,7 @@ inscribe:
     len
     ==
     assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
-    // inscription.py:255-256
+    // inscription.py:260-261
     // # --- structural preconditions ---
     // assert cid in self.committed_pubkey, "cell not registered"             # must be minted
     dig 2
@@ -329,7 +341,7 @@ inscribe:
     box_len
     bury 1
     assert // cell not registered
-    // inscription.py:257
+    // inscription.py:262
     // assert falcon_sig.native.length <= SIG_COMPRESSED_MAXLEN, "falcon sig too large"  # .native (no ARC4 prefix); det1024 compressed <=1423B: cheap pre-verify DoS bound
     swap
     extract 2 0
@@ -339,14 +351,14 @@ inscribe:
     pushint 1423
     <=
     assert // falcon sig too large
-    // inscription.py:259
+    // inscription.py:264
     // assert payload_uri.native.length <= URI_MAXLEN, "payload_uri too long"  # .native (no ARC4 prefix); spec §3 <=128B: bounds the write-once box size (M3)
     extract 2 0
     len
     pushint 128
     <=
     assert // payload_uri too long
-    // inscription.py:261-266
+    // inscription.py:266-271
     // # --- C1: ownership, HARDENED [Hermes#2] ---
     // # Sender must (a) currently hold exactly the Cell, AND (b) be the controlling owner recorded
     // # at mint. (b) defeats transient/flash-custody: a temporary ASA holder is not the recorded
@@ -356,7 +368,7 @@ inscribe:
     txn Sender
     swap
     asset_holding_get AssetBalance
-    // inscription.py:267
+    // inscription.py:272
     // assert exists and balance == UInt64(1), "sender does not hold the cell"
     bz inscribe_bool_false@4
     dup
@@ -366,10 +378,10 @@ inscribe:
     intc_1 // 1
 
 inscribe_bool_merge@5:
-    // inscription.py:267
+    // inscription.py:272
     // assert exists and balance == UInt64(1), "sender does not hold the cell"
     assert // sender does not hold the cell
-    // inscription.py:268
+    // inscription.py:273
     // assert cid in self.controlling_owner, "no controlling owner set"
     bytec_2 // 0x6f5f
     dig 4
@@ -380,14 +392,14 @@ inscribe_bool_merge@5:
     box_len
     bury 1
     assert // no controlling owner set
-    // inscription.py:269
+    // inscription.py:274
     // assert self.controlling_owner[cid] == Txn.sender.bytes, "sender not controlling owner"
     box_get
     pop
     txn Sender
     ==
     assert // sender not controlling owner
-    // inscription.py:271-272
+    // inscription.py:276-277
     // # --- C2: single-use / write-once (I1) ---
     // assert cid not in self.inscriptions, "cell already inscribed"
     bytec_3 // 0x695f
@@ -399,7 +411,7 @@ inscribe_bool_merge@5:
     bury 1
     !
     assert // cell already inscribed
-    // inscription.py:274-278
+    // inscription.py:279-283
     // # --- C5: the controlling key is the one committed at mint, read from the IMMUTABLE mint
     // # record [Hermes#4]. There is no pubkey argument to validate against a hash anymore (A9): the
     // # contract uses the committed key DIRECTLY, so key-substitution is impossible by construction
@@ -410,35 +422,35 @@ inscribe_bool_merge@5:
     swap
     bury 10
     assert // check self.committed_pubkey entry exists
-    // inscription.py:307
+    // inscription.py:312
     // + op.itob(Global.current_application_id.id)   # [Hermes#3] bind to THIS app
     global CurrentApplicationID
     itob
-    // inscription.py:306
+    // inscription.py:311
     // DOMAIN_TAG
     pushbytes 0x5452454c59414e2d494e534352495054494f4e2d7631
-    // inscription.py:306-307
+    // inscription.py:311-312
     // DOMAIN_TAG
     // + op.itob(Global.current_application_id.id)   # [Hermes#3] bind to THIS app
     swap
     concat
-    // inscription.py:306-308
+    // inscription.py:311-313
     // DOMAIN_TAG
     // + op.itob(Global.current_application_id.id)   # [Hermes#3] bind to THIS app
     // + op.itob(cell_id)
     swap
     concat
-    // inscription.py:306-309
+    // inscription.py:311-314
     // DOMAIN_TAG
     // + op.itob(Global.current_application_id.id)   # [Hermes#3] bind to THIS app
     // + op.itob(cell_id)
     // + artifact_hash
     dig 6
     concat
-    // inscription.py:310
+    // inscription.py:315
     // + Global.genesis_hash          # A2: native network genesis (not a deploy-time arg)
     global GenesisHash
-    // inscription.py:306-310
+    // inscription.py:311-315
     // DOMAIN_TAG
     // + op.itob(Global.current_application_id.id)   # [Hermes#3] bind to THIS app
     // + op.itob(cell_id)
@@ -467,7 +479,7 @@ inscribe_while_top@9:
     b inscribe_while_top@9
 
 inscribe_after_while@14:
-    // inscription.py:287-288
+    // inscription.py:292-293
     // # --- C4: Falcon-1024 signature check against the COMMITTED key (the expensive opcode, run last) ---
     // assert op.falcon_verify(m, falcon_sig.native, pubkey), "falcon signature invalid"  # .native: raw compressed sig, no ARC4 len prefix
     dig 9
@@ -475,17 +487,17 @@ inscribe_after_while@14:
     dig 9
     falcon_verify
     assert // falcon signature invalid
-    // inscription.py:296
+    // inscription.py:301
     // inscribed_round=arc4.UInt64(Global.round),
     global Round
     itob
-    // inscription.py:297
+    // inscription.py:302
     // inscriber=arc4.Address(Txn.sender),
     txn Sender
-    // inscription.py:293
+    // inscription.py:298
     // version=arc4.UInt8(INS_VERSION),
     pushbytes 0x01
-    // inscription.py:290-299
+    // inscription.py:295-304
     // # --- effect: write the write-once record. The committed pubkey is NOT duplicated here — it
     // # already lives permanently in committed_pubkey[cid]; an I3 re-verifier reads both boxes. ---
     // rec = InscriptionRecord(
@@ -508,7 +520,7 @@ inscribe_after_while@14:
     concat
     dig 5
     concat
-    // inscription.py:300
+    // inscription.py:305
     // self.inscriptions[cid] = rec.copy()
     dig 9
     dup
@@ -516,7 +528,7 @@ inscribe_after_while@14:
     pop
     swap
     box_put
-    // inscription.py:231
+    // inscription.py:236
     // @arc4.abimethod
     intc_1 // 1
     return
@@ -528,7 +540,7 @@ inscribe_bool_false@4:
 
 // inscription.TrelyanInscription.update_owner[routing]() -> void:
 update_owner:
-    // inscription.py:317
+    // inscription.py:322
     // @arc4.abimethod
     txna ApplicationArgs 1
     dup
@@ -543,7 +555,7 @@ update_owner:
     intc_3 // 32
     ==
     assert // invalid number of bytes for arc4.static_array<arc4.uint8, 32>
-    // inscription.py:326
+    // inscription.py:331
     // assert cid in self.controlling_owner, "cell not registered"
     swap
     itob
@@ -554,7 +566,7 @@ update_owner:
     box_len
     bury 1
     assert // cell not registered
-    // inscription.py:327
+    // inscription.py:332
     // assert self.controlling_owner[cid] == Txn.sender.bytes, "only controlling owner"
     dup
     box_get
@@ -562,7 +574,7 @@ update_owner:
     txn Sender
     ==
     assert // only controlling owner
-    // inscription.py:328
+    // inscription.py:333
     // assert cid not in self.inscriptions, "already inscribed; owner frozen"
     bytec_3 // 0x695f
     uncover 2
@@ -571,14 +583,31 @@ update_owner:
     bury 1
     !
     assert // already inscribed; owner frozen
-    // inscription.py:329
+    // inscription.py:334-345
+    // # The DESTINATION was previously unvalidated: any 32 bytes were written. The zero
+    // # address is an absorbing state — both remaining movers (inscribe C1 and this method)
+    // # require controlling_owner[cid] == Txn.sender.bytes, which no key can ever satisfy for
+    // # it. Re-registration is blocked by the register-once guards above, on_update/on_delete
+    // # hard-fail (I5), and there is no admin override, so the cell becomes permanently
+    // # un-inscribable — one of only 1,024, dead, with no remedy short of minting a
+    // # replacement. THREAT_MODEL_AND_TRACEABILITY.md lists "commit a malformed key (brick a
+    // # cell)" as a defended attack and register_cell applies exactly this reasoning to the
+    // # OTHER field committed at mint; the owner pointer was simply missed.
+    // # Reachable by griefing AND by accident — algosdk encodes a default-constructed
+    // # arc4.Address as 32 zero bytes, which satisfied the only check present (ARC-4 len == 32).
+    // assert new_owner.bytes != Global.zero_address.bytes, "new owner cannot be the zero address"
+    dig 1
+    global ZeroAddress
+    !=
+    assert // new owner cannot be the zero address
+    // inscription.py:346
     // self.controlling_owner[cid] = new_owner.bytes
     dup
     box_del
     pop
     swap
     box_put
-    // inscription.py:317
+    // inscription.py:322
     // @arc4.abimethod
     intc_1 // 1
     return
@@ -586,7 +615,7 @@ update_owner:
 
 // inscription.TrelyanInscription.get_inscription[routing]() -> void:
 get_inscription:
-    // inscription.py:335
+    // inscription.py:352
     // @arc4.abimethod(readonly=True)
     txna ApplicationArgs 1
     dup
@@ -594,7 +623,7 @@ get_inscription:
     intc_2 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // inscription.py:342
+    // inscription.py:359
     // return self.inscriptions[cell_id.native]
     btoi
     itob
@@ -603,7 +632,7 @@ get_inscription:
     concat
     box_get
     assert // check self.inscriptions entry exists
-    // inscription.py:335
+    // inscription.py:352
     // @arc4.abimethod(readonly=True)
     pushbytes 0x151f7c75
     swap

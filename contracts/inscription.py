@@ -215,6 +215,11 @@ class TrelyanInscription(ARC4Contract):
         assert op.getbyte(committed_pubkey.native, UInt64(0)) == UInt64(0x0A), "bad committed pubkey header (logn=10)"
         # 1,024 cell hard cap (spec §2)
         assert self.cells_registered < TOTAL_CELLS, "all 1024 cells registered"
+        # Same absorbing-state guard as update_owner, at the OTHER point an owner enters state.
+        # Minting straight to the zero address would brick the cell at registration, before any
+        # owner ever holds it. Both writers are covered so the invariant is "no cell is ever
+        # owned by the zero address", not "one path happens to check".
+        assert controlling_owner.bytes != Global.zero_address.bytes, "controlling owner cannot be the zero address"
         # register-once: committed key and owner must not already exist
         assert cid not in self.committed_pubkey, "cell already registered"
         assert cid not in self.controlling_owner, "cell already registered (owner)"
@@ -326,6 +331,18 @@ class TrelyanInscription(ARC4Contract):
         assert cid in self.controlling_owner, "cell not registered"
         assert self.controlling_owner[cid] == Txn.sender.bytes, "only controlling owner"
         assert cid not in self.inscriptions, "already inscribed; owner frozen"
+        # The DESTINATION was previously unvalidated: any 32 bytes were written. The zero
+        # address is an absorbing state — both remaining movers (inscribe C1 and this method)
+        # require controlling_owner[cid] == Txn.sender.bytes, which no key can ever satisfy for
+        # it. Re-registration is blocked by the register-once guards above, on_update/on_delete
+        # hard-fail (I5), and there is no admin override, so the cell becomes permanently
+        # un-inscribable — one of only 1,024, dead, with no remedy short of minting a
+        # replacement. THREAT_MODEL_AND_TRACEABILITY.md lists "commit a malformed key (brick a
+        # cell)" as a defended attack and register_cell applies exactly this reasoning to the
+        # OTHER field committed at mint; the owner pointer was simply missed.
+        # Reachable by griefing AND by accident — algosdk encodes a default-constructed
+        # arc4.Address as 32 zero bytes, which satisfied the only check present (ARC-4 len == 32).
+        assert new_owner.bytes != Global.zero_address.bytes, "new owner cannot be the zero address"
         self.controlling_owner[cid] = new_owner.bytes
 
     # -------------------------------------------------------------------------
