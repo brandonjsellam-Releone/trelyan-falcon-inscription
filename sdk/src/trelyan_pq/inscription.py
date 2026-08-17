@@ -145,7 +145,39 @@ class TrelyanInscriptionClient:
                     validity_window=1000),
                 send_params=au.SendParams(populate_app_call_resources=False),
             )
-        except Exception:
+        except Exception as first:
+            # DO NOT RETRY BLINDLY. `inscribe` is WRITE-ONCE on chain (invariant I1, contract
+            # assert `cid not in inscriptions`), so this is not an idempotent call and a bare
+            # `except Exception: retry` is unsound for two distinct reasons.
+            #
+            # 1. THE FIRST ATTEMPT MAY HAVE LANDED. Anything that raises AFTER submission - a
+            #    timeout waiting for confirmation, a dropped connection, an indexer hiccup -
+            #    leaves a successful inscription on chain while the client believes it failed.
+            #    The retry then submits a second inscribe for the same cell, the contract
+            #    correctly rejects it as already inscribed, and the caller is handed a failure
+            #    for an operation that SUCCEEDED. The cell is fine; the report is wrong, which
+            #    for a write-once record is exactly the wrong way round.
+            #
+            # 2. THE RETRY ONLY ADDRESSES FEES. The two strategies differ solely in fee handling
+            #    (static fee + manual references, versus auto resource population + inner-fee
+            #    coverage). A rejected signature, a wrong controlling owner, or a malformed
+            #    argument fails identically both times - so retrying wastes a round trip and,
+            #    worse, surfaces the SECOND exception, discarding the first and usually more
+            #    informative one.
+            #
+            # So: ask the chain what actually happened before doing anything else.
+            try:
+                already = self.get_inscription(cell_id) is not None
+            except Exception:
+                # A missing box RAISES by design (contract AUDIT-NOTE A3 - a missing-key read
+                # fails the program rather than returning a zero record), so "not inscribed" and
+                # "could not reach the node" arrive the same way here. Treated as NOT inscribed,
+                # which keeps the fee fallback reachable when the node is merely unreachable.
+                already = False
+            if already:
+                # The first attempt succeeded. Returning is correct: the record exists, is
+                # immutable, and a second submission could only fail.
+                return
             self.app.send.inscribe(
                 args=args,
                 params=au.CommonAppCallParams(
