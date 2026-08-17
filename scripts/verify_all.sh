@@ -130,7 +130,11 @@ if ! python -c "import trelyan_pq, pytest" >/dev/null 2>&1; then
   echo "installing in-tree SDK (sdk[dev]) ..."
   python -m pip install --quiet -e "sdk[dev]" || echo "  WARN: SDK install reported an error"
 fi
-# TRELYAN_REQUIRE_KAT=1 makes the KAT FAIL (not skip) if the fixture is still the sentinel.
+# TRELYAN_REQUIRE_KAT=1 makes the KAT FAIL (not skip) on BOTH an unpopulated fixture AND an
+# unloadable Falcon library. It used to arm only the first: with a bad FALCON_DET1024_LIB this
+# block printed PASS having compared zero signature bytes, because the byte-identity tests are
+# gated by a separate `requires_lib` mark the variable never touched. See
+# test_the_library_is_available_when_required in sdk/tests/test_signature_kat.py.
 if TRELYAN_REQUIRE_KAT=1 FALCON_DET1024_LIB="${FALCON_DET1024_LIB:-$LIB_PATH}" \
      python -m pytest sdk/tests/test_signature_kat.py -v; then
   record PASS "Axis C — committed goldens re-sign byte-identically (build-divergence control)"
