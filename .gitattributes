@@ -1,0 +1,8 @@
+# Vendored pinned Falcon tree (third_party/falcon-det1024/src): the bytes MUST be identical on
+# every OS because CI asserts the pinned tree digest and deterministic.c's sha512/256 before
+# building the signer. `-text` disables ALL end-of-line conversion for these paths, so a Windows
+# checkout with core.autocrlf=true no longer rewrites LF to CRLF (which changed deterministic.c
+# from the pinned 601390dc… to e005ebda… — the exact failure that made CI fetch a tarball
+# instead of cloning). SHA256SUMS is covered for the same reason: `sha256sum -c` reads it.
+third_party/falcon-det1024/src/**  -text
+third_party/falcon-det1024/SHA256SUMS  -text
