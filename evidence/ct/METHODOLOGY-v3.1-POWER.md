@@ -69,14 +69,25 @@ claim that PASS supports.
 
 **`--samples 82000`, `--null-sessions 20`**, one machine, quiet, no builds running alongside.
 
-| | median sd (733 µs) | worst-pair sd (1 039 µs) |
-|---|---|---|
-| n per class (after the 2 % warm-up) | 40 180 | 40 180 |
-| SE of Δmean | 5.15 µs | 7.30 µs |
-| 95 % CI half-width | ±10.1 µs | ±14.3 µs |
-| **MDE₈₀** | 27.5 µs | 39.0 µs |
-| **MDE₉₀** | **29.9 µs** | **42.4 µs** |
-| estimated wall-clock | ≈ 5.7 h | (same session) |
+n per class after the 2 % warm-up: **40 180** (binomial sd of the split ≈ 143, far above the
+2 000 floor). Resolution is **per experiment**, because the pairs' sds differ by 2.4×:
+
+| gated line | sd | SE | 95 % CI ± | MDE₈₀ | **MDE₉₀** |
+|---|---|---|---|---|---|
+| `sign-kk-0` | 733 µs | 5.17 µs | ±10.1 µs | 27.6 µs | **29.9 µs** |
+| `sign-kk-1` | 425 µs | 3.00 µs | ±5.9 µs | 16.0 µs | **17.4 µs** |
+| `sign-kk-2` | 1 039 µs | 7.33 µs | ±14.4 µs | 39.2 µs | **42.4 µs** |
+| `sign-rr` | 826 µs | 5.83 µs | ±11.4 µs | 31.1 µs | **33.7 µs** |
+| `sign-aa` (control, planning sd) | 733 µs | 5.17 µs | ±10.1 µs | 27.6 µs | **29.9 µs** |
+
+**The session's resolution is therefore MDE₉₀ 17–42 µs, CI ±5.9 to ±14.4 µs.** An earlier draft of
+this file, and of `CT_REPORT.md` §4b, quoted "30–42 µs / ±10–14 µs": that is the *median-to-worst*
+range and silently drops `sign-kk-1`, the narrowest pair. The error under-claims the session's
+resolution rather than overstating it, but a range that is not the range is still wrong, and each
+experiment's own `mde90_ns` is authoritative over any table written in advance.
+
+Estimated wall-clock **≈ 5.5 h, band 5.5–5.9 h** (the earlier "≈ 5.7 h" scaled from a six-signing-
+experiment session; `sign-aa` makes it seven and adds ≈ 0.19 h).
 
 Derivation, so it can be checked rather than believed: `SE = √(sd₀²/n₀ + sd₁²/n₁)`;
 `MDE_power = (4.5 + z_power)·SE` with `z₈₀ = 0.8416`, `z₉₀ = 1.2816`. Wall-clock is measured, not
@@ -141,8 +152,9 @@ keys at all.
 
 > Across three fixed-key pairs and a pool-vs-pool control, no difference in mean signing time
 > was detected at the pre-registered lines. At this sample size the session would have detected a
-> true difference of **≈ 30 µs (median-sd pairs) to ≈ 42 µs (the widest pair)** with 90 %
-> probability; smaller differences remain neither confirmed nor excluded. Machine-, build- and
+> true difference of **17 µs (narrowest pair) to 42 µs (widest pair)** with 90 % probability —
+> each experiment's own MDE₉₀ applies to that experiment; smaller differences remain neither
+> confirmed nor excluded. Machine-, build- and
 > input-distribution-specific. Not a proof, and not evidence of absence below those figures.
 
 **Sentences it does not license, at any sample size:** that the signer *is* constant-time; that
@@ -255,12 +267,79 @@ Three further changes, none of which touches a decision rule or the timed region
 - **Nothing is written until the end.** `report.json` and the CSVs are written after the last
   experiment, so a crash at hour 5 loses the session. Accepted for this run rather than changing
   the measurement path on the eve of it (writing between measurements is new I/O in the timed
-  environment, and the session is repeatable); the console log **is** captured to
-  `console.log` in the session directory, so a crash is at least diagnosable and the per-null-session
-  progress survives. Incremental structured output is a v4 item.
+  environment, and the session is repeatable). The console log is captured by **the launch
+  command's redirect** (`falcon-ct … > <session-dir>/console.log 2>&1`) — the harness itself
+  writes no log file, and an earlier draft of this bullet wrongly implied it did — so a crash is
+  at least diagnosable and the per-null-session progress survives. Incremental structured output
+  is a v4 item.
 - **det1024 is deterministic**: one (key, message) pair always does the same work, which is why
   `sign-kk` rotates four messages identically across both classes.
+- **Known reporting defect, not fixed before this run (deliberately).** When the null is unfit or
+  absent, `judge_v2` computes the empirical *p* as `(0+1)/(0+1) = 1.0` from an empty null and its
+  SHAPE arm is guarded by `n > 0`, so it cannot fire — the experiment then falls through to PASS
+  with a PASS-shaped `crop_empirical_p: 1.0` in the JSON. It is visible in the committed
+  `session-…-v3/report.json` (four `PASS` rows beside `null_ok: false`). **It cannot change this
+  session's verdicts:** an unfit null already forces the flat control to INCONCLUSIVE, which
+  forces every key verdict to INCONCLUSIVE through the same lever. But it does mean a reader must
+  check `null_ok` before believing any `crop_empirical_p`, and it would silently disable
+  `sign-aa`'s SHAPE arm in that state. Fixed after the run (`None` and INCONCLUSIVE when `n == 0`),
+  not during it — the harness must not be rebuilt while a session is measuring.
 - Still open from v3: fixed-vs-random screening compares a point mass with a mixture (`sign-key`
   SHAPE is a hypothesis, not a reading). The variance-matched design that would settle it —
   multiple fixed keys against variance-matched mixtures — is a **v4** item and is not attempted
   here.
+
+---
+
+## 7. Predictions, recorded 2026-08-18 while the session was still in its null phase
+
+The session launched at 16:39; the 20 null sessions take ≈ 3.7 h and **no experiment had run**
+when this section was written. Everything below is arithmetic on the *v3b* numbers, projected to
+n = 40 180 per class. It is written now so that none of it can be offered afterwards as insight.
+
+**A. Three non-gated lines are expected to cross |t| = 4.5, and none of them is a finding.**
+At this sample size the screening and informational designs become trivially "significant"
+because their v3b effects are large relative to the new SE:
+
+| line | v3b Δ | SE at 40 180/class | expected \|t\| | status |
+|---|---|---|---|---|
+| `sign-key` | −46.4 µs | 3.72 µs | **≈ 12.5** | screening, **not gated** |
+| `verify-ctrl` | +1.3 µs | 0.04 µs | **≈ 33** | informational — public data only |
+| `keygen` | +11.1 ms | 73.4 µs | **≈ 151** | informational — rejection-sampled, *expected* variable-time |
+
+`sign-key` compares a fixed (key, message) point mass against a 32-key mixture; that design was
+demoted to screening in v2 precisely because such a comparison is confounded, and a bigger *n*
+does not decorrelate it. **A raw FAIL on any of these three is a prediction being met, not a
+discovery**, and none of them touches the session verdict.
+
+**B. A session FAIL is close to a coin flip, and will not be re-run smaller if it happens.**
+Taking v3b's own per-pair deltas *as if they were true* (their v3b CIs all span zero, so this is
+"not a low-probability event", not a forecast): `sign-kk-2` (Δ +31.4 µs, λ = 4.29) → **P(FAIL) ≈
+42 %**; `sign-kk-0` (+13.8 µs, λ = 2.67) → 3.4 %; `sign-kk-1` (−1.0 µs) → ≈ 0 %; `sign-rr` → ≈ 0 %.
+**P(at least one `sign-kk` pair FAILs) ≈ 44 %**, which by the pre-registered combination rule
+(FAIL if *any* pair FAILs) is a session FAIL. The sentence §3 licenses for a FAIL — *an effect of
+size Δ ± CI is now resolvable between two particular keys on this machine* — is the sentence that
+has to survive a 44 % event without becoming "Falcon leaks the key".
+
+**C. `sign-aa` will most likely PASS, and its verdict word is the least interesting thing about
+it.** Its gate fires at |t| ≥ 4.5, i.e. |Δ| ≥ 23.3 µs, while the arm offset it exists to test is
+≈ +13.9 µs — comfortably under the gate. So **read `sign-aa`'s Δmean and its CI, not its verdict**:
+
+- Δ ≈ +14 µs with a CI excluding zero → the arm artefact is **confirmed**, the +12–17 µs "key
+  deltas" of v2/v3/v3b are the apparatus, and `sign-kk` must randomise its arms before it measures
+  keys again (v4). This is the outcome that would make the session worth its 5.5 hours regardless
+  of every other line.
+- Δ ≈ 0 with a CI of ±10 µs → the layout hypothesis is disfavoured at that resolution, and the
+  8-of-9 sign pattern needs another explanation (it is not thereby a key effect).
+- |t| ≥ 4.5 → every key verdict in the session is INCONCLUSIVE by §2a, and that is the correct
+  outcome, not a reason to re-read anything.
+
+**D. Two procedural notes for the person reading the output.** The binary was **not** smoke-run
+end-to-end before this session — `sign-aa`, `controls.null_detail`, the three power fields and
+`schema_version: 4` are all new since v3b, and the cheapest end-to-end check (`--samples 4600`)
+costs ≈ 19 min of load, which cannot be spent while a timing session is running. The fixture path
+is known good (the session got past `Fixtures::prepare`, which builds the new `aa` pair), and the
+remaining new code is one experiment runner, one pure gate function (property-tested) and three
+`f64` fields. If serialisation nevertheless fails at the end, the loss is the session, not the
+method: re-run it. **This ordering was a mistake — smoke-test first, then launch — and it is
+recorded here rather than quietly fixed.**
