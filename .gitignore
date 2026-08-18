@@ -38,3 +38,6 @@ build/
 
 # local contract-test virtualenv (algokit-utils + pytest); never committed
 .venv-contracts/
+
+# Rust workspace build output (rust/)
+rust/target/

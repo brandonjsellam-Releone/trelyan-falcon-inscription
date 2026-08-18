@@ -1,0 +1,22 @@
+[package]
+name = "trelyan-pq-ffi"
+version = "0.1.0"
+description = "Raw FFI to the pinned, vendored deterministic Falcon-1024 (det1024) C reference — the ONLY crate in this workspace allowed to contain `unsafe`"
+# Internal to TRELYAN; not distributed via crates.io.
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+links = "falcondet1024"
+build = "build.rs"
+
+[dependencies]
+
+[build-dependencies]
+cc.workspace = true
+sha2.workspace = true
+
+[lints]
+workspace = true
