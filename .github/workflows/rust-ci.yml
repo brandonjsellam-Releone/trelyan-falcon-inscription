@@ -146,28 +146,34 @@ jobs:
         run: FALCON_CT_RUSTC="$(rustc --version)" cargo build --release -p falcon-ct
       # 4400 measurements → ≈2 156 per class after the 2 % warm-up: above the 2 000 minimum, so
       # a verdict is possible; still short enough for a CI job (signing is ~ms with FPEMU).
-      - name: Run the session
-        run: ./target/release/falcon-ct --samples 4400 --out ../evidence/ct/ci-run
+      # 20 null sessions is the v2 minimum (METHODOLOGY-v2 §1); the flat loop is cheap.
+      - name: Run the session (METHODOLOGY v2)
+        run: ./target/release/falcon-ct --samples 4400 --null-sessions 20 --out ../evidence/ct/ci-run
       - name: Publish the result (job summary + annotations; never a failure)
         working-directory: evidence/ct/ci-run
         run: |
           set -euo pipefail
           verdict=$(python3 -c 'import json;print(json.load(open("report.json"))["session_verdict"])')
           ok=$(python3 -c 'import json;print(json.load(open("report.json"))["controls"]["controls_ok"])')
+          nullok=$(python3 -c 'import json;print(json.load(open("report.json"))["controls"].get("null_ok"))')
           {
             echo "## falcon-ct — constant-time evidence session (ubuntu-latest, shared runner)"
             echo
-            echo "**SESSION VERDICT: ${verdict}** — controls_ok=${ok}. Observation per evidence/ct/METHODOLOGY.md; not a gate."
+            echo "**SESSION VERDICT: ${verdict}** — controls_ok=${ok}, null_ok=${nullok}. Observation per evidence/ct/METHODOLOGY-v2.md; not a gate. SHAPE = shape/scale difference only (never PASS, never FAIL)."
             echo
-            echo '| experiment | n0 | n1 | mean0 (ns) | mean1 (ns) | max abs t | verdict | gated |'
-            echo '|---|---|---|---|---|---|---|---|'
+            echo '| experiment | n0 | n1 | Δmean (ns) | raw t | p(raw) | crop max abs t | crop p_emp | verdict | gated |'
+            echo '|---|---|---|---|---|---|---|---|---|---|'
             python3 - <<'PY'
           import json
           r=json.load(open("report.json"))
+          def row(e, verdict, gated):
+              pe = e.get("crop_empirical_p")
+              pe = "-" if pe is None else f"{pe:.3f}"
+              print(f"| {e['id']} | {e['class0']['n']} | {e['class1']['n']} | {e.get('mean_diff_ns',0):+.0f} | {e.get('raw_t',0):.2f} | {e.get('p_raw',0):.2e} | {e.get('crop_max_abs_t',0):.2f} | {pe} | {verdict} | {gated} |")
           for e in [r["controls"]["flat"], r["controls"]["leaky"]]:
-              print(f"| {e['id']} | {e['class0']['n']} | {e['class1']['n']} | {e['class0']['mean_ns']:.0f} | {e['class1']['mean_ns']:.0f} | {e['max_abs_t']:.2f} | {e['isolated_verdict']} | control |")
+              row(e, e["isolated_verdict"], "control")
           for e in r["experiments"]:
-              print(f"| {e['id']} | {e['class0']['n']} | {e['class1']['n']} | {e['class0']['mean_ns']:.0f} | {e['class1']['mean_ns']:.0f} | {e['max_abs_t']:.2f} | {e['verdict']} | {'yes' if e['gated'] else 'no'} |")
+              row(e, e["verdict"], "yes" if e["gated"] else "no")
           PY
             echo
             echo '<details><summary>report.json</summary>'
@@ -178,9 +184,10 @@ jobs:
             echo '</details>'
           } >> "$GITHUB_STEP_SUMMARY"
           case "$verdict" in
-            PASS) echo "::notice::falcon-ct: PASS on this runner (not a proof; see METHODOLOGY.md)";;
-            FAIL) echo "::warning::falcon-ct: FAIL — the pinned signer's timing is input-dependent at this power (see job summary)";;
-            *)    echo "::warning::falcon-ct: INCONCLUSIVE — a control misbehaved or too few samples; no statement";;
+            PASS)  echo "::notice::falcon-ct: PASS on this runner (not a proof; see METHODOLOGY-v2.md)";;
+            SHAPE) echo "::notice::falcon-ct: SHAPE — timing distributions differ in shape/scale, not location; not a leak claim (see job summary)";;
+            FAIL)  echo "::warning::falcon-ct: FAIL — a LOCATION difference in signing time between key classes at this power (see job summary)";;
+            *)     echo "::warning::falcon-ct: INCONCLUSIVE — a control or the null misbehaved, or too few samples; no statement";;
           esac
 
   supply-chain:
