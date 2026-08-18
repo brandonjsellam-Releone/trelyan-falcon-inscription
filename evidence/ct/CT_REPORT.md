@@ -65,7 +65,38 @@ The reference design treats these loops as acceptable ("isochronous" in *distrib
 - No patch to the vendored primitive. The zero-patch ledger stays empty. If a constant-time signer is required, the answer is a different *approved artifact* or scoping Falcon signing out of the product claim — never a hand edit here.
 - The audit pack (Phase P) carries this report as-is; INCONCLUSIVE/FAIL are never rewritten as PASS.
 
-## 5. METHODOLOGY v2 — what changes before the next Falcon verdict (to be written, dated, before running)
+## 4a. Second session — METHODOLOGY **v2** (`session-2026-08-18-local-v2`, same machine)
+
+Run after `METHODOLOGY-v2.md` was committed (`ff655d9`). Same machine, release build, 8 000 measurements per experiment, key pools of 32, **24 flat-control null sessions**. Raw CSVs and `report.json` (schema 2) committed beside it.
+
+### SESSION VERDICT: **SHAPE** (by the v2 rule)
+
+| | raw *t* | *p*(raw) | Δmean (µs) [95 % CI] | crop stat | crop *p*ₑₘₚ | verdict |
+|---|---|---|---|---|---|---|
+| null (24 flat sessions) | max \|t\| < 4.5 ✔ | | | **max 1.89**, min 0.47 | — | null OK |
+| control-flat | 1.49 | | | 1.33 | | PASS ✔ |
+| control-leaky | −75.2 | | | | | FAIL ✔ |
+| **sign-kk-0** (K_a vs K_b) | **−3.22** | 1.3e-3 | **+16.6 [+6.5, +26.7]** | **26.2** | 0.040 | **SHAPE** |
+| **sign-kk-1** (K_c vs K_d) | **−2.35** | 1.9e-2 | **+11.8 [+2.0, +21.7]** | **26.3** | 0.040 | **SHAPE** |
+| **sign-kk-2** (K_e vs K_f) | **−3.00** | 2.7e-3 | **+15.0 [+5.2, +24.8]** | **10.3** | 0.040 | **SHAPE** |
+| **sign-rr** (pool A vs pool B) | +1.51 | 0.13 | −10.0 [−23.1, +3.0] | **3.06** | 0.040 | SHAPE |
+| sign-key *(screening)* | +1.14 | 0.25 | −7.2 [−19.5, +5.2] | 9.1 | 0.040 | SHAPE |
+| sign-msg *(screening)* | +0.81 | 0.42 | −4.3 [−14.7, +6.1] | 15.1 | 0.040 | SHAPE |
+| verify-ctrl *(informational)* | −23.4 | ≈0 | +1.5 [+1.3, +1.6] | 113 | 0.040 | FAIL (public data; expected) |
+| keygen *(informational)* | −50.2 | ≈0 | +11 739 | 56.5 | 0.040 | FAIL (rejection-sampled; expected) |
+
+(Δmean = class 1 − class 0; signing ≈ 7.85–7.90 ms; sd ≈ 0.21–0.31 ms; df ≈ 7 600–7 800.)
+
+**Reading, stated exactly:**
+
+1. **No gated experiment reaches the pre-registered FAIL line** (raw |t| ≥ 4.5). The word is SHAPE, and it stays SHAPE.
+2. **The three fixed-key pairs are the informative result.** Each pair is two *point masses* (one deterministic key, one fixed message each). All three show a mean difference of **+12 to +17 µs on ≈ 7.9 ms (0.15–0.2 %)** with 95 % confidence intervals excluding zero (*p* = 0.001–0.02 on the raw *t*), and crop statistics of **10–26 — an order of magnitude beyond the null (1.89) and 3–9× the pool-vs-pool control (3.06)**. That is consistent with a **per-key timing fingerprint** of order tens of microseconds — exactly what det1024's deterministic per-input rejection pattern would produce — measured directly, without the fixed-vs-random confound the v1 design had. It is *not* a FAIL under the rule that was fixed before the run, and it is not evidence that the fingerprint carries usable information about the key. (All three Δ have the same sign, K_b slower; with random pairs that is a 1-in-4 coincidence and is noted, not interpreted.)
+3. **The synthetic null is too benign for the crop diagnostic on this operation.** Every experiment's crop *p* sits at the floor 1/25 because a ~50 µs flat loop has none of the heavy-tail structure of an 8 ms signature. `sign-rr` (two independent 32-key pools) is the honest noise floor for the crop statistic *on the real operation*: **3.06**. `sign-kk`'s 10–26 clears it; the screening designs (9–15) sit between. **v3 note:** build the empirical null from repeated pool-vs-pool signing sessions, not the flat loop.
+4. Environment caveats unchanged: Windows QPC ≈ 100 ns, no core pinning, turbo not controlled, FPEMU-specific.
+
+**Consequences:** unchanged from §4 — Phase E stays blocked (no PASS exists; a SHAPE-with-consistent-Δ is a reason to do the source-level reading next, not to relax anything); no patch to the vendored primitive; nothing here is a key-leak claim. The finding to carry forward is precise: *two fixed det1024 keys can be distinguished by signing time on this machine at the ~15 µs level; whether that distinguishes anything about the keys is the open question for the source reading and for a methodology v3 with a real-operation null.*
+
+## 5. METHODOLOGY v2 — what changed before the second session (implemented; see `METHODOLOGY-v2.md`)
 
 Adopted from the team's review; none of this is retro-applied to this session.
 

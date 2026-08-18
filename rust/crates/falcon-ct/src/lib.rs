@@ -18,10 +18,14 @@
 // the precision-loss lint cannot fire on real data; the `f64` → `usize` casts are of percentile
 // indices already clamped into range and warm-up counts derived from a length. Allowed crate-wide
 // with this reason rather than sprinkled per line, so the numeric code reads as numeric code.
+// `suboptimal_flops` (nursery) asks for `mul_add` in the erfc polynomial and the CI bounds; the
+// textbook forms are kept because a reader should recognise Abramowitz–Stegun 7.1.26 and
+// `d ± 1.96·se` at sight, and FMA-level precision is irrelevant to a reported p-value.
 #![allow(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
-    clippy::cast_sign_loss
+    clippy::cast_sign_loss,
+    clippy::suboptimal_flops
 )]
 
 use std::time::Instant;
@@ -38,28 +42,34 @@ pub const WARMUP_FRACTION: f64 = 0.02;
 /// the pooled percentile are discarded before recomputing *t*.
 pub const CROP_PERCENTILES: [f64; 9] = [0.50, 0.60, 0.70, 0.80, 0.90, 0.95, 0.97, 0.98, 0.99];
 
-/// The three words a session or an experiment can end in.
+/// The words a session or an experiment can end in.
+///
+/// v1 (`METHODOLOGY.md`) used PASS / FAIL / INCONCLUSIVE. v2 (`METHODOLOGY-v2.md`) adds
+/// `SHAPE`: the raw Welch *t* is null but the crop diagnostic exceeds the session's empirical
+/// null — the distributions differ in shape/scale, not in location. SHAPE is never PASS and never
+/// FAIL; it is a call for the source-level reading, not a leak claim.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Verdict {
-    /// Controls behaved, enough samples, `max |t| < 4.5`. Not a proof; "not detected here".
+    /// Controls behaved, enough samples, no location difference (and, in v2, no shape signal).
     Pass,
-    /// Controls behaved, enough samples, `max |t| ≥ 4.5`. The classes are distinguishable.
+    /// (v2 only) Raw *t* null, crop diagnostic beyond the empirical null. Informational.
+    Shape,
+    /// Controls behaved, enough samples, the classes are distinguishable in location.
     Fail,
     /// A control misbehaved, too few samples, or the harness could not run. No statement.
     Inconclusive,
 }
 
 impl Verdict {
-    /// The worse of two verdicts, for folding a session: FAIL > INCONCLUSIVE > PASS is the
-    /// ordering for "what must the reader act on", but for the *session* word the methodology
-    /// says INCONCLUSIVE dominates (a bad control invalidates every Falcon verdict), so this
-    /// orders INCONCLUSIVE > FAIL > PASS.
+    /// The worse of two verdicts, for folding a session. INCONCLUSIVE dominates (a bad control
+    /// invalidates every Falcon verdict), then FAIL, then SHAPE, then PASS.
     #[must_use]
     pub const fn worse(self, other: Self) -> Self {
         match (self, other) {
             (Self::Inconclusive, _) | (_, Self::Inconclusive) => Self::Inconclusive,
             (Self::Fail, _) | (_, Self::Fail) => Self::Fail,
+            (Self::Shape, _) | (_, Self::Shape) => Self::Shape,
             (Self::Pass, Self::Pass) => Self::Pass,
         }
     }
@@ -94,16 +104,38 @@ pub struct ExperimentResult {
     pub class1: ClassStats,
     /// Ten *t* values: raw + nine crops.
     pub t_values: Vec<TValue>,
-    /// `max |t|` over `t_values` — the reported statistic.
+    /// `max |t|` over ALL ten `t_values` — the v1 reported statistic (kept for comparability).
     pub max_abs_t: f64,
-    /// Whether `max_abs_t >= T_THRESHOLD` (distinguishable) — the raw finding, before controls
-    /// and sample-size rules are applied by the session.
+    /// Whether `max_abs_t >= T_THRESHOLD` — the v1 raw finding.
     pub distinguishable: bool,
     /// Whether both classes reached `MIN_PER_CLASS`.
     pub enough_samples: bool,
     /// The verdict for this experiment IN ISOLATION (controls not yet applied). The session
-    /// applies the control rule and may downgrade PASS/FAIL to INCONCLUSIVE.
+    /// applies the control rule and may downgrade to INCONCLUSIVE.
     pub isolated_verdict: Verdict,
+    // ── v2 fields (METHODOLOGY-v2 §1). Absent (`None`/default) on v1-judged results. ──
+    /// The raw (uncropped) Welch *t* — the v2 PRIMARY statistic.
+    #[serde(default)]
+    pub raw_t: f64,
+    /// Welch–Satterthwaite degrees of freedom for the raw *t*.
+    #[serde(default)]
+    pub df: f64,
+    /// Two-sided *p*-value for the raw *t* (normal approximation; df here is always ≫ 100).
+    #[serde(default)]
+    pub p_raw: f64,
+    /// `mean1 − mean0` in nanoseconds, with its 95 % confidence interval.
+    #[serde(default)]
+    pub mean_diff_ns: f64,
+    #[serde(default)]
+    pub ci95_ns: (f64, f64),
+    /// `max |t|` over the NINE crops only (excluding raw) — the v2 SECONDARY diagnostic.
+    #[serde(default)]
+    pub crop_max_abs_t: f64,
+    /// Empirical *p* of `crop_max_abs_t` against the session's flat-control null:
+    /// (number of null sessions with a crop statistic ≥ observed + 1) / (N + 1). `None` if no
+    /// null was supplied (v1 judging).
+    #[serde(default)]
+    pub crop_empirical_p: Option<f64>,
 }
 
 /// Raw samples of one experiment, kept for the CSV.
@@ -166,6 +198,62 @@ pub fn welch_t(a: &[u64], b: &[u64]) -> f64 {
     (ma - mb) / denom
 }
 
+/// Welch–Satterthwaite degrees of freedom for two samples. `0.0` if either has < 2 points.
+#[must_use]
+pub fn welch_df(a: &[u64], b: &[u64]) -> f64 {
+    if a.len() < 2 || b.len() < 2 {
+        return 0.0;
+    }
+    let (_, sa) = mean_stddev(a);
+    let (_, sb) = mean_stddev(b);
+    let (na, nb) = (a.len() as f64, b.len() as f64);
+    let va = sa * sa / na;
+    let vb = sb * sb / nb;
+    let num = (va + vb) * (va + vb);
+    let den = va * va / (na - 1.0) + vb * vb / (nb - 1.0);
+    if den == 0.0 { 0.0 } else { num / den }
+}
+
+/// Complementary error function, Abramowitz & Stegun 7.1.26 (|error| < 1.5e-7). Enough for a
+/// reported *p*-value; the constitution's numeric caution is about crypto, not statistics.
+#[must_use]
+pub fn erfc(x: f64) -> f64 {
+    let z = x.abs();
+    let t = 1.0 / (1.0 + 0.5 * z);
+    let poly = t
+        * (-z * z - 1.265_512_23
+            + t * (1.000_023_68
+                + t * (0.374_091_96
+                    + t * (0.096_784_18
+                        + t * (-0.186_288_06
+                            + t * (0.278_868_07
+                                + t * (-1.135_203_98
+                                    + t * (1.488_515_87
+                                        + t * (-0.822_152_23 + t * 0.170_872_77)))))))))
+            .exp();
+    if x >= 0.0 { poly } else { 2.0 - poly }
+}
+
+/// Two-sided *p*-value for a *t* statistic under the normal approximation (valid for large df,
+/// which every experiment here has: thousands per class).
+#[must_use]
+pub fn two_sided_p_normal(t: f64) -> f64 {
+    erfc(t.abs() / core::f64::consts::SQRT_2)
+}
+
+/// `mean(b) − mean(a)` and its 95 % confidence interval (normal approximation).
+#[must_use]
+pub fn mean_diff_ci95(a: &[u64], b: &[u64]) -> (f64, (f64, f64)) {
+    if a.len() < 2 || b.len() < 2 {
+        return (0.0, (0.0, 0.0));
+    }
+    let (ma, sa) = mean_stddev(a);
+    let (mb, sb) = mean_stddev(b);
+    let se = (sa * sa / a.len() as f64 + sb * sb / b.len() as f64).sqrt();
+    let d = mb - ma;
+    (d, (d - 1.96 * se, d + 1.96 * se))
+}
+
 /// The value at the `p`-th percentile (0..=1) of the POOLED samples, by nearest-rank.
 #[must_use]
 pub fn pooled_percentile(a: &[u64], b: &[u64], p: f64) -> u64 {
@@ -213,16 +301,32 @@ fn class_stats(xs: &[u64]) -> ClassStats {
     }
 }
 
-/// Judge one experiment from its raw samples: discard the warm-up, split by class, compute the
-/// ten *t* values, apply the sample-size rule. Controls are applied by the caller (session).
-#[must_use]
-pub fn judge(id: &str, description: &str, raw: &RawSamples) -> ExperimentResult {
+/// Split warm-up-trimmed samples by class.
+fn split_classes(raw: &RawSamples) -> (Vec<u64>, Vec<u64>) {
     let total = raw.samples.len();
     let skip = ((total as f64) * WARMUP_FRACTION).floor() as usize;
     let (mut c0, mut c1) = (Vec::new(), Vec::new());
     for &(class, ns) in raw.samples.iter().skip(skip) {
         if class == 0 { c0.push(ns) } else { c1.push(ns) }
     }
+    (c0, c1)
+}
+
+/// The nine-crop statistic alone (excluding the raw *t*) — the v2 secondary diagnostic.
+#[must_use]
+pub fn crop_statistic(a: &[u64], b: &[u64]) -> f64 {
+    t_values(a, b)
+        .iter()
+        .skip(1)
+        .map(|v| v.t.abs())
+        .fold(0.0_f64, f64::max)
+}
+
+/// **v1 judging** (`METHODOLOGY.md`): `max |t|` over raw + nine crops against 4.5. Kept so the
+/// first session's numbers stay reproducible; new sessions use [`judge_v2`].
+#[must_use]
+pub fn judge(id: &str, description: &str, raw: &RawSamples) -> ExperimentResult {
+    let (c0, c1) = split_classes(raw);
     let tv = t_values(&c0, &c1);
     let max_abs_t = tv.iter().map(|v| v.t.abs()).fold(0.0_f64, f64::max);
     let enough = c0.len() >= MIN_PER_CLASS && c1.len() >= MIN_PER_CLASS;
@@ -234,17 +338,61 @@ pub fn judge(id: &str, description: &str, raw: &RawSamples) -> ExperimentResult 
     } else {
         Verdict::Pass
     };
+    let raw_t = tv.first().map_or(0.0, |v| v.t);
+    let (mean_diff_ns, ci95_ns) = mean_diff_ci95(&c0, &c1);
     ExperimentResult {
         id: id.to_owned(),
         description: description.to_owned(),
         class0: class_stats(&c0),
         class1: class_stats(&c1),
+        crop_max_abs_t: crop_statistic(&c0, &c1),
         t_values: tv,
         max_abs_t,
         distinguishable,
         enough_samples: enough,
         isolated_verdict,
+        raw_t,
+        df: welch_df(&c0, &c1),
+        p_raw: two_sided_p_normal(raw_t),
+        mean_diff_ns,
+        ci95_ns,
+        crop_empirical_p: None,
     }
+}
+
+/// **v2 judging** (`METHODOLOGY-v2.md` §1).
+///
+/// The raw Welch *t* is primary (|t| ≥ 4.5 → FAIL). The nine-crop statistic is judged against
+/// `null_crop_stats` — the crop statistics of the session's N flat-control runs — and a
+/// crop-only exceedance yields SHAPE, never FAIL. Empirical *p* = (#null ≥ observed + 1) /
+/// (N + 1); SHAPE iff raw |t| < 4.5 and *p* < 1/N.
+#[must_use]
+pub fn judge_v2(
+    id: &str,
+    description: &str,
+    raw: &RawSamples,
+    null_crop_stats: &[f64],
+) -> ExperimentResult {
+    let mut r = judge(id, description, raw);
+    let n = null_crop_stats.len();
+    let ge = null_crop_stats
+        .iter()
+        .filter(|&&s| s >= r.crop_max_abs_t)
+        .count();
+    let p = (ge as f64 + 1.0) / (n as f64 + 1.0);
+    r.crop_empirical_p = Some(p);
+    // v2's `distinguishable` means "in LOCATION": the raw statistic only.
+    r.distinguishable = r.raw_t.abs() >= T_THRESHOLD;
+    r.isolated_verdict = if !r.enough_samples {
+        Verdict::Inconclusive
+    } else if r.distinguishable {
+        Verdict::Fail
+    } else if n > 0 && p < 1.0 / n as f64 {
+        Verdict::Shape
+    } else {
+        Verdict::Pass
+    };
+    r
 }
 
 // ── runner ─────────────────────────────────────────────────────────────────────────────────
@@ -291,6 +439,20 @@ pub const fn apply_controls(
     } else {
         Verdict::Inconclusive
     }
+}
+
+/// Fold the flat-control null sessions (v2): every one must PASS on the RAW statistic, else the
+/// environment is too noisy for any Falcon verdict. Returns the crop statistics for the null.
+#[must_use]
+pub fn null_from_flat_sessions(flat: &[ExperimentResult]) -> Option<Vec<f64>> {
+    if flat.is_empty()
+        || flat
+            .iter()
+            .any(|f| !f.enough_samples || f.raw_t.abs() >= T_THRESHOLD)
+    {
+        return None;
+    }
+    Some(flat.iter().map(|f| f.crop_max_abs_t).collect())
 }
 
 /// Render raw samples as CSV (`class,ns` per line, header first).
