@@ -1,0 +1,148 @@
+name: rust-ci
+
+# Gates for the Rust workspace under rust/ (trelyan-pq-ffi, trelyan-pq-core) — constitution §3
+# and §6: cargo fmt, clippy (pedantic + nursery, -D warnings), the full test suite on three OSes,
+# a build on the declared MSRV, cargo audit + cargo deny. The KAT test in trelyan-pq-core is the
+# first thing that must be green (§2.5): it asserts the Rust signer reproduces the committed
+# det1024 goldens byte for byte, on every OS in the matrix, from the vendored pinned tree.
+#
+# Path filters include third_party/** because the ffi build script compiles that tree and refuses
+# to compile anything but the pinned digest — a change there must run this workflow.
+
+on:
+  push:
+    paths: ["rust/**", "third_party/**", ".github/workflows/rust-ci.yml"]
+  pull_request:
+    paths: ["rust/**", "third_party/**", ".github/workflows/rust-ci.yml"]
+  schedule:
+    # Weekly: cargo audit reads a database that changes without this repo changing.
+    - cron: "41 5 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # Fail on warnings from rustc itself, not only from clippy.
+  RUSTFLAGS: "-D warnings"
+
+defaults:
+  run:
+    working-directory: rust
+
+jobs:
+  lint:
+    name: rust fmt + clippy (pedantic, nursery, -D warnings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned toolchain (rust/rust-toolchain.toml)
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustc --version && cargo --version
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: rust
+      - name: cargo fmt --check
+        run: cargo fmt --all --check
+      - name: cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  test:
+    name: rust test + det1024 KAT (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned toolchain (rust/rust-toolchain.toml)
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustc --version && cargo --version
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: rust
+      # The ffi build script prints "vendored Falcon tree verified against pin …" as a cargo
+      # warning on success and FAILS the build on drift — so a green build here already implies
+      # the compiled bytes are the pinned bytes.
+      - name: cargo test --all (includes the byte-identity KAT)
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --all --all-features 2>&1 | tee test.log
+          grep -q "vendored Falcon tree verified against pin ce15e75b" test.log \
+            || { echo "::error::the ffi build script did not report the pin verification"; exit 1; }
+      # A green "0 tests ran" is indistinguishable from a green suite in the checks list. The
+      # workspace has 11 tests today; 8 is a floor that survives churn but not a harness that
+      # silently stopped collecting. The KAT file must be among them, by name.
+      - name: Assert the suite — and the KAT — actually ran
+        shell: bash
+        run: |
+          set -o pipefail
+          passed=$(grep -oE '^test result: ok\. [0-9]+ passed' test.log \
+                   | grep -oE '[0-9]+' | awk '{s+=$1} END {print s+0}')
+          echo "tests passed: ${passed:-0}"
+          if [ "${passed:-0}" -lt 8 ]; then
+            echo "::error::only ${passed:-0} tests ran; expected 8+. A collection failure reads as a pass."
+            exit 1
+          fi
+          grep -q "signatures_are_byte_identical_to_the_committed_goldens ... ok" test.log \
+            || { echo "::error::the det1024 byte-identity KAT did not run or did not pass"; exit 1; }
+
+  msrv:
+    name: rust build on the declared MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Read rust-version from Cargo.toml and install exactly that
+        id: msrv
+        run: |
+          set -euo pipefail
+          v=$(grep -m1 '^rust-version' Cargo.toml | cut -d'"' -f2)
+          if [ -z "$v" ]; then
+            echo "::error::no rust-version in rust/Cargo.toml — §3 requires the MSRV pinned"
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          rustup toolchain install "$v" --profile minimal
+          rustc "+$v" --version
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: rust
+      # Build only, on the floor: the claim is that a consumer on the declared MSRV can compile
+      # the library. rust-toolchain.toml pins the DEV channel; `+version` overrides it here.
+      - name: cargo build on ${{ steps.msrv.outputs.version }}
+        run: cargo "+${{ steps.msrv.outputs.version }}" build --all-features
+
+  supply-chain:
+    name: rust cargo audit + cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: rust
+      - name: Install cargo-audit and cargo-deny
+        run: cargo install cargo-audit cargo-deny --locked
+      - name: cargo audit
+        run: cargo audit
+      # With NO config, cargo-deny's licence allowlist is EMPTY and it rejects even MIT — a
+      # failure that looks identical to a real licence violation. Assert the config is present.
+      - name: cargo deny check
+        run: |
+          set -euo pipefail
+          test -f deny.toml || { echo "::error::rust/deny.toml missing — an unconfigured cargo-deny rejects everything, which reads like a real finding"; exit 1; }
+          cargo deny check

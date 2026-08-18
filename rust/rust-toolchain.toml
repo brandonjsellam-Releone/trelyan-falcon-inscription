@@ -1,0 +1,6 @@
+# The channel developers and CI build with. Deliberately NOT the MSRV floor: pinning the channel
+# to the 1.90 floor would run clippy on an old ruleset. The floor (`rust-version` in Cargo.toml)
+# is what a CONSUMER needs and is verified by a separate CI job that builds on exactly that.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]
