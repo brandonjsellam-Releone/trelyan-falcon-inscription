@@ -92,14 +92,16 @@ experiment session; `sign-aa` makes it seven and adds ≈ 0.19 h).
 Derivation, so it can be checked rather than believed: `SE = √(sd₀²/n₀ + sd₁²/n₁)`;
 `MDE_power = (4.5 + z_power)·SE` with `z₈₀ = 0.8416`, `z₉₀ = 1.2816`. Wall-clock is measured, not
 guessed: v3b spent 38.8 s per null session and 379.5 s on experiments + controls at 4 800
-samples (plus ≈ 45 s of fixture key generation), and every experiment and null session runs at
-the same `--samples` value, so the session scales linearly at ≈ 0.25 s per sample-unit:
-82 000 × 0.25 s ≈ 20 500 s ≈ 5.7 h. Roughly two thirds of that is the 20-session null.
+samples (plus ≈ 85 s of fixture and null-pool key generation), and every experiment and null
+session runs at the same `--samples` value, so the session scales linearly at ≈ 0.24 s per
+sample-unit: 85 s + 82 000 × 0.2405 s ≈ 19 800 s ≈ 5.5 h, rising to ≈ 5.9 h if the null's
+per-signature cost matches `sign-rr`'s 8.27 ms rather than the 7.66 ms its measured 38.8 s
+implies. Roughly two thirds of the session is the 20-session null.
 
 **Why 82 000 and not more.** It is the largest size that finishes in one unattended evening on
 the machine that is available, and it is the point where the marginal return falls off: 82 k
-takes 5.7 h to reach ~30 µs, while 15 µs needs 320 k and 22 h — a 4× cost for a 2× improvement.
-The choice is a budget, and it is stated as one. **This is not the size at which a PASS would
+takes ≈ 5.5 h to reach 17–42 µs, while 15 µs everywhere needs 320 k and ≈ 22 h — a 4× cost for
+roughly a 2× improvement. The choice is a budget, and it is stated as one. **This is not the size at which a PASS would
 become a constant-time claim; no size is.**
 
 ## 2a. One new control: `sign-aa` (added *because* of the high power, not despite it)
