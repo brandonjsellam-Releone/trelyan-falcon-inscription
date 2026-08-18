@@ -94,6 +94,7 @@ unsafe extern "C" {
     fn shake256_init(sc: *mut Shake256Context);
     fn shake256_inject(sc: *mut Shake256Context, data: *const c_void, len: usize);
     fn shake256_flip(sc: *mut Shake256Context);
+    fn shake256_extract(sc: *mut Shake256Context, out: *mut c_void, len: usize);
     fn shake256_init_prng_from_system(sc: *mut Shake256Context) -> c_int;
 
     fn falcon_det1024_keygen(
@@ -147,6 +148,19 @@ pub fn prng_from_seed(seed: &[u8]) -> Shake256Context {
         shake256_flip(&raw mut sc);
     }
     sc
+}
+
+/// `shake256_extract`: draw `out.len()` pseudo-random bytes from a FLIPPED context.
+///
+/// Only valid on a context produced by [`prng_from_system`] or [`prng_from_seed`] (both leave the
+/// context in output mode). Used by the constant-time evidence harness for class selection and
+/// random messages, so that the harness needs no RNG dependency of its own and draws from the
+/// same audited SHAKE PRNG the signer's key generation uses.
+pub fn prng_extract(sc: &mut Shake256Context, out: &mut [u8]) {
+    // SAFETY: `sc` is a live, correctly sized context that one of the two constructors flipped
+    // into output mode; `out` is exclusively borrowed and valid for `out.len()` bytes, which is
+    // exactly the length passed. The C side only writes within that range.
+    unsafe { shake256_extract(&raw mut *sc, out.as_mut_ptr().cast::<c_void>(), out.len()) }
 }
 
 /// `falcon_det1024_keygen`: fill `privkey` and `pubkey` from `rng`.
