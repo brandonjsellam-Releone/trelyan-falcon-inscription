@@ -271,9 +271,14 @@ Three further changes, none of which touches a decision rule or the timed region
   the measurement path on the eve of it (writing between measurements is new I/O in the timed
   environment, and the session is repeatable). The console log is captured by **the launch
   command's redirect** (`falcon-ct … > <session-dir>/console.log 2>&1`) — the harness itself
-  writes no log file, and an earlier draft of this bullet wrongly implied it did — so a crash is
-  at least diagnosable and the per-null-session progress survives. Incremental structured output
-  is a v4 item.
+  writes no log file, and an earlier draft of this bullet wrongly implied it did. **How little
+  that buys, stated exactly:** the null loop logs only its start line and, ≈ 3.7 h later, its
+  summary; individual null sessions are logged only if one *fails* to run. So for the first two
+  thirds of the session the console shows a single line, and a crash inside the null phase is
+  diagnosable only as "it died somewhere in the null". Each experiment after that does log as it
+  starts. A second draft of this bullet claimed "the per-null-session progress survives", which
+  is false, and it is corrected here rather than left to be discovered from an empty log.
+  Per-session progress output and incremental structured results are v4 items.
 - **det1024 is deterministic**: one (key, message) pair always does the same work, which is why
   `sign-kk` rotates four messages identically across both classes.
 - **Known reporting defect, not fixed before this run (deliberately).** When the null is unfit or
