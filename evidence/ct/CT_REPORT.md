@@ -100,6 +100,38 @@ After a second team review (5 seats, 3 "reading over-claims" / 2 "honest"), the 
 
 **Consequences:** unchanged from §4 — Phase E stays blocked (no PASS exists); no patch to the vendored primitive; nothing here is a key-leak claim. The finding to carry forward, precisely: *at the pre-registered line, no location difference in det1024 signing time was found between fixed keys, between random key pools, or between fixed and random inputs on this machine; small sub-threshold differences were observed for three specific (key, message) pairs, cause undetermined; the crop diagnostic needs a real-operation null before it can say anything.*
 
+## 4b. Third session — METHODOLOGY **v3** (`session-2026-08-18-local-v3` INCONCLUSIVE, then `…-v3b` on a quiet machine)
+
+`METHODOLOGY-v3.md` was committed (`3061ae1`) before either run. **v3 changes:** the empirical null is **20 pool-vs-pool signing sessions of the real operation** (fresh 32-key pools each); `sign-kk` rotates **four fixed messages identically for both classes** (key-only, message-balanced); the kk **combination rule** is pre-registered (FAIL if any pair FAILs on the raw statistic; SHAPE only if ≥ 2 of 3 pairs SHAPE; else PASS); descriptive statistics are barred from the words "distinguishable / fingerprint / leak".
+
+**First v3 run (`-v3`, 4 200 measurements): INCONCLUSIVE.** With a random per-measurement class bit, 4 200 sits ≈ 2 sd above the 2 000-per-class floor and several sessions split below it (e.g. `sign-kk-0` 1934/2182); the harness rejected the null and refused every verdict — correct behaviour, boring cause. It also overlapped cargo builds on the same machine. Kept as evidence of the refusal path; the sample default became 4 800 and the harness now refuses `< 4600` up front, naming the reason.
+
+**Second v3 run (`-v3b`, 4 800 measurements, no other load): SESSION VERDICT — PASS (by the v3 rule).**
+
+| | n0 / n1 | raw *t* | *p*(raw) | Δmean (µs) [95 % CI] | crop stat | crop *p*ₑₘₚ | verdict |
+|---|---|---|---|---|---|---|---|
+| null (20 pool-vs-pool sessions, real operation) | ≥ 2 000 each ✔ | all \|t\| < 4.5 ✔ | | | **min 0.67 · median 1.84 · max 5.75** | — | null OK |
+| control-flat | | −0.21 | | | | | PASS ✔ |
+| control-leaky | | −21.9 | | | | | FAIL ✔ |
+| **sign-kk-0** (K_a vs K_b, 4 msgs) | 2314 / 2390 | −0.65 | 0.52 | +13.8 [−28, +56] | 4.93 | 0.095 | **PASS** |
+| **sign-kk-1** (K_c vs K_d) | 2369 / 2335 | +0.08 | 0.93 | −1.0 [−25, +23] | 2.57 | 0.286 | **PASS** |
+| **sign-kk-2** (K_e vs K_f) | 2343 / 2361 | −1.04 | 0.30 | +31.4 [−28, +91] | 2.78 | 0.286 | **PASS** |
+| **sign-kk combined** (≥ 2 of 3 rule) | | | | | | | **PASS** |
+| **sign-rr** (pool A vs pool B) | 2288 / 2416 | +0.04 | 0.97 | −0.9 [−48, +46] | 3.62 | 0.143 | **PASS** |
+| sign-key *(screening: fixed vs random)* | 2308 / 2396 | +3.01 | 0.003 | −46.4 [−77, −16] | 11.67 | 0.048 | SHAPE (informational) |
+| sign-msg *(screening)* | 2381 / 2323 | −0.28 | 0.78 | +5.4 [−33, +44] | 12.94 | 0.048 | SHAPE (informational) |
+| verify-ctrl / keygen *(informational)* | | −8.1 / −36.9 | | +1.3 / +11 118 | 55 / 40 | | FAIL (expected: public-data decoding / rejection-sampled keygen) |
+
+**Reading, stated exactly:**
+
+1. **At the pre-registered lines, no key-dependence of signing time is detected:** all three message-balanced fixed-key pairs and the pool-vs-pool control PASS on the raw statistic (|t| ≤ 1.04, every CI spanning zero) **and** on the crop diagnostic against a null of the same kind (crop *p*ₑₘₚ 0.10–0.29). The v3 rule's word is **PASS**, and PASS here means what METHODOLOGY says it means: *not detected at this power on this machine and build; not a proof.*
+2. **The real-operation null is wide (crop-stat max 5.75, median 1.84)** — confirming that v2's flat-loop null (max 1.89) was too benign and its SHAPE labels were artefacts, as §3a/§4a already concluded.
+3. **Power caveat, stated plainly:** the four-message rotation widens each class into a mixture (sd 0.41–1.06 ms here vs 0.21–0.23 ms in v2), so 95 % CIs on Δmean are ≈ ±25–60 µs versus ±10 µs in v2. **The ~12–17 µs fixed-key deltas v2 recorded are therefore neither confirmed nor excluded by this session.** Detecting an effect of that size under v3's design needs roughly 4× the samples (≈ 20 k per experiment); that is the next run, not a change of rule.
+4. **`sign-key` (fixed vs random) still shows SHAPE (crop 11.7, and raw *t* +3.0 with CI [−77, −16] µs on a single message).** This is the point-mass-vs-mixture asymmetry the design was demoted for — a fixed (key, message) has a narrower timing distribution than a mixture of 32 keys — and it is *why* v3 gates on `sign-kk`/`sign-rr` and reports fixed-vs-random only as screening. It is not read as key-dependence.
+5. Environment: same i9 desktop, Windows QPC ≈ 100 ns, no core pinning, turbo uncontrolled, FPEMU-specific; **no other load during `-v3b`** (unlike `-v3`).
+
+**Consequences:** Phase E stays **blocked** — one PASS on one machine at limited power is not "a sound PASS exists"; METHODOLOGY says a PASS is not a proof, and the v2 deltas are unresolved. What changes is the *direction of the evidence*: after three pre-registered iterations, the pinned det1024 signer shows **no location dependence on the key at the tested power**, the earlier "FAIL" and "SHAPE" readings are understood as artefacts of the statistic and null used, and the open question is precisely sized (≈ 15 µs effects, ≈ 20 k samples to resolve). No patch to the vendored primitive; nothing here is a security claim in either direction.
+
 ## 5. METHODOLOGY v2 — what changed before the second session (implemented; see `METHODOLOGY-v2.md`)
 
 Adopted from the team's review; none of this is retro-applied to this session.
