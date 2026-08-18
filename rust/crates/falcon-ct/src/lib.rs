@@ -136,6 +136,18 @@ pub struct ExperimentResult {
     /// null was supplied (v1 judging).
     #[serde(default)]
     pub crop_empirical_p: Option<f64>,
+    // ── v3.1 power fields. Descriptive, never decision criteria. ──
+    /// Welch standard error of `mean_diff_ns`, in nanoseconds.
+    #[serde(default)]
+    pub se_ns: f64,
+    /// The smallest true mean difference this experiment would have flagged at the
+    /// pre-registered `|t| >= 4.5` line with probability 0.80 / 0.90, in nanoseconds
+    /// ([`min_detectable_effect`]). A PASS means "nothing at or above this size was detected",
+    /// and these two numbers are what makes that sentence readable.
+    #[serde(default)]
+    pub mde80_ns: f64,
+    #[serde(default)]
+    pub mde90_ns: f64,
 }
 
 /// Raw samples of one experiment, kept for the CSV.
@@ -254,6 +266,103 @@ pub fn mean_diff_ci95(a: &[u64], b: &[u64]) -> (f64, (f64, f64)) {
     (d, (d - 1.96 * se, d + 1.96 * se))
 }
 
+/// The standard error of the difference in means (Welch), in the samples' unit.
+#[must_use]
+pub fn welch_se(a: &[u64], b: &[u64]) -> f64 {
+    if a.len() < 2 || b.len() < 2 {
+        return f64::INFINITY;
+    }
+    let (_, sa) = mean_stddev(a);
+    let (_, sb) = mean_stddev(b);
+    (sa * sa / a.len() as f64 + sb * sb / b.len() as f64).sqrt()
+}
+
+/// The standard normal quantile `z` such that `P(Z <= z) = p`, for `p` in (0, 1).
+///
+/// Acklam's rational approximation, relative error < 1.15e-9 over the whole domain. Needed
+/// because the harness reports its own statistical power and a power statement needs `z_beta`;
+/// no dependency is added for it (constitution §3).
+///
+/// **No Halley refinement**, deliberately. The textbook refinement step
+/// (`x -= u / (1 + x·u/2)` with `u` from the CDF) is only an improvement if the CDF used is more
+/// accurate than the approximation being refined. This crate's [`erfc`] is Abramowitz–Stegun
+/// 7.1.26, whose absolute error is ≈ 1.5e-7 — two orders of magnitude WORSE than Acklam — so
+/// refining with it moved the answer away from the published quantiles (measured: z(0.9) off by
+/// ~1e-7 with the step, < 1e-9 without). Kept as a comment because the step looks like free
+/// precision and someone will otherwise add it back.
+#[must_use]
+#[allow(clippy::many_single_char_names)]
+pub fn inverse_normal_cdf(p: f64) -> f64 {
+    const A: [f64; 6] = [
+        -3.969_683_028_665_376e1,
+        2.209_460_984_245_205e2,
+        -2.759_285_104_469_687e2,
+        1.383_577_518_672_69e2,
+        -3.066_479_806_614_716e1,
+        2.506_628_277_459_239e0,
+    ];
+    const B: [f64; 5] = [
+        -5.447_609_879_822_406e1,
+        1.615_858_368_580_409e2,
+        -1.556_989_798_598_866e2,
+        6.680_131_188_771_972e1,
+        -1.328_068_155_288_572e1,
+    ];
+    const C: [f64; 6] = [
+        -7.784_894_002_430_293e-3,
+        -3.223_964_580_411_365e-1,
+        -2.400_758_277_161_838e0,
+        -2.549_732_539_343_734e0,
+        4.374_664_141_464_968e0,
+        2.938_163_982_698_783e0,
+    ];
+    const D: [f64; 4] = [
+        7.784_695_709_041_462e-3,
+        3.224_671_290_700_398e-1,
+        2.445_134_137_142_996e0,
+        3.754_408_661_907_416e0,
+    ];
+    const P_LOW: f64 = 0.024_25;
+    if !(p > 0.0 && p < 1.0) {
+        return f64::NAN;
+    }
+    if p < P_LOW {
+        let q = (-2.0 * p.ln()).sqrt();
+        (((((C[0] * q + C[1]) * q + C[2]) * q + C[3]) * q + C[4]) * q + C[5])
+            / ((((D[0] * q + D[1]) * q + D[2]) * q + D[3]) * q + 1.0)
+    } else if p <= 1.0 - P_LOW {
+        let q = p - 0.5;
+        let r = q * q;
+        (((((A[0] * r + A[1]) * r + A[2]) * r + A[3]) * r + A[4]) * r + A[5]) * q
+            / (((((B[0] * r + B[1]) * r + B[2]) * r + B[3]) * r + B[4]) * r + 1.0)
+    } else {
+        let q = (-2.0 * (1.0 - p).ln()).sqrt();
+        -(((((C[0] * q + C[1]) * q + C[2]) * q + C[3]) * q + C[4]) * q + C[5])
+            / ((((D[0] * q + D[1]) * q + D[2]) * q + D[3]) * q + 1.0)
+    }
+}
+
+/// The smallest true mean difference this experiment would flag with probability `power`,
+/// given its own standard error and the pre-registered decision threshold.
+///
+/// **This is the number that makes a PASS readable.** A non-detection is only as strong as the
+/// effect it could have detected: with `|t| >= threshold` as the rule, a true difference `d`
+/// is flagged with probability ≈ `P(Z >= threshold - d/se)`, so the detectable effect is
+/// `(threshold + z_power) * se`. Reported per experiment so no session can state "no difference
+/// detected" without publishing the size of what it could have seen.
+///
+/// Normal approximation: the degrees of freedom here are in the thousands. It is a *planning*
+/// quantity — computed from the observed sd, so it describes the run that happened, and it is
+/// never a decision criterion (METHODOLOGY-v3 §1: only the raw statistic and the crop/null
+/// comparison decide).
+#[must_use]
+pub fn min_detectable_effect(se: f64, threshold: f64, power: f64) -> f64 {
+    if !se.is_finite() || se <= 0.0 || !(power > 0.0 && power < 1.0) {
+        return f64::NAN;
+    }
+    (threshold + inverse_normal_cdf(power)) * se
+}
+
 /// The value at the `p`-th percentile (0..=1) of the POOLED samples, by nearest-rank.
 #[must_use]
 pub fn pooled_percentile(a: &[u64], b: &[u64], p: f64) -> u64 {
@@ -340,7 +449,11 @@ pub fn judge(id: &str, description: &str, raw: &RawSamples) -> ExperimentResult 
     };
     let raw_t = tv.first().map_or(0.0, |v| v.t);
     let (mean_diff_ns, ci95_ns) = mean_diff_ci95(&c0, &c1);
+    let se_ns = welch_se(&c0, &c1);
     ExperimentResult {
+        se_ns,
+        mde80_ns: min_detectable_effect(se_ns, T_THRESHOLD, 0.80),
+        mde90_ns: min_detectable_effect(se_ns, T_THRESHOLD, 0.90),
         id: id.to_owned(),
         description: description.to_owned(),
         class0: class_stats(&c0),
@@ -490,6 +603,79 @@ mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
     use super::*;
+
+    #[test]
+    fn inverse_normal_cdf_matches_published_quantiles() {
+        // Reference values (Abramowitz & Stegun / any standard table), to 1e-9.
+        for &(p, want) in &[
+            (0.5_f64, 0.0_f64),
+            (0.8, 0.841_621_233_572_914_4),
+            (0.9, 1.281_551_565_544_600_4_f64),
+            (0.95, 1.644_853_626_951_472_7),
+            (0.975, 1.959_963_984_540_054),
+            (0.999, 3.090_232_306_167_813),
+            (0.01, -2.326_347_874_040_841),
+            (0.001, -3.090_232_306_167_813),
+        ] {
+            let got = inverse_normal_cdf(p);
+            assert!(
+                (got - want).abs() < 1e-8,
+                "z({p}) = {got}, want {want} (diff {:e})",
+                (got - want).abs()
+            );
+        }
+        assert!(
+            inverse_normal_cdf(0.0).is_nan(),
+            "p outside (0,1) is NaN, not a number to use"
+        );
+        assert!(inverse_normal_cdf(1.0).is_nan());
+        assert!(inverse_normal_cdf(-0.5).is_nan());
+    }
+
+    #[test]
+    fn min_detectable_effect_is_the_threshold_plus_z_times_se() {
+        // The rule is |t| >= 4.5, NOT 1.96: a 4.5-sigma line needs (4.5 + z_power) * SE, so
+        // the detectable effect is ~2.7x the 95% CI half-width, never equal to it. Getting this
+        // wrong is how a report claims four times the resolution it has.
+        let se = 10_000.0; // 10 us
+        let m90 = min_detectable_effect(se, T_THRESHOLD, 0.90);
+        let m80 = min_detectable_effect(se, T_THRESHOLD, 0.80);
+        assert!((m90 - (4.5 + 1.281_551_565_544_6) * se).abs() < 1e-4);
+        assert!((m80 - (4.5 + 0.841_621_233_572_9) * se).abs() < 1e-4);
+        assert!(m90 > m80, "more power costs a bigger detectable effect");
+        assert!(
+            m90 > 2.9 * 1.96 * se && m90 < 3.0 * 1.96 * se,
+            "MDE90 ({m90}) must be ~2.95x the CI half-width ({}), not equal to it",
+            1.96 * se
+        );
+        assert!(min_detectable_effect(f64::INFINITY, T_THRESHOLD, 0.9).is_nan());
+        assert!(min_detectable_effect(0.0, T_THRESHOLD, 0.9).is_nan());
+        assert!(min_detectable_effect(se, T_THRESHOLD, 1.0).is_nan());
+    }
+
+    #[test]
+    fn power_fields_scale_as_one_over_sqrt_n() {
+        // Quadrupling the sample count halves the standard error, and therefore halves the
+        // detectable effect. This is the whole cost model of a high-power session.
+        let mut rng = Xs(0x1234_5678_9abc_def0);
+        let make = |rng: &mut Xs, n: usize| -> RawSamples {
+            let samples = (0..n)
+                .map(|i| {
+                    let noise = rng.next() % 200_000;
+                    (u8::from(i % 2 == 1), 8_000_000 + noise)
+                })
+                .collect();
+            RawSamples { samples }
+        };
+        let small = judge("s", "", &make(&mut rng, 10_000));
+        let big = judge("b", "", &make(&mut rng, 40_000));
+        let ratio = small.mde90_ns / big.mde90_ns;
+        assert!(
+            (ratio - 2.0).abs() < 0.15,
+            "4x the samples should halve MDE90; got ratio {ratio}"
+        );
+        assert!(small.se_ns.is_finite() && big.se_ns.is_finite());
+    }
 
     /// A tiny deterministic PRNG for tests (xorshift64*). NOT for anything but tests.
     struct Xs(u64);

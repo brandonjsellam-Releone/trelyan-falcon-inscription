@@ -40,8 +40,9 @@ const KK_PAIRS: usize = 3;
 const KK_MESSAGES: usize = 4;
 /// Real-operation null sessions (v3 §1: N ≥ 20).
 const DEFAULT_NULL_SESSIONS: usize = 20;
-const METHODOLOGY: &str =
-    "evidence/ct/METHODOLOGY-v3.md (2026-08-18); v2 = METHODOLOGY-v2.md; v1 = METHODOLOGY.md";
+const METHODOLOGY: &str = "evidence/ct/METHODOLOGY-v3.md (2026-08-18) + METHODOLOGY-v3.1-POWER.md \
+    (sample size and reported power; NO decision rule changed); v2 = METHODOLOGY-v2.md; \
+    v1 = METHODOLOGY.md";
 const READING_GUIDE: &str = "v3. Primary: raw Welch |t| >= 4.5 => FAIL (a LOCATION difference). \
     Secondary: crop statistic vs an empirical null of N pool-vs-pool signing sessions of the \
     REAL operation; SHAPE = raw |t| < 4.5 but crop stat beyond every null session (shape/scale, \
@@ -49,7 +50,12 @@ const READING_GUIDE: &str = "v3. Primary: raw Welch |t| >= 4.5 => FAIL (a LOCATI
     only if >= 2 of 3 pairs SHAPE; else PASS. INCONCLUSIVE = a control or the null misbehaved, \
     or too few samples; never PASS. Descriptive stats (dmean, CI, p) are NOT decision criteria. \
     Gated: sign-kk (combined) and sign-rr. Screening/informational: sign-key, sign-msg, \
-    verify-ctrl, keygen. Not a proof; machine- and build-specific.";
+    verify-ctrl, keygen. POWER (v3.1): each experiment reports se_ns and mde80_ns/mde90_ns = \
+    (4.5 + z_power) * SE — the smallest true mean difference it would have flagged at that \
+    probability. A PASS therefore reads 'nothing at or above mde90_ns was detected', NOT 'the \
+    means are equal' and NOT 'no leak exists'; smaller effects keep a smaller, non-zero \
+    detection probability. mde is descriptive and decides nothing. Not a proof; machine- and \
+    build-specific.";
 
 #[derive(Serialize)]
 struct Environment {
@@ -117,6 +123,15 @@ struct Controls {
     /// v2: whether the harness pinned itself to one CPU. std has no affinity API and the
     /// constitution allows no new dependency for it here, so this is `false` and stated.
     affinity_pinned: bool,
+    /// v3.1: the full judged result of **every** null session, not just its crop statistic.
+    ///
+    /// The null costs about two thirds of a session's wall-clock and previously survived as 20
+    /// bare floats: an auditor could not check the *n* per class, the means, the raw *t*, or the
+    /// ten *t* values that produced each one, and the raw samples were dropped. The summaries are
+    /// small (no raw samples ride in [`ExperimentResult`]) and make the most expensive part of
+    /// the session auditable. Serialising them costs nothing in the timed region — it happens
+    /// after the last measurement.
+    null_detail: Vec<ExperimentResult>,
 }
 
 #[derive(Serialize)]
@@ -210,6 +225,7 @@ fn random_bytes(rng: &mut Shake256Context, n: usize) -> Vec<u8> {
     v
 }
 
+#[derive(Clone)]
 struct Keypair {
     sk: [u8; PRIVKEY_SIZE],
     pk: [u8; PUBKEY_SIZE],
@@ -230,6 +246,20 @@ struct Fixtures {
     pool_b: Vec<Keypair>,
     /// v2: fixed key pairs for `sign-kk`.
     kk: Vec<(Keypair, Keypair)>,
+    /// v3.1 A/A control: **the same keypair twice**, in a tuple laid out exactly like a `kk`
+    /// pair. Class 0 reads the copy at tuple offset 0, class 1 the copy at offset
+    /// `size_of::<Keypair>()` — the identical difference in address and cache alignment that
+    /// class 0 and class 1 see in `sign-kk`, but with byte-identical key material. Its true mean
+    /// difference is therefore **exactly zero by construction**, so any *t* it produces is
+    /// harness, layout or environment, and never a key effect.
+    ///
+    /// It exists because the committed data says it must: over the v2, v3 and v3b sessions,
+    /// **8 of 9 independent `sign-kk` pairs put class 1 slower, mean +13.9 µs** — a sign pattern
+    /// that follows the *arm* rather than any particular key (binomial *p* ≈ 0.04), while
+    /// `sign-rr`, whose two arms live in separate allocations, shows the opposite sign. At
+    /// 82 000 measurements the CI on that offset is ±10 µs, so the session would have measured
+    /// it precisely and had no control that could say whether it came from the keys.
+    aa: (Keypair, Keypair),
     m0: Vec<u8>,
     msgs: Vec<Vec<u8>>,
     s0: Vec<u8>,
@@ -255,6 +285,11 @@ impl Fixtures {
         for _ in 0..KK_PAIRS {
             kk.push((gen_keypair(rng)?, gen_keypair(rng)?));
         }
+        // Same keypair in both slots — see the field's doc comment. Cloned rather than
+        // referenced twice so the two arms read DIFFERENT addresses holding IDENTICAL bytes,
+        // which is exactly the asymmetry `sign-kk` has and the property being controlled for.
+        let aa_key = gen_keypair(rng)?;
+        let aa = (aa_key.clone(), aa_key);
         let m0 = random_bytes(rng, MSG_LEN);
         let msgs = (0..KEY_POOL).map(|_| random_bytes(rng, MSG_LEN)).collect();
         let mut sig_buf = [0u8; SIG_COMPRESSED_MAXSIZE];
@@ -283,6 +318,7 @@ impl Fixtures {
             pool,
             pool_b,
             kk,
+            aa,
             m0,
             msgs,
             s0,
@@ -347,6 +383,26 @@ fn run_sign_key(f: &Fixtures, samples: usize, bits: &mut ClassBits) -> RawSample
 /// so the comparison is key-only and message-balanced (METHODOLOGY-v3 §2).
 fn run_sign_kk(f: &Fixtures, pair: usize, samples: usize, bits: &mut ClassBits) -> RawSamples {
     let (ka, kb) = &f.kk[pair];
+    let mut out = [0u8; SIG_COMPRESSED_MAXSIZE];
+    let mut i = 0usize;
+    measure(
+        samples,
+        || bits.next(),
+        |class| {
+            let sk = if class { &kb.sk } else { &ka.sk };
+            let m: &[u8] = &f.msgs[i % KK_MESSAGES];
+            i += 1;
+            let _ = std::hint::black_box(sign_compressed(sk, m, &mut out));
+        },
+    )
+}
+
+/// v3.1 `sign-aa`: the A/A layout control. Byte-for-byte identical to [`run_sign_kk`] except
+/// that both arms sign with copies of the **same** keypair, so the true difference is zero.
+/// A FAIL here means the harness distinguishes its own arms and no key verdict in the session
+/// may be believed (it can only downgrade a verdict, never lift one).
+fn run_sign_aa(f: &Fixtures, samples: usize, bits: &mut ClassBits) -> RawSamples {
+    let (ka, kb) = &f.aa;
     let mut out = [0u8; SIG_COMPRESSED_MAXSIZE];
     let mut i = 0usize;
     measure(
@@ -439,6 +495,80 @@ fn run_keygen(f: &Fixtures, samples: usize, bits: &mut ClassBits) -> RawSamples 
     )
 }
 
+/// The flat-control verdict the session must be judged under, given what the A/A control did.
+///
+/// **Only a PASS on A/A lets the session speak.** A FAIL means the harness separates its own
+/// arms in location; a SHAPE means it separates them in the crop diagnostic, which is the very
+/// statistic the key experiments' secondary arm rests on; an INCONCLUSIVE means the control
+/// itself could not be judged. In all three the session cannot tell an arm effect from a key
+/// effect, so no key verdict may be issued.
+///
+/// Pure, so the rule can be tested without running a ten-minute experiment — the rule and the
+/// thing that enforces it are the same line of code (this repository's standing complaint is
+/// checks that cannot fail).
+const fn flat_verdict_under_aa(aa: Verdict, flat: Verdict) -> Verdict {
+    match aa {
+        Verdict::Pass => flat,
+        _ => Verdict::Inconclusive,
+    }
+}
+
+/// Run and judge the v3.1 A/A layout control, and return it with the flat-control verdict the
+/// rest of the session must be judged under.
+///
+/// Both arms sign with copies of the SAME keypair (see [`Fixtures::aa`]), so the true mean
+/// difference is zero by construction and any signal is harness, layout or environment. A FAIL
+/// here means the harness distinguishes its own arms, which would make every key comparison in
+/// the session unreadable — so it forces them all INCONCLUSIVE. It can only **downgrade**: no
+/// rule that produces a PASS is touched by it.
+///
+/// The downgrade is routed through the flat control's verdict, the lever [`apply_controls`]
+/// already reads, so a future reader cannot find two different ways for a session to be gated.
+fn run_aa_control(
+    f: &Fixtures,
+    samples: usize,
+    bits: &mut ClassBits,
+    controls: &Controls,
+    log: &dyn Fn(&str),
+) -> (Judged, RawSamples, Verdict) {
+    log("running sign-aa (A/A layout control; true difference is zero by construction) …");
+    let raw = run_sign_aa(f, samples, bits);
+    let aa = judge_v2(
+        "sign-aa",
+        "sign_compressed: the SAME keypair in both arms, laid out exactly as a sign-kk pair \
+         (class 0 at tuple offset 0, class 1 at offset size_of::<Keypair>()); identical message \
+         rotation. True Δmean = 0 by construction, so any signal is harness/layout/environment, \
+         never a key effect. CONTROL: a FAIL forces every key verdict INCONCLUSIVE.",
+        &raw,
+        &controls.null_crop_stats,
+    );
+    let ok = aa.isolated_verdict == Verdict::Pass;
+    log(&format!(
+        "sign-aa: raw t={:.2} Δmean={:+.0}ns [{:+.0},{:+.0}] → {:?}{}",
+        aa.raw_t,
+        aa.mean_diff_ns,
+        aa.ci95_ns.0,
+        aa.ci95_ns.1,
+        aa.isolated_verdict,
+        if ok {
+            ""
+        } else {
+            "  — ARM BIAS: every key verdict in this session is INCONCLUSIVE"
+        }
+    ));
+    let flat_for_rule = flat_verdict_under_aa(aa.isolated_verdict, controls.flat.isolated_verdict);
+    let verdict = aa.isolated_verdict;
+    (
+        Judged {
+            verdict,
+            gated: false,
+            result: aa,
+        },
+        raw,
+        flat_for_rule,
+    )
+}
+
 /// The Falcon experiments in METHODOLOGY-v2 §2 order, each judged (v2) against the controls
 /// and the empirical null.
 fn falcon_experiments(
@@ -451,12 +581,18 @@ fn falcon_experiments(
     type Runner = fn(&Fixtures, usize, &mut ClassBits) -> RawSamples;
     let mut judged = Vec::new();
     let mut raws = Vec::new();
+
+    // v3.1 A/A layout control, before anything else is judged (see `run_aa_control`).
+    let (aa_judged, aa_raw, flat_for_rule) = run_aa_control(f, samples, bits, controls, log);
+    judged.push(aa_judged);
+    raws.push(("sign-aa".to_owned(), aa_raw));
+
     let mut push = |id: String, description: &str, gated: bool, raw: RawSamples| {
         let r = judge_v2(&id, description, &raw, &controls.null_crop_stats);
         judged.push(Judged {
             verdict: apply_controls(
                 r.isolated_verdict,
-                controls.flat.isolated_verdict,
+                flat_for_rule,
                 controls.leaky.isolated_verdict,
             ),
             gated,
@@ -563,6 +699,11 @@ fn write_outputs(opts: &Opts, report: &Report, raws: &[(String, RawSamples)]) ->
         report.controls.leaky.raw_t,
         if report.controls.ok { "ok" } else { "NOT OK" }
     );
+    println!(
+        "  power: each line's MDE90 is the smallest true Δmean that experiment would have \
+         flagged at |t|>=4.5 with probability 0.90. A PASS reads 'nothing at or above MDE90 was \
+         detected', never 'no difference exists'."
+    );
     for j in &report.experiments {
         println!(
             "  {:<11} n={:<4}/{:<4} Δmean={:>+9.0}ns [{:>+8.0},{:>+8.0}]  raw t={:>6.2} p={:<8.2e} crop max|t|={:>6.2} p_emp={:<5.3}  {:?}{}",
@@ -578,6 +719,10 @@ fn write_outputs(opts: &Opts, report: &Report, raws: &[(String, RawSamples)]) ->
             j.result.crop_empirical_p.unwrap_or(f64::NAN),
             j.verdict,
             if j.gated { "" } else { "  (informational)" }
+        );
+        println!(
+            "  {:<11} SE={:>8.0}ns  MDE80={:>9.0}ns  MDE90={:>9.0}ns",
+            "", j.result.se_ns, j.result.mde80_ns, j.result.mde90_ns
         );
     }
     println!("  SESSION VERDICT: {:?}", report.session_verdict);
@@ -727,6 +872,7 @@ fn null_and_controls(
             null_crop_stats,
             null_ok,
             affinity_pinned: false,
+            null_detail: null_results,
         },
         flat_raw,
         leaky_raw,
@@ -793,7 +939,11 @@ fn main() -> Result<()> {
 
     let report = Report {
         methodology: METHODOLOGY,
-        schema_version: 3,
+        // 4: every experiment carries `se_ns` / `mde80_ns` / `mde90_ns` (v3.1 power addendum).
+        // Additive and `#[serde(default)]`, so a schema-3 reader still parses these reports; the
+        // bump is how a reader tells "this session published its resolution" from one that could
+        // not. Decision rules are unchanged from v3.
+        schema_version: 4,
         samples_per_experiment: opts.samples,
         key_pool: KEY_POOL,
         message_len: MSG_LEN,
@@ -804,4 +954,72 @@ fn main() -> Result<()> {
         reading_guide: READING_GUIDE,
     };
     write_outputs(&opts, &report, &all_raws)
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+
+    use falcon_ct::Verdict;
+
+    use super::flat_verdict_under_aa;
+
+    /// The A/A control's whole purpose: it can shut the session up, and it can never open it.
+    #[test]
+    fn only_a_passing_aa_control_lets_the_session_speak() {
+        // PASS on A/A: the flat control's own verdict is carried through untouched, whatever it
+        // is — the A/A control adds no new way to reach a verdict.
+        for flat in [
+            Verdict::Pass,
+            Verdict::Shape,
+            Verdict::Fail,
+            Verdict::Inconclusive,
+        ] {
+            assert_eq!(
+                flat_verdict_under_aa(Verdict::Pass, flat),
+                flat,
+                "a passing A/A control must not change how the session is judged"
+            );
+        }
+        // Anything else on A/A: INCONCLUSIVE, even when the flat control passed. A FAIL means the
+        // harness tells its own arms apart in location; SHAPE means it does so in the crop
+        // diagnostic the key experiments' secondary arm rests on; INCONCLUSIVE means the control
+        // could not be judged. None of the three can be distinguished from a key effect.
+        for aa in [Verdict::Shape, Verdict::Fail, Verdict::Inconclusive] {
+            for flat in [
+                Verdict::Pass,
+                Verdict::Shape,
+                Verdict::Fail,
+                Verdict::Inconclusive,
+            ] {
+                assert_eq!(
+                    flat_verdict_under_aa(aa, flat),
+                    Verdict::Inconclusive,
+                    "A/A = {aa:?} must force INCONCLUSIVE even with flat = {flat:?}"
+                );
+            }
+        }
+    }
+
+    /// Downgrade-only, stated as a property rather than as four cases: for every pair of
+    /// verdicts, the rule's output is either the flat control's verdict or INCONCLUSIVE. It can
+    /// never invent a PASS, a SHAPE or a FAIL that the session did not otherwise have.
+    #[test]
+    fn the_aa_rule_can_only_downgrade() {
+        let all = [
+            Verdict::Pass,
+            Verdict::Shape,
+            Verdict::Fail,
+            Verdict::Inconclusive,
+        ];
+        for aa in all {
+            for flat in all {
+                let out = flat_verdict_under_aa(aa, flat);
+                assert!(
+                    out == flat || out == Verdict::Inconclusive,
+                    "A/A = {aa:?}, flat = {flat:?} produced {out:?} — the rule invented a verdict"
+                );
+            }
+        }
+    }
 }
