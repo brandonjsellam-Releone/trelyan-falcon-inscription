@@ -1,0 +1,29 @@
+[package]
+name = "falcon-ct"
+version = "0.1.0"
+description = "Constant-time EVIDENCE harness for the pinned Falcon-1024 det1024 signer: dudect-style two-class timing with Welch's t, per evidence/ct/METHODOLOGY.md. An observation, not a gate."
+# Internal to TRELYAN; not distributed via crates.io.
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "falcon-ct"
+path = "src/main.rs"
+
+[dependencies]
+trelyan-pq-ffi = { path = "../trelyan-pq-ffi" }
+# The report is JSON so anyone can recompute the statistic from the raw CSVs and compare; serde is
+# already justified at the workspace level (KAT fixtures). Here it is a production dependency of
+# the harness binary only — the signer crates do not depend on it.
+serde.workspace = true
+serde_json.workspace = true
+# anyhow: binary-only error handling (constitution §3). The library half uses no error type at all —
+# statistics on slices cannot fail; the runner reports INCONCLUSIVE instead of erroring.
+anyhow.workspace = true
+
+[lints]
+workspace = true

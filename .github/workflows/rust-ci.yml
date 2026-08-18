@@ -123,6 +123,66 @@ jobs:
       - name: cargo build on ${{ steps.msrv.outputs.version }}
         run: cargo "+${{ steps.msrv.outputs.version }}" build --all-features
 
+  falcon-ct:
+    name: falcon-ct evidence session (observation, never a gate)
+    # Runs the pre-registered constant-time session (evidence/ct/METHODOLOGY.md) against the
+    # pinned signer on a shared runner and PUBLISHES the result to the job summary. It does not
+    # fail on FAIL or INCONCLUSIVE — that is what "observation, not a gate" means in the plan —
+    # and shared runners are noisy enough that INCONCLUSIVE (the flat control tripping) is an
+    # expected, honest outcome. It DOES fail if the harness itself cannot run.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned toolchain (rust/rust-toolchain.toml)
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustc --version && cargo --version
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: rust
+      - name: Build the harness (release)
+        run: FALCON_CT_RUSTC="$(rustc --version)" cargo build --release -p falcon-ct
+      # 4400 measurements → ≈2 156 per class after the 2 % warm-up: above the 2 000 minimum, so
+      # a verdict is possible; still short enough for a CI job (signing is ~ms with FPEMU).
+      - name: Run the session
+        run: ./target/release/falcon-ct --samples 4400 --out ../evidence/ct/ci-run
+      - name: Publish the result (job summary + annotations; never a failure)
+        working-directory: evidence/ct/ci-run
+        run: |
+          set -euo pipefail
+          verdict=$(python3 -c 'import json;print(json.load(open("report.json"))["session_verdict"])')
+          ok=$(python3 -c 'import json;print(json.load(open("report.json"))["controls"]["controls_ok"])')
+          {
+            echo "## falcon-ct — constant-time evidence session (ubuntu-latest, shared runner)"
+            echo
+            echo "**SESSION VERDICT: ${verdict}** — controls_ok=${ok}. Observation per evidence/ct/METHODOLOGY.md; not a gate."
+            echo
+            echo '| experiment | n0 | n1 | mean0 (ns) | mean1 (ns) | max abs t | verdict | gated |'
+            echo '|---|---|---|---|---|---|---|---|'
+            python3 - <<'PY'
+          import json
+          r=json.load(open("report.json"))
+          for e in [r["controls"]["flat"], r["controls"]["leaky"]]:
+              print(f"| {e['id']} | {e['class0']['n']} | {e['class1']['n']} | {e['class0']['mean_ns']:.0f} | {e['class1']['mean_ns']:.0f} | {e['max_abs_t']:.2f} | {e['isolated_verdict']} | control |")
+          for e in r["experiments"]:
+              print(f"| {e['id']} | {e['class0']['n']} | {e['class1']['n']} | {e['class0']['mean_ns']:.0f} | {e['class1']['mean_ns']:.0f} | {e['max_abs_t']:.2f} | {e['verdict']} | {'yes' if e['gated'] else 'no'} |")
+          PY
+            echo
+            echo '<details><summary>report.json</summary>'
+            echo
+            echo '```json'
+            cat report.json
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+          case "$verdict" in
+            PASS) echo "::notice::falcon-ct: PASS on this runner (not a proof; see METHODOLOGY.md)";;
+            FAIL) echo "::warning::falcon-ct: FAIL — the pinned signer's timing is input-dependent at this power (see job summary)";;
+            *)    echo "::warning::falcon-ct: INCONCLUSIVE — a control misbehaved or too few samples; no statement";;
+          esac
+
   supply-chain:
     name: rust cargo audit + cargo deny
     runs-on: ubuntu-latest

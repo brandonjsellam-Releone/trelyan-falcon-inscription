@@ -43,3 +43,7 @@ build/
 contracts/.teal-check-*/
 # Rust workspace build output (rust/)
 rust/target/
+
+# falcon-ct CI runs write here; CI publishes them to the job summary, the repo keeps only named sessions
+evidence/ct/ci-run/
+evidence/ct/out/
