@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/trelyan-pq-ffi", "crates/trelyan-pq-core"]
+members = ["crates/trelyan-pq-ffi", "crates/trelyan-pq-core", "crates/falcon-ct"]
 
 [workspace.package]
 edition = "2024"
@@ -28,6 +28,9 @@ sha2    = "0.10"
 zeroize = { version = "1", features = ["derive"] }
 # thiserror : library error types (constitution §3 — thiserror in libraries).
 thiserror = "2"
+# anyhow  : binary-only error handling (constitution §3 — anyhow only in binaries). Used by the
+#           falcon-ct harness binary; no library crate depends on it.
+anyhow = "1"
 # serde / serde_json : DEV-ONLY, to read sdk/tests/vectors/det1024_kat.json in the KAT tests.
 #           No production code path parses JSON.
 serde      = { version = "1", features = ["derive"] }
