@@ -195,6 +195,15 @@ class FalconDet1024:
         """Sign the RAW message M (low-level; prefer sign_inscription()). Do NOT pre-hash M.
 
         Returns the compressed signature `falcon_verify` expects (first byte 0xBA).
+
+        ONLY pass private-key bytes produced by keygen() or read from a store whose integrity you
+        have already checked. The reference validates only the key's header byte; a 2305-byte
+        buffer whose header says Falcon-1024 (0x5A) but whose body is not a valid NTRU basis sends
+        the reference signer's retry loop (do_sign_dyn, `for (;;)`, no iteration cap in the pinned
+        source) spinning without bound - this call then NEVER RETURNS instead of raising. Found
+        2026-08-18 by the Rust FFI's negative-input tests (rust/crates/trelyan-pq-ffi/tests/
+        negative_inputs.rs); the vendored C is not patched, the guard is at the caller. A corrupted
+        key file is therefore an availability hazard (a hang), not a clean error.
         """
         if len(privkey) != PRIVKEY_SIZE:
             raise ValueError(f"privkey must be {PRIVKEY_SIZE} bytes, got {len(privkey)}")
