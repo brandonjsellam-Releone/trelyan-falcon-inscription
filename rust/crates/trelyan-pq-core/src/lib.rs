@@ -146,6 +146,14 @@ pub struct SecretKey([u8; PRIVKEY_SIZE]);
 impl SecretKey {
     /// Wrap 2305 bytes the caller already holds (deserialisation, KAT fixtures). Callers should
     /// zeroize their own copy afterwards; this type owns only what it was given.
+    ///
+    /// **No structural validation is performed, and none is cheap:** the reference decodes only
+    /// the header byte. Bytes whose header says Falcon-1024 but whose body is not a valid NTRU
+    /// basis will make [`sign`] **hang** (the reference signer's retry loop has no iteration cap;
+    /// finding 2026-08-18, see `trelyan-pq-ffi/tests/negative_inputs.rs`), not fail. Only wrap
+    /// bytes that came from [`keygen`] or from a store whose integrity you have already checked
+    /// (e.g. an authenticated container, or a self-KAT sign+verify performed on a *known-good*
+    /// copy). A corrupted key file is an availability hazard here, by design of the reference.
     #[must_use]
     pub const fn from_bytes(bytes: [u8; PRIVKEY_SIZE]) -> Self {
         Self(bytes)

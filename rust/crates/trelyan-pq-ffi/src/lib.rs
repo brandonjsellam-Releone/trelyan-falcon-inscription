@@ -192,9 +192,16 @@ pub fn keygen(
 /// C side does not consult the buffer's capacity — the array type is the guarantee that it is
 /// large enough.
 ///
+/// **Only ever pass key bytes produced by [`keygen`] or read from a trusted, integrity-checked
+/// store.** A key whose header byte says Falcon-1024 but whose body is not a valid NTRU basis
+/// makes the reference signer's retry loop (`do_sign_dyn`, `for (;;)`, no iteration cap in the
+/// pinned source) spin without bound — the call never returns (finding 2026-08-18, pinned by
+/// `tests/negative_inputs.rs`). A corrupted key file is therefore a hang, not a clean error.
+/// The vendored C is not patched for this; the guard is at the caller.
+///
 /// # Errors
-/// The C error code: [`ERR_FORMAT`] if `privkey` does not decode as a Falcon-1024 key, or an
-/// internal failure.
+/// The C error code: [`ERR_FORMAT`] if `privkey`'s header does not decode as a Falcon-1024 key,
+/// or an internal failure.
 pub fn sign_compressed(
     privkey: &[u8; PRIVKEY_SIZE],
     data: &[u8],
