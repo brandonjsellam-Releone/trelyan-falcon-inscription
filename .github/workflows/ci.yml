@@ -5,10 +5,13 @@ on:
   # change ever triggered CI: inscription.py could be edited and merged without a single test
   # running, and with nothing to notice it no longer matched the deployed application. That is
   # precisely what happened in 2ec798e (2026-06-16), and it went unseen for two months.
+  # third_party/** was added 2026-08-18 with the vendored Falcon tree: every job that builds the
+  # library now builds it from there, so a change to those bytes must run the KAT and the
+  # sanitizer gate exactly like a change to the SDK would.
   push:
-    paths: ["sdk/**", "contracts/**", ".github/workflows/ci.yml"]
+    paths: ["sdk/**", "contracts/**", "third_party/**", ".github/workflows/ci.yml"]
   pull_request:
-    paths: ["sdk/**", "contracts/**", ".github/workflows/ci.yml"]
+    paths: ["sdk/**", "contracts/**", "third_party/**", ".github/workflows/ci.yml"]
   schedule:
     - cron: "23 6 * * 1"   # Mondays 06:23 UTC — continuous proof the deployed app still verifies
   workflow_dispatch: {}
@@ -113,6 +116,30 @@ jobs:
             echo "::error::do not lower this floor."
             exit 1
           fi
+  vendored-falcon-integrity:
+    name: Vendored Falcon tree is byte-exact to the pin (offline)
+    # third_party/falcon-det1024/src is the pinned algorand/falcon@ce15e75b tree, vendored
+    # 2026-08-18 so no job depends on GitHub serving that tarball at build time. Two checks, on
+    # purpose: SHA256SUMS is the per-file manifest a reviewer can read line by line; the digest
+    # script is the SAME check CI applied to the downloaded tarball before the tree was vendored,
+    # so "vendored" and "pinned" remain one claim, not two. Either failing blocks the KAT jobs
+    # below from building a drifted signer.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Per-file manifest (27 files under src/)
+        working-directory: third_party/falcon-det1024
+        run: |
+          set -o pipefail
+          sha256sum -c SHA256SUMS
+          # The manifest must be COMPLETE: a file added to src/ without a SHA256SUMS line would
+          # otherwise be silently unverified.
+          test "$(find src -type f | wc -l)" = "$(wc -l < SHA256SUMS)"
+      - name: Pinned tree digest + emulated FP backend (same tool as before vendoring)
+        run: python sdk/ci/verify_pinned_digest.py third_party/falcon-det1024/src
 
   wire-format:
     name: Wire-format tests (no network, no native lib)
@@ -310,26 +337,18 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Fetch pinned Falcon source (commit ce15e75…, tarball = byte-exact to the pin)
+      - name: Stage the vendored pinned Falcon tree (commit ce15e75, no network)
         shell: bash
-        # Use the GitHub source TARBALL, not `git clone`: a clone applies the runner's
-        # core.autocrlf, which on some runners rewrites the C sources LF→CRLF and changes
-        # their bytes (deterministic.c → e005ebda instead of the pinned 601390dc), failing
-        # the digest gate below for a non-substantive reason. The tarball is LF on every OS
-        # and is exactly what the pin (and verify.html) were computed from.
-        run: |
-          # Download and extract as SEPARATE steps, with -f and retries. Piping `curl -sL` into
-          # `tar xz` had three problems, all seen in run 31626290777 (windows leg): without -f,
-          # curl exits 0 on an HTTP error and pipes the error PAGE into tar; without pipefail the
-          # pipeline's status is tar's anyway; and with no retry a transient blip fails the build.
-          # The observable result was "tar: Error is not recoverable: exiting now", which names
-          # the wrong component - the download failed, not the archive.
-          set -o pipefail
-          curl -sfL --retry 3 --retry-delay 2 --retry-all-errors             https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz             -o falcon-src.tar.gz
-          tar xzf falcon-src.tar.gz
-          mv falcon-ce15e75bceb372867daf6b8e81918ab6978686eb falcon-src
+        # Until 2026-08-18 this step downloaded the GitHub source tarball on every run (chosen
+        # over `git clone` because a clone applies the runner's core.autocrlf and changed the C
+        # bytes). The tree is now vendored at third_party/falcon-det1024/src, byte-identical to
+        # that tarball (see PROVENANCE.md), so the build no longer depends on GitHub serving an
+        # archive, and the `vendored-falcon-integrity` job checks the bytes on every push. The
+        # copy keeps the rest of this job's paths unchanged. `.gitattributes` must never mark
+        # these files for CRLF conversion — the digest gate below would catch it if it did.
+        run: cp -r third_party/falcon-det1024/src falcon-src
 
-      - name: Assert pinned-build digest + emulated FP backend (fail fast if upstream drifted)
+      - name: Assert pinned-build digest + emulated FP backend (fail fast if the tree drifted)
         shell: bash
         # Verifies tree digest c6adf48…, deterministic.c 601390dc…, AND that config.h pins
         # FALCON_FPEMU=1 / FALCON_FPNATIVE=0 — the precondition that makes cross-platform
@@ -514,14 +533,8 @@ jobs:
       # signatures that the AVM's falcon_verify opcode must accept, so the signer has to be the
       # pinned build for the same reason that job says: a silent sampler or encoding change in a
       # deterministic signer is exactly the failure that must never pass unnoticed.
-      - name: Fetch pinned Falcon source (commit ce15e75, tarball = byte-exact to the pin)
-        run: |
-          set -o pipefail
-          curl -sfL --retry 3 --retry-delay 2 --retry-all-errors \
-            https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz \
-            -o falcon-src.tar.gz
-          tar xzf falcon-src.tar.gz
-          mv falcon-ce15e75bceb372867daf6b8e81918ab6978686eb falcon-src
+      - name: Stage the vendored pinned Falcon tree (commit ce15e75, no network)
+        run: cp -r third_party/falcon-det1024/src falcon-src
 
       - name: Assert pinned-build digest + emulated FP backend
         run: python sdk/ci/verify_pinned_digest.py falcon-src
@@ -582,22 +595,13 @@ jobs:
       # which is unpinned: upstream algorand/falcon resumed activity in June-July 2026, so that now
       # resolves to a DIFFERENT commit than the pin, and it skipped the digest gate entirely. For a
       # deterministic signer a silent sampler/encoding change is exactly the failure that must never
-      # go unnoticed. Fetch the pinned tarball and assert digest + FPEMU backend before building,
-      # matching the signature-kat job above.
-      - name: Fetch pinned Falcon source (commit ce15e75, tarball = byte-exact to the pin)
-        run: |
-          # Download and extract as SEPARATE steps, with -f and retries. Piping `curl -sL` into
-          # `tar xz` had three problems, all seen in run 31626290777 (windows leg): without -f,
-          # curl exits 0 on an HTTP error and pipes the error PAGE into tar; without pipefail the
-          # pipeline's status is tar's anyway; and with no retry a transient blip fails the build.
-          # The observable result was "tar: Error is not recoverable: exiting now", which names
-          # the wrong component - the download failed, not the archive.
-          set -o pipefail
-          curl -sfL --retry 3 --retry-delay 2 --retry-all-errors             https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz             -o falcon-src.tar.gz
-          tar xzf falcon-src.tar.gz
-          mv falcon-ce15e75bceb372867daf6b8e81918ab6978686eb falcon-src
+      # go unnoticed. Since 2026-08-18 the tree comes from third_party/ (vendored, byte-identical to
+      # the pinned tarball) and the digest + FPEMU gate still runs before building, matching the
+      # signature-kat job above.
+      - name: Stage the vendored pinned Falcon tree (commit ce15e75, no network)
+        run: cp -r third_party/falcon-det1024/src falcon-src
 
-      - name: Assert pinned-build digest + emulated FP backend (fail fast if upstream drifted)
+      - name: Assert pinned-build digest + emulated FP backend (fail fast if the tree drifted)
         run: python sdk/ci/verify_pinned_digest.py falcon-src
 
       - name: Build the deterministic Falcon-1024 shared library
