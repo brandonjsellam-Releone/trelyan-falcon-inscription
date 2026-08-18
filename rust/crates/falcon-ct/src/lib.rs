@@ -441,18 +441,35 @@ pub const fn apply_controls(
     }
 }
 
-/// Fold the flat-control null sessions (v2): every one must PASS on the RAW statistic, else the
-/// environment is too noisy for any Falcon verdict. Returns the crop statistics for the null.
-#[must_use]
-pub fn null_from_flat_sessions(flat: &[ExperimentResult]) -> Option<Vec<f64>> {
-    if flat.is_empty()
-        || flat
-            .iter()
-            .any(|f| !f.enough_samples || f.raw_t.abs() >= T_THRESHOLD)
-    {
-        return None;
+/// Fold the null sessions (v2: flat loops; v3: pool-vs-pool signing).
+///
+/// Every one must have enough samples per class and PASS on the RAW statistic, else no Falcon
+/// verdict may be issued. Returns the crop statistics for the null, or the reason it is unusable.
+///
+/// # Errors
+/// A one-line reason naming which sessions failed which precondition.
+pub fn null_from_sessions(sessions: &[ExperimentResult]) -> Result<Vec<f64>, String> {
+    if sessions.is_empty() {
+        return Err("no null sessions ran".to_owned());
     }
-    Some(flat.iter().map(|f| f.crop_max_abs_t).collect())
+    let too_few: Vec<&str> = sessions
+        .iter()
+        .filter(|s| !s.enough_samples)
+        .map(|s| s.id.as_str())
+        .collect();
+    let raw_fail: Vec<&str> = sessions
+        .iter()
+        .filter(|s| s.enough_samples && s.raw_t.abs() >= T_THRESHOLD)
+        .map(|s| s.id.as_str())
+        .collect();
+    if !too_few.is_empty() || !raw_fail.is_empty() {
+        return Err(format!(
+            "below the per-class minimum: [{}]; raw |t| >= {T_THRESHOLD}: [{}]",
+            too_few.join(", "),
+            raw_fail.join(", ")
+        ));
+    }
+    Ok(sessions.iter().map(|s| s.crop_max_abs_t).collect())
 }
 
 /// Render raw samples as CSV (`class,ns` per line, header first).
@@ -620,6 +637,36 @@ mod tests {
                 flat_res.max_abs_t
             );
         }
+    }
+
+    #[test]
+    fn null_from_sessions_names_the_reason_it_is_unusable() {
+        let mut ok = judge(
+            "n0",
+            "x",
+            &RawSamples {
+                samples: (0..4600u64)
+                    .map(|i| (u8::from(i % 2 == 1), 1_000 + i % 7))
+                    .collect(),
+            },
+        );
+        assert!(ok.enough_samples);
+        assert!(null_from_sessions(std::slice::from_ref(&ok)).is_ok());
+        // Too few samples → named.
+        let few = judge(
+            "n1",
+            "x",
+            &RawSamples {
+                samples: (0..400u64).map(|i| (u8::from(i % 2 == 1), 1_000)).collect(),
+            },
+        );
+        let e = null_from_sessions(&[ok.clone(), few]).unwrap_err();
+        assert!(e.contains("n1") && e.contains("minimum"), "{e}");
+        // Raw statistic failed → named.
+        ok.raw_t = 9.0;
+        let e = null_from_sessions(&[ok]).unwrap_err();
+        assert!(e.contains("n0") && e.contains("raw"), "{e}");
+        assert!(null_from_sessions(&[]).is_err());
     }
 
     #[test]

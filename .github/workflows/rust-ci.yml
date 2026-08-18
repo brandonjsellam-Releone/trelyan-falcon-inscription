@@ -144,11 +144,12 @@ jobs:
           workspaces: rust
       - name: Build the harness (release)
         run: FALCON_CT_RUSTC="$(rustc --version)" cargo build --release -p falcon-ct
-      # 4400 measurements → ≈2 156 per class after the 2 % warm-up: above the 2 000 minimum, so
-      # a verdict is possible; still short enough for a CI job (signing is ~ms with FPEMU).
-      # 20 null sessions is the v2 minimum (METHODOLOGY-v2 §1); the flat loop is cheap.
-      - name: Run the session (METHODOLOGY v2)
-        run: ./target/release/falcon-ct --samples 4400 --null-sessions 20 --out ../evidence/ct/ci-run
+      # 4800 measurements → ≈2 352 per class after the 2 % warm-up: clears the 2 000 minimum
+      # with margin for the random class split (the harness refuses < 4600). 20 null sessions
+      # is the v3 minimum (METHODOLOGY-v3 §1); each is a real pool-vs-pool signing session, so
+      # this job runs ~20+ min on a shared runner — the honest cost of a real-operation null.
+      - name: Run the session (METHODOLOGY v3)
+        run: ./target/release/falcon-ct --samples 4800 --null-sessions 20 --out ../evidence/ct/ci-run
       - name: Publish the result (job summary + annotations; never a failure)
         working-directory: evidence/ct/ci-run
         run: |

@@ -20,7 +20,7 @@ use std::{fs, path::PathBuf};
 use anyhow::{Context, Result, anyhow};
 use falcon_ct::{
     ExperimentResult, RawSamples, Verdict, apply_controls, judge, judge_v2, measure,
-    null_from_flat_sessions, to_csv,
+    null_from_sessions, to_csv,
 };
 use serde::Serialize;
 use trelyan_pq_ffi::{
@@ -28,21 +28,28 @@ use trelyan_pq_ffi::{
     prng_from_seed, prng_from_system, sign_compressed, verify_compressed,
 };
 
-const DEFAULT_SAMPLES: usize = 8_000;
+/// 4 800 → ≈ 2 352 per class after the 2 % warm-up: comfortably above the 2 000 minimum even
+/// with the random class split's ± ~35 swing (4 200 was too tight — see `parse_opts`), and short
+/// enough that a v3 session (20 real-operation null sessions + experiments) is ≈ 20 min locally.
+const DEFAULT_SAMPLES: usize = 4_800;
 const KEY_POOL: usize = 32;
 const MSG_LEN: usize = 64;
-/// Number of fixed-key pairs for `sign-kk` (METHODOLOGY-v2 §2: three pairs).
+/// Number of fixed-key pairs for `sign-kk` (three pairs; METHODOLOGY-v3 §1 combination rule).
 const KK_PAIRS: usize = 3;
-/// Flat-control sessions forming the empirical null for the crop statistic (v2 §1: N ≥ 20).
-const DEFAULT_NULL_SESSIONS: usize = 24;
-const METHODOLOGY: &str = "evidence/ct/METHODOLOGY-v2.md (2026-08-18); v1 = METHODOLOGY.md";
-const READING_GUIDE: &str = "v2. PASS = raw Welch |t| < 4.5 AND crop statistic within the \
-    session's empirical null (not a proof; machine- and build-specific). SHAPE = raw |t| < 4.5 \
-    but crop statistic beyond every null session: distributions differ in shape/scale, not \
-    location — never PASS, never FAIL, a call for the source-level reading. FAIL = raw |t| >= \
-    4.5 with controls behaved: a LOCATION difference. INCONCLUSIVE = a control or the null \
-    misbehaved, or too few samples; never read as PASS. Gated: sign-kk (three pairs) and \
-    sign-rr. Screening/informational: sign-key, sign-msg, verify-ctrl, keygen.";
+/// Messages rotated through in `sign-kk`, identically for both classes (v3 §2).
+const KK_MESSAGES: usize = 4;
+/// Real-operation null sessions (v3 §1: N ≥ 20).
+const DEFAULT_NULL_SESSIONS: usize = 20;
+const METHODOLOGY: &str =
+    "evidence/ct/METHODOLOGY-v3.md (2026-08-18); v2 = METHODOLOGY-v2.md; v1 = METHODOLOGY.md";
+const READING_GUIDE: &str = "v3. Primary: raw Welch |t| >= 4.5 => FAIL (a LOCATION difference). \
+    Secondary: crop statistic vs an empirical null of N pool-vs-pool signing sessions of the \
+    REAL operation; SHAPE = raw |t| < 4.5 but crop stat beyond every null session (shape/scale, \
+    never PASS, never FAIL). sign-kk combination (pre-registered): FAIL if any pair FAILs; SHAPE \
+    only if >= 2 of 3 pairs SHAPE; else PASS. INCONCLUSIVE = a control or the null misbehaved, \
+    or too few samples; never PASS. Descriptive stats (dmean, CI, p) are NOT decision criteria. \
+    Gated: sign-kk (combined) and sign-rr. Screening/informational: sign-key, sign-msg, \
+    verify-ctrl, keygen. Not a proof; machine- and build-specific.";
 
 #[derive(Serialize)]
 struct Environment {
@@ -169,8 +176,15 @@ fn parse_opts() -> Result<Opts> {
         }
         i += 1;
     }
-    if o.samples < 100 {
-        return Err(anyhow!("--samples must be at least 100"));
+    // 2 000 per class after the 2 % warm-up needs ≈ 4 082 measurements at an EXACT half split;
+    // the class bit is random per measurement (binomial sd ≈ 32 at this size), so anything
+    // close to that floor produces INCONCLUSIVE sessions by chance alone (seen 2026-08-18 at
+    // 4 200: one experiment split 1934/2182). Refuse under-powered sessions up front.
+    if o.samples < 4_600 {
+        return Err(anyhow!(
+            "--samples must be at least 4600 so both classes clear the 2 000 minimum after warm-up with a comfortable margin (METHODOLOGY-v3 §1); got {}",
+            o.samples
+        ));
     }
     if o.null_sessions < 20 {
         return Err(anyhow!(
@@ -328,16 +342,21 @@ fn run_sign_key(f: &Fixtures, samples: usize, bits: &mut ClassBits) -> RawSample
     )
 }
 
-/// v2 sign-kk: fixed message M0; class 0 = key `K_a`, class 1 = key `K_b` (pair `pair`).
+/// v3 sign-kk: class 0 = key `K_a`, class 1 = key `K_b` (pair `pair`); the message rotates
+/// through four fixed messages in the SAME order for both classes (index = measurement mod 4),
+/// so the comparison is key-only and message-balanced (METHODOLOGY-v3 §2).
 fn run_sign_kk(f: &Fixtures, pair: usize, samples: usize, bits: &mut ClassBits) -> RawSamples {
     let (ka, kb) = &f.kk[pair];
     let mut out = [0u8; SIG_COMPRESSED_MAXSIZE];
+    let mut i = 0usize;
     measure(
         samples,
         || bits.next(),
         |class| {
             let sk = if class { &kb.sk } else { &ka.sk };
-            let _ = std::hint::black_box(sign_compressed(sk, &f.m0, &mut out));
+            let m: &[u8] = &f.msgs[i % KK_MESSAGES];
+            i += 1;
+            let _ = std::hint::black_box(sign_compressed(sk, m, &mut out));
         },
     )
 }
@@ -525,7 +544,7 @@ fn write_outputs(opts: &Opts, report: &Report, raws: &[(String, RawSamples)]) ->
     println!();
     println!("falcon-ct session — {}", report.methodology);
     println!(
-        "  null: {} flat sessions (crop-stat max {:.2}) {} | controls: flat {:?} (raw t {:.2}), leaky {:?} (raw t {:.2}) → {}",
+        "  null: {} pool-vs-pool sessions (crop-stat max {:.2}) {} | controls: flat {:?} (raw t {:.2}), leaky {:?} (raw t {:.2}) → {}",
         report.controls.null_sessions,
         report
             .controls
@@ -568,29 +587,81 @@ fn write_outputs(opts: &Opts, report: &Report, raws: &[(String, RawSamples)]) ->
 
 /// v2 empirical null (N flat-control sessions, each must PASS on the RAW statistic) followed by
 /// the two controls. Returns the `Controls` block and the two controls' raw samples.
+/// One v3 null session: fresh pool A vs fresh pool B on a fixed message.
+fn run_null_rr(
+    rng: &mut Shake256Context,
+    samples: usize,
+    bits: &mut ClassBits,
+) -> Result<RawSamples> {
+    let mut pool_a = Vec::with_capacity(KEY_POOL);
+    let mut pool_b = Vec::with_capacity(KEY_POOL);
+    for _ in 0..KEY_POOL {
+        pool_a.push(gen_keypair(rng)?);
+        pool_b.push(gen_keypair(rng)?);
+    }
+    let m0 = random_bytes(rng, MSG_LEN);
+    let idx: Vec<usize> = random_bytes(rng, samples)
+        .into_iter()
+        .map(|b| usize::from(b) % KEY_POOL)
+        .collect();
+    let mut i = 0usize;
+    let mut out = [0u8; SIG_COMPRESSED_MAXSIZE];
+    Ok(measure(
+        samples,
+        || bits.next(),
+        |class| {
+            let j = idx[i % idx.len()];
+            let sk = if class { &pool_b[j].sk } else { &pool_a[j].sk };
+            i += 1;
+            let _ = std::hint::black_box(sign_compressed(sk, &m0, &mut out));
+        },
+    ))
+}
+
 fn null_and_controls(
     opts: &Opts,
+    rng: &mut Shake256Context,
     bits: &mut ClassBits,
     log: &dyn Fn(&str),
 ) -> (Controls, RawSamples, RawSamples) {
+    // v3 (METHODOLOGY-v3 §1): the null is the REAL operation — N pool-vs-pool signing sessions,
+    // each with two fresh independent 32-key pools, the same measurement count as the
+    // experiments, class randomised per measurement. Every null session must PASS on the raw
+    // statistic or the environment is too noisy for any Falcon verdict.
     log(&format!(
-        "running {} flat-control null sessions …",
+        "running {} pool-vs-pool null sessions (real operation; fresh pools each) …",
         opts.null_sessions
     ));
     let mut null_results = Vec::with_capacity(opts.null_sessions);
     for k in 0..opts.null_sessions {
-        let raw = run_control_flat(opts.samples, bits);
+        let raw = match run_null_rr(rng, opts.samples, bits) {
+            Ok(r) => r,
+            Err(e) => {
+                log(&format!("null session {k} could not run: {e}"));
+                break;
+            }
+        };
         null_results.push(judge(
-            &format!("null-flat-{k}"),
-            "flat control (null session)",
+            &format!("null-rr-{k}"),
+            "sign_compressed: fixed message; fresh pool A vs fresh pool B (null session)",
             &raw,
         ));
     }
-    let null_crop_stats = null_from_flat_sessions(&null_results);
-    let null_ok = null_crop_stats.is_some();
-    let null_crop_stats = null_crop_stats.unwrap_or_default();
+    let null_crop_stats = if null_results.len() == opts.null_sessions {
+        null_from_sessions(&null_results)
+    } else {
+        Err(format!(
+            "only {} of {} null sessions ran",
+            null_results.len(),
+            opts.null_sessions
+        ))
+    };
+    let (null_ok, null_crop_stats, null_reason) = match null_crop_stats {
+        Ok(v) => (true, v, String::from("OK")),
+        Err(reason) => (false, Vec::new(), format!("NOT OK — {reason}")),
+    };
     log(&format!(
-        "null: {} sessions, raw|t| max {:.2}, crop-stat range {:.2}..{:.2} → {}",
+        "null: {} pool-vs-pool sessions, raw|t| max {:.2}, crop-stat range {:.2}..{:.2} → {}",
         null_results.len(),
         null_results
             .iter()
@@ -601,11 +672,7 @@ fn null_and_controls(
             .copied()
             .fold(f64::INFINITY, f64::min),
         null_crop_stats.iter().copied().fold(0.0_f64, f64::max),
-        if null_ok {
-            "OK"
-        } else {
-            "NOT OK — a null session failed the raw statistic; environment too noisy"
-        }
+        null_reason
     ));
 
     log("running control-flat …");
@@ -687,7 +754,7 @@ fn main() -> Result<()> {
         opts.out.display()
     ));
 
-    let (controls, flat_raw, leaky_raw) = null_and_controls(&opts, &mut bits, &log);
+    let (controls, flat_raw, leaky_raw) = null_and_controls(&opts, &mut rng, &mut bits, &log);
 
     // ── Falcon ─────────────────────────────────────────────────────────────────────────────
     let (experiments, mut raws) =
@@ -698,15 +765,35 @@ fn main() -> Result<()> {
     ];
     all_raws.append(&mut raws);
 
-    let session_verdict = experiments
+    // v3 §1 combination rule for sign-kk: FAIL if any pair FAILs; SHAPE only if >= 2 of the 3
+    // pairs are SHAPE; INCONCLUSIVE if any pair is INCONCLUSIVE; else PASS. sign-rr stands alone.
+    let kk: Vec<Verdict> = experiments
         .iter()
-        .filter(|j| j.gated)
+        .filter(|j| j.gated && j.result.id.starts_with("sign-kk-"))
+        .map(|j| j.verdict)
+        .collect();
+    let kk_combined = if kk.contains(&Verdict::Inconclusive) {
+        Verdict::Inconclusive
+    } else if kk.contains(&Verdict::Fail) {
+        Verdict::Fail
+    } else if kk.iter().filter(|v| **v == Verdict::Shape).count() >= 2 {
+        Verdict::Shape
+    } else {
+        Verdict::Pass
+    };
+    let rr = experiments
+        .iter()
+        .filter(|j| j.gated && j.result.id == "sign-rr")
         .map(|j| j.verdict)
         .fold(Verdict::Pass, Verdict::worse);
+    let session_verdict = kk_combined.worse(rr);
+    log(&format!(
+        "sign-kk combined (>=2 of 3 rule): {kk_combined:?} from {kk:?}; sign-rr: {rr:?}"
+    ));
 
     let report = Report {
         methodology: METHODOLOGY,
-        schema_version: 2,
+        schema_version: 3,
         samples_per_experiment: opts.samples,
         key_pool: KEY_POOL,
         message_len: MSG_LEN,
