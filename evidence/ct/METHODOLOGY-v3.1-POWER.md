@@ -350,3 +350,53 @@ remaining new code is one experiment runner, one pure gate function (property-te
 `f64` fields. If serialisation nevertheless fails at the end, the loss is the session, not the
 method: re-run it. **This ordering was a mistake — smoke-test first, then launch — and it is
 recorded here rather than quietly fixed.**
+
+---
+
+## 8. How to read this session's `report.json` — including where the artifact misdescribes itself
+
+The binary that is measuring cannot be rebuilt while it measures, so several strings and one
+structural gap are **frozen into this session's output**. They are listed here, before the output
+exists, so that a reader — an external auditor especially — is not left to reconcile the JSON
+with the methodology unaided.
+
+### Gate order: five checks before looking at a single *t*
+
+1. **`schema_version == 4`.** If it is 3, an older binary ran; discard the session.
+2. **`controls.null_ok == true` and `controls.null_detail.len() == 20`**, then each entry's
+   *n* per class ≈ 40 180 (±~450) and raw |t| < 4.5. This is the first session in which the null
+   is auditable rather than 20 bare floats — use it.
+3. **`controls_ok == true`, `control-flat` PASS, `control-leaky` FAIL.** If `control-leaky` ever
+   PASSes, the harness has lost the power to detect anything and the session is void whatever
+   else it says.
+4. **`sign-aa` PASS** (§2a). If not, every key line is INCONCLUSIVE and stays so.
+5. **`sign-aa`'s Δmean and CI**, read regardless of its verdict (§7C), against `sign-kk-0/1/2`'s Δ.
+
+### Where the artifact misdescribes itself (frozen in this session; fixed after it)
+
+- **The `controls` block does not show the `sign-aa` downgrade.** The A/A gate is applied through
+  a *local* `flat_for_rule` value inside `falcon_experiments`, so if `sign-aa` fails, `report.json`
+  still reads `controls_ok: true` and `controls.flat.isolated_verdict: "PASS"` while every key
+  verdict shows INCONCLUSIVE. **The only trace of the reason is the `sign-aa` row itself.** A
+  reader who checks the `controls` block alone would find the downgrade unexplained. Post-run fix:
+  surface the A/A verdict in `Controls`.
+- **`reading_guide` does not mention `sign-aa`.** The guide compiled into this session enumerates
+  the gated, screening and informational experiments and the power fields, but was written before
+  the control existed, so the artifact's own glossary omits the thing that gates it. §2a of this
+  file is the authority for this session.
+- **`sign-kk`'s `description` is stale and uses a barred word.** It reads "fixed message M0 … the
+  per-key timing fingerprint measured directly". Both halves are wrong now: v3 replaced the single
+  message with a four-message rotation (§2 of `METHODOLOGY-v3.md`), and "fingerprint" presupposes
+  the finding — `METHODOLOGY-v3.md` §1 bars the report from using it. Read the description as
+  historical text, not as a statement about this session's design.
+- **`distinguishable` is a field name, and the word is barred in prose for good reason.** Since v2
+  it means exactly `raw |t| ≥ 4.5` and nothing more. It is not a claim that two things can be told
+  apart in any operational sense.
+- **Code comments still call the v3 real-operation null a "flat-control null"** in three places.
+  The null in this session is 20 pool-vs-pool *signing* sessions; the flat loop is a separate,
+  informational control. The JSON field name `null_crop_stats` is correct; the prose around it is
+  a v2 leftover.
+
+None of these changes a number or a verdict. They are recorded because a report that describes
+itself incorrectly is a report an auditor has to double-check line by line, and the correction
+belongs in the pre-registration rather than in a reply to the auditor who finds it.
