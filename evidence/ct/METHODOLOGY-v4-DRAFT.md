@@ -96,7 +96,54 @@ for the one experiment built the same way.
 
 With `null-ss` as the gate, Kimi's independent derivation puts the per-session false-trip rate at
 **≈ 6.8 × 10⁻⁶**, i.e. ≈ 1.4 × 10⁻⁴ across twenty sessions — a gate that fires on the environment
-rather than on arithmetic.
+rather than on arithmetic. **And it keeps its power against a machine that really is noisy:** at
+sd(*t*) = 1.742 it still fires 18 % of the time, at 2.95 (the CI runner's value) 93 %. It is not
+being turned into a check that cannot fail.
+
+### What this costs — the design is not free, and the first version did not price it
+
+Three references at 82 000 measurements each is **not runnable on the laptop.** Measured from the
+committed rows: mean `sign_compressed` = 7.7066 ms, so one 82 k block is 632 s and 20 null
+sessions are **3.51 h — 63.6 %** of v3.1's 5 h 31 m. Two references ≈ 7 h of null before a single
+experiment runs; three ≈ 10.5 h.
+
+So v4's first session **must** state its reference count, the *n* each runs at, and the resulting
+wall-clock. The draft's recommendation:
+
+1. **v4 session 1 is a validation run at v3b scale (`--samples 4800`)**, not a verdict run. Its
+   only job is to answer §4.1: does `null-ss` actually give sd(*t*) ≈ 1, and does the crop
+   statistic deflate as expected? That is ≈ 1 h with all three references and answers the question
+   the whole design rests on.
+2. **Only then** size a verdict session, with the reference count fixed and the machine decided.
+
+Running a 10-hour verdict session on an unvalidated null would repeat the v3.1 ordering mistake
+(§7D) at five times the cost.
+
+## 2b. Alternatives considered and rejected
+
+- **A label-permutation / circular-shift surrogate null** (reshuffle the class labels of the
+  experiment's own samples). Tempting, free, and **disqualifying**: it returns sd(*t*) ≈ 1 *by
+  algebraic identity*, whatever the data contains. An auditor ran the procedure on
+  `raw-control-leaky.csv` — the deliberately leaky synthetic control, raw *t* = **−296.34** — and
+  got **0.97**. A reference that certifies the leaky control as null is the check-that-cannot-fail
+  defect this project keeps a register for. It is an excellent *regression fixture* and is not a
+  null.
+- **Split-half of one pool** (16 keys vs the other 16). Doubles the offending term rather than
+  removing it: two disjoint 16-key halves have a larger between-set mean difference than two
+  32-key pools.
+- **A single-key A/A null only** (`sign-aa` alone). True zero, but *unimodal* — it cannot calibrate
+  the crop statistic of a mixture comparison, which is why §2a pairs it with `null-ss` rather than
+  replacing it.
+- **A set-level gate** (reject on the sd of the N null *t* values rather than max-of-N). Filed as
+  §4.2 and still open; it is a refinement, not a prerequisite, and does not block promotion.
+
+### Second, independent confirmation of the defect — without using a *t* statistic at all
+
+Across the 20 committed null sessions, sd(Δmean) = **3 229.8 ns** against an rms standard error of
+**1 839.1 ns**. The excess implies a between-pool offset of sd **δ = 2 655 ns**, hence
+δ/se = 1.444 and a predicted sd(*t*) of **1.756** — against **1.742** observed. Both routes put
+`σ_key` at 10.49 / 10.62 µs. The mechanism is confirmed by two disjoint calculations on the same
+committed data, one of which never touches the statistic under suspicion.
 
 ### `sign-rr` cannot be gated against a fixed threshold at all
 
@@ -178,36 +225,92 @@ SHAPE requires an experiment's crop statistic to exceed **all 20** null sessions
 | `sign-kk-2` | 5.36 | 9 / 20 | 0.476 |
 | `sign-rr` | 1.51 | 19 / 20 | 0.952 |
 
-The null's crop statistics run 0.98 … **10.24**. For `sign-kk-1` to become SHAPE, every null
-session must fall below 5.84 — a **43 %** shrink of the null's maximum. Is that plausible under
-the fix? The raw-*t* inflation factor is 1.742, and **10.24 / 1.742 = 5.88** — within 1 % of
-`sign-kk-1`'s 5.84. If the crop statistic deflates by roughly the same factor as the raw
-statistic, the v4 null lands **exactly at the boundary** where v3.1's `sign-kk-1` flips PASS →
-SHAPE.
+The null's crop statistics run 0.98 … **10.24**.
 
-**Therefore:**
+**A second review — an independent reimplementation of the statistics that reproduces
+`report.json` exactly — demolished the arithmetic this section originally used, and corrected its
+conclusion in both directions. All of it is kept below.**
 
-- **"This does not change v3.1's PASS" is withdrawn.** It may well change it, and whether the crop
-  statistic deflates like the raw *t* is an open empirical question (§4.1), not something to
-  settle by reasoning here.
-- **The v3 secondary arm has been systematically insensitive.** The same inflation that voids
-  sessions on quiet machines also makes SHAPE *too hard to reach*, because the reference it is
-  compared against is wider than a true null. Every "no SHAPE" reading in v2, v3, v3b and v3.1 was
-  made against an inflated null. That is a **second defect from the same root**, pointing the
-  other way: the primary statistic was never affected, but the diagnostic meant to catch
-  shape/scale differences has been running with its threshold set too high.
-- **The direction of the change is still conservative:** a narrower null makes SHAPE *more*
-  likely, never less. v4 makes sessions harder to pass, as §2 claimed — the correction is that
-  "harder" may reach back to a result already published, and that must be said now rather than
-  discovered later.
+### The withdrawn arithmetic: `10.24 / 1.742 = 5.88` is a category error
+
+The first version of this section observed that `10.24 / 1.742 = 5.88`, "within 1 %" of
+`sign-kk-1`'s 5.84, and called that landing "exactly at the boundary". **That number should never
+have been computed.** Three reasons, each checkable against the committed `null_detail`:
+
+1. **It divides a max-of-nine order statistic by an sd measured on a different statistic.** The
+   nine crop *t*'s each have their own spread across the 20 null sessions — **3.82, 4.79, 5.21,
+   5.63, 4.69, 3.94, 3.24, 2.91, 2.33** (crops 0.50 → 0.99). *None* of them is 1.742, which is the
+   **raw** *t*'s sd. There is no single factor to divide by. The max is attained at crop 0.80 in 8
+   of 20 sessions but at six other crops in the remaining 12, so it is not even a fixed statistic.
+2. **Cropping shrinks the denominator, so a location offset enters the crop *amplified*.** Measured
+   on `raw-sign-rr.csv`: the Welch SE is 2 466 ns raw but 906 ns at crop 0.50 and 1 016 ns at crop
+   0.80 — ratios of 2.7 and 2.4. Removing the between-pool offset therefore deflates the crop by
+   **more** than 1.742, the opposite direction to what "the same factor" assumes.
+3. **Every stable-looking estimate disagrees with every other.** The χ² band on the underlying
+   spread (§3.1) maps 10.24 to **4.03 – 7.73** — which spans *all three* outcome branches below.
+   Two different decompositions of the committed null give **4.97** and **7.31**. Four routes,
+   four different answers.
+
+### The three branches, pre-registered — including the one that matters
+
+The first version named only the middle outcome, which is the one that does **not** change the
+session verdict. That is precisely the branch a post-hoc argument would pick, so all three are
+written down now. Thresholds come from the code: SHAPE iff the crop exceeds **all 20** null
+sessions (`lib.rs`), `sign-kk` combines at **≥ 2 of 3** (`main.rs`), session = worst of
+`kk_combined` and `sign-rr`. The three `sign-kk` crop statistics are **3.4754, 5.3584, 5.8405**.
+
+| v4 null crop max | what moves | **session verdict** |
+|---|---|---|
+| ≥ 5.8405 | nothing | **PASS**, unchanged |
+| 5.3584 – 5.8405 | `sign-kk-1` alone → SHAPE | **PASS, unchanged** — one pair cannot carry the ≥ 2-of-3 rule. But `CT_REPORT.md` §4c's table row and its sentence "every gated crop *p*ₑₘₚ ≥ 0.476" would need correcting |
+| < 5.3584 | `sign-kk-1` **and** `-2` → `kk_combined` = SHAPE | **SHAPE** — the session reading changes |
+
+**So "v3.1's PASS may flip" was overstated in its own consequence.** Flipping the *session*
+requires the v4 null's crop maximum to fall below **5.3584**, not below 5.84.
+
+### The best available prior says the verdict does not change
+
+`v3b`'s 20 null sessions carry an inflation factor of only **1.004 – 1.024** — under 2.5 %, because
+its `σ_total` was 413–1 055 µs at n = 2 352. **They are already a v4-equivalent null on the
+location statistic**, and their crop statistics are min 0.666 / median 1.823 / **max 5.749**.
+
+That maximum sits **between** `sign-kk-2`'s 5.358 and `sign-kk-1`'s 5.840 — squarely in the middle
+branch. It is an n = 2 352 datum against v3.1's n = 40 180 and settles nothing, but it is the best
+evidence available and it points at **session verdict unchanged, one table row to correct**.
+
+### What survives, corrected
+
+- **"This does not change v3.1's PASS" is still withdrawn** — but the honest replacement is *"the
+  session verdict is unlikely to change; one experiment's crop verdict and two sentences of
+  `CT_REPORT.md` §4c may need correcting"*, not the alarm the first version raised.
+- **The "systematically insensitive secondary arm" claim is FALSE and is withdrawn.** It said every
+  "no SHAPE" reading in v2, v3, v3b and v3.1 was judged against an inflated null. Checked: **v2**'s
+  null was 24 *flat-loop* sessions — a *narrow* null, not an inflated one — and v2 returned SHAPE
+  on all six signing experiments, so it contains no "no SHAPE" readings at all; **v3**'s first run
+  had `null_ok: false` and minted no verdicts; **v3b**'s inflation was under 2.5 % and immaterial.
+  **Only v3.1 had a materially inflated null.** Over-claiming about this project's own record is
+  exactly the failure this file exists to correct, and it happened here.
+- **The direction of the change is still conservative:** a narrower null makes SHAPE *more* likely,
+  never less.
 
 ### 3.3 Required before v4 is adopted
 
-**Re-judge v3.1's committed raw CSVs against a v4-style null, and publish the outcome whatever it
-is.** All ten experiments' raw samples are committed with `SHA256SUMS`, so the experiment side is
-byte-reproducible; only fresh same-pool null sessions need measuring. If `sign-kk-1` flips to
-SHAPE, `CT_REPORT.md` §4c gets a correction and v3.1 is re-read — not quietly, and not after the
-next session has moved on.
+**Re-judge v3.1's committed experiment CSVs against repeated `sign-aa`** — naming the reference
+explicitly, because the first version of this file said "a v4-style null" here while §2a assigned
+`sign-kk`'s crop reference to repeated `sign-aa`. Those are different constructions and the whole
+flip question is about `sign-kk`, so the ambiguity had to go before any measurement, not after.
+
+**What is and is not reproducible**, stated exactly (the first version said "all ten experiments'
+raw samples are committed", which is wrong on the count and silent on the gap):
+
+- `report.json` holds **9** experiments; the directory holds **11** raw CSVs (9 experiments + 2
+  synthetic controls); `SHA256SUMS` covers **13** files. The experiment side is byte-reproducible.
+- **The null side is not recoverable.** Null sessions' raw samples were never written — only their
+  summaries, in `controls.null_detail`. So a "re-judge" necessarily compares **August's experiment
+  crops against a null measured later**, on different key material, in a different thermal state.
+  That is a real limitation of the comparison and must be stated in whatever it produces.
+
+Publish the outcome whatever it is, against the three pre-registered branches above.
 
 ## 4. Open questions this draft does not settle
 
