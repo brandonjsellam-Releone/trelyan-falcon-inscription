@@ -2,10 +2,17 @@
 //! Falcon-1024 det1024 signer and write `report.json` + one raw CSV per experiment.
 //!
 //! Usage:
-//!   falcon-ct [--samples N] [--out DIR] [--json-only]
+//!   falcon-ct [--samples N] [--null-sessions N] [--out DIR] [--json-only]
+//!            [--null-design rr|ss]  (--aa-repeats / --rr-sessions parse but are REFUSED: METHODOLOGY-v4 2a is the next increment)
 //!
-//! `--samples N` is measurements PER EXPERIMENT (both classes together; default 8000, i.e. ~4000
-//! per class, above the 2 000 minimum). `--out DIR` (default `evidence/ct/out`) receives
+//! `--null-design` selects the environment-gate null: **`rr` (default) is the v3 rule in force** —
+//! fresh pool A vs fresh pool B — and `ss` is v4's true-zero construction (ONE pool, both classes,
+//! independent index draws; `METHODOLOGY-v4.md` §1). `--aa-repeats` and `--rr-sessions` configure
+//! v4's matched crop references and are REFUSED under `rr`, where they would be ignored.
+//!
+//! `--samples N` is measurements PER EXPERIMENT (both classes together; default 4800, i.e. ~2350
+//! per class, above the 2 000 minimum; below 4600 is refused). `--out DIR` (default
+//! `evidence/ct/out`) receives
 //! `report.json` and `raw-<experiment>.csv`. The exit code is 0 whenever the session ran to
 //! completion — including on FAIL or INCONCLUSIVE — because this is an observation, not a gate
 //! (METHODOLOGY §0). Non-zero only if the harness itself could not run (I/O, keygen error).
@@ -108,8 +115,16 @@ struct Report {
     environment: Environment,
     controls: Controls,
     experiments: Vec<Judged>,
-    /// The worst gated Falcon-experiment verdict after controls (v2 §1–§2).
+    /// The worst gated Falcon-experiment verdict after controls (v2 §1–§2) — or, when
+    /// [`Self::validation_only`] is set, INCONCLUSIVE regardless of what was measured.
     session_verdict: Verdict,
+    /// `true` under `--null-design ss`: this session may **not** issue a Falcon verdict.
+    ///
+    /// `ss` narrows the null without §2a's compensating matched crop references, so it makes the
+    /// fixed `|t| < 4.5` gate easier to clear. Such a session is measurement only: every
+    /// experiment is ungated, `session_verdict` is INCONCLUSIVE, and the reading is
+    /// `controls.null_raw_t_sd` (`METHODOLOGY-v4.md` §2).
+    validation_only: bool,
     reading_guide: &'static str,
 }
 
@@ -127,6 +142,23 @@ struct Controls {
     null_sessions: usize,
     null_crop_stats: Vec<f64>,
     null_ok: bool,
+    /// v4: which construction played the environment gate — `"rr"` (v3, default) or `"ss"`.
+    /// In the artifact because the rules a session ran under must be readable from the artifact.
+    null_design: NullDesign,
+    /// v4 (METHODOLOGY-v4 §2): the sample sd of the null sessions' raw *t* values. **1.000 under
+    /// a true null.** v3.1 measured 1.742 under `rr`, which is the defect §0 of that file
+    /// describes; it is the single number the v4 validation run exists to read.
+    ///
+    /// **`null` when fewer than two sessions were usable** — not `0.0`. A false zero would land
+    /// §2's only decision in its "≤ 1.25 → proceed" band on no data.
+    null_raw_t_sd: Option<f64>,
+    /// Who applies §2's `1.25 / 1.60` lines — always `"human"`.
+    ///
+    /// The harness computes `null_raw_t_sd` and prints it with its pre-registered band, and **no
+    /// verdict anywhere reads it**. Recorded in the artifact so `null_ok: true` can never be
+    /// mistaken for "§2 was satisfied". The protection that *is* mechanical is
+    /// [`Report::validation_only`].
+    null_raw_t_sd_gate: &'static str,
     /// A6: **why** the null was accepted or rejected — `"OK"`, or the reason naming which
     /// sessions failed which precondition. It previously existed only as a console line, so a
     /// reader holding `report.json` alone could see `null_ok: false` and had no way to tell a
@@ -169,11 +201,37 @@ struct Judged {
     gated: bool,
 }
 
+/// Which construction plays the **environment gate** null (METHODOLOGY-v4 §1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum NullDesign {
+    /// v3: fresh pool A vs fresh pool B. The rules in force by default. Its *t* is inflated by
+    /// `1 + (σ_key/σ_total)²·(n/32)` because two finite pools do not share a mean — the defect
+    /// `METHODOLOGY-v4.md` §0 describes. Kept as the default so no session changes its rules
+    /// without saying so on the command line.
+    Rr,
+    /// v4: ONE pool, both classes, independent index draws. True zero by construction
+    /// (conditional on the pool), mixture shape preserved.
+    Ss,
+}
+
 struct Opts {
     samples: usize,
     out: PathBuf,
     json_only: bool,
     null_sessions: usize,
+    /// `--null-design rr|ss`. Default `rr` = v3 rules; `ss` selects the v4 matched-null design.
+    null_design: NullDesign,
+    /// `--aa-repeats N` (v4 only): how many A/A sessions run; the first is the downgrade-only
+    /// control exactly as today, and under `ss` all N crop statistics are the reference for
+    /// `sign-kk-*`. **`None` = not supplied** — the distinction matters, because
+    /// `--null-design rr --aa-repeats 1` must be refused as a category error even though the
+    /// value happens to equal the default (checking the value instead of the presence let that
+    /// through).
+    aa_repeats: Option<usize>,
+    /// `--rr-sessions N` (v4 only): how many pool-vs-pool sessions run as `sign-rr`'s crop
+    /// reference when they no longer gate anything. Default = `--null-sessions`.
+    rr_sessions: Option<usize>,
 }
 
 fn parse_opts() -> Result<Opts> {
@@ -182,6 +240,9 @@ fn parse_opts() -> Result<Opts> {
         out: PathBuf::from("evidence/ct/out"),
         json_only: false,
         null_sessions: DEFAULT_NULL_SESSIONS,
+        null_design: NullDesign::Rr,
+        aa_repeats: None,
+        rr_sessions: None,
     };
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut i = 0;
@@ -208,14 +269,48 @@ fn parse_opts() -> Result<Opts> {
                     .parse()
                     .context("--null-sessions must be a positive integer")?;
             }
+            "--null-design" => {
+                i += 1;
+                o.null_design = match args.get(i).map(String::as_str) {
+                    Some("rr") => NullDesign::Rr,
+                    Some("ss") => NullDesign::Ss,
+                    other => {
+                        return Err(anyhow!(
+                            "--null-design must be rr (v3, default) or ss (v4); got {other:?}"
+                        ));
+                    }
+                };
+            }
+            "--aa-repeats" => {
+                i += 1;
+                o.aa_repeats = Some(
+                    args.get(i)
+                        .context("--aa-repeats needs a number")?
+                        .parse()
+                        .context("--aa-repeats must be a positive integer")?,
+                );
+            }
+            "--rr-sessions" => {
+                i += 1;
+                o.rr_sessions = Some(
+                    args.get(i)
+                        .context("--rr-sessions needs a number")?
+                        .parse()
+                        .context("--rr-sessions must be a positive integer")?,
+                );
+            }
             "-h" | "--help" => {
-                println!("falcon-ct [--samples N] [--null-sessions N] [--out DIR] [--json-only]");
+                println!(
+                    "falcon-ct [--samples N] [--null-sessions N] [--out DIR] [--json-only] \
+                     [--null-design rr|ss]  (--aa-repeats / --rr-sessions parse but are REFUSED: METHODOLOGY-v4 2a is the next increment)"
+                );
                 std::process::exit(0);
             }
             other => return Err(anyhow!("unknown option {other}")),
         }
         i += 1;
     }
+    check_v4_options(&o)?;
     // 2 000 per class after the 2 % warm-up needs ≈ 4 082 measurements at an EXACT half split;
     // the class bit is random per measurement (binomial sd ≈ 32 at this size), so anything
     // close to that floor produces INCONCLUSIVE sessions by chance alone (seen 2026-08-18 at
@@ -232,6 +327,47 @@ fn parse_opts() -> Result<Opts> {
         ));
     }
     Ok(o)
+}
+
+/// Refuse v4 options that are parsed but not honoured, rather than letting an operator believe a
+/// knob is turned.
+///
+/// Two separate refusals, because they mean different things:
+/// * under `--null-design rr` these options do not apply at all — the v3 rules have one null and
+///   one A/A control, so setting them would be a category error;
+/// * under `ss` they *will* apply, but the matched crop references of `METHODOLOGY-v4.md` §2a
+///   (repeated `sign-aa` for `sign-kk-*`, `null-rr` for `sign-rr`) are **not wired yet** — this
+///   increment adds the `null-ss` construction and `null_raw_t_sd` only. Accepting `--aa-repeats
+///   20` and then running a single A/A session is exactly the inert knob this project's register
+///   is full of, so it is an error until the wiring lands.
+///
+/// # Errors
+/// Naming which option is unhonoured and why.
+fn check_v4_options(o: &Opts) -> Result<()> {
+    // Zero of either is a request for a reference built from nothing.
+    if o.aa_repeats == Some(0) || o.rr_sessions == Some(0) {
+        return Err(anyhow!(
+            "--aa-repeats and --rr-sessions must be at least 1 when supplied; zero would ask for \
+             a crop reference built from no sessions"
+        ));
+    }
+    // PRESENCE, not value: `--null-design rr --aa-repeats 1` is still a category error, and
+    // testing the value let it through because 1 is the default.
+    if o.null_design == NullDesign::Rr && (o.aa_repeats.is_some() || o.rr_sessions.is_some()) {
+        return Err(anyhow!(
+            "--aa-repeats and --rr-sessions only apply to --null-design ss; under rr (the v3 \
+             rules) they would be silently ignored, which is worse than an error"
+        ));
+    }
+    if o.aa_repeats.is_some_and(|n| n != 1) || o.rr_sessions.is_some() {
+        return Err(anyhow!(
+            "--aa-repeats / --rr-sessions are accepted by the parser but NOT yet implemented: the \
+             v4 §2a matched crop references (repeated sign-aa for sign-kk, null-rr for sign-rr) \
+             are the next increment. Refusing rather than running one A/A session while you \
+             believe twenty ran. Use --null-design ss on its own to exercise the v4 gate null."
+        ));
+    }
+    Ok(())
 }
 
 /// A class-bit source over the audited SHAKE PRNG: one byte per bit, no buffering games.
@@ -790,6 +926,73 @@ fn run_null_rr(
     ))
 }
 
+/// Two independent index streams into a `pool_len`-key pool, one per class, for a `null-ss`
+/// session (METHODOLOGY-v4 §1). Pure and separated from the timed region so the property that
+/// matters can be tested without timing anything.
+///
+/// **The trap this exists to close:** if both classes used the *same* index every measurement
+/// pair would sign with the same key, the mixture would collapse to a single key, and the "null"
+/// would be a fixed-key A/A comparison wearing a pool's name. The two streams are drawn from
+/// disjoint halves of one random byte buffer, so they are independent, and
+/// [`index_pairs_differ_fraction`] lets a test assert they differ at ≈ `1 − 1/pool_len`.
+fn null_ss_index_pairs(
+    rng: &mut Shake256Context,
+    samples: usize,
+    pool_len: usize,
+) -> Vec<(usize, usize)> {
+    let bytes = random_bytes(rng, samples * 2);
+    (0..samples)
+        .map(|k| {
+            let a = usize::from(bytes[k]) % pool_len;
+            let b = usize::from(bytes[samples + k]) % pool_len;
+            (a, b)
+        })
+        .collect()
+}
+
+/// Fraction of index pairs whose two arms differ. Expectation for independent uniform draws over
+/// `p` keys is `1 − 1/p`; a value near 0 would mean the two arms are correlated (the collapsed
+/// mixture the design must avoid).
+// Counts and lengths of a measurement session are far below 2^52, so the `f64` conversion cannot
+// lose precision on any input this harness produces.
+#[cfg(test)]
+#[allow(clippy::cast_precision_loss)]
+fn index_pairs_differ_fraction(pairs: &[(usize, usize)]) -> f64 {
+    if pairs.is_empty() {
+        return 0.0;
+    }
+    let diff = pairs.iter().filter(|(a, b)| a != b).count();
+    diff as f64 / pairs.len() as f64
+}
+
+/// One v4 `null-ss` session: ONE fresh 32-key pool, both classes drawing from it by INDEPENDENT
+/// index streams on a fixed message. True mean difference zero by construction (conditional on
+/// the pool); the mixture shape is preserved, unlike a single-key A/A null.
+fn run_null_ss(
+    rng: &mut Shake256Context,
+    samples: usize,
+    bits: &mut ClassBits,
+) -> Result<RawSamples> {
+    let mut pool = Vec::with_capacity(KEY_POOL);
+    for _ in 0..KEY_POOL {
+        pool.push(gen_keypair(rng)?);
+    }
+    let m0 = random_bytes(rng, MSG_LEN);
+    let pairs = null_ss_index_pairs(rng, samples, KEY_POOL);
+    let mut i = 0usize;
+    let mut out = [0u8; SIG_COMPRESSED_MAXSIZE];
+    Ok(measure(
+        samples,
+        || bits.next(),
+        |class| {
+            let (a, b) = pairs[i % pairs.len()];
+            let sk = if class { &pool[b].sk } else { &pool[a].sk };
+            i += 1;
+            let _ = std::hint::black_box(sign_compressed(sk, &m0, &mut out));
+        },
+    ))
+}
+
 /// Fold the null sessions into `(ok, crop statistics, reason)` and log the summary.
 ///
 /// Split out of [`null_and_controls`] so that function stays readable, and so the empty-null
@@ -832,40 +1035,74 @@ fn fold_null(
     (ok, stats, reason)
 }
 
-fn null_and_controls(
+/// Sample standard deviation (**n − 1**, not the population sd), or `None` for fewer than two
+/// observations.
+///
+/// **`None`, not `0.0`.** A sample sd of one observation is undefined, and returning zero would
+/// put the v4 validation reading (`METHODOLOGY-v4.md` §2: `≤ 1.25` → proceed) in its *proceed*
+/// band on no data at all — a check that cannot fail, which is this project's dominant defect
+/// class. The incomplete-run path can produce it for real: the null loop breaks on the first
+/// session that cannot run, so a session that dies after one null would report a confident
+/// `0.000` spread.
+// A session has at most a few dozen null sessions, so `len() as f64` cannot lose precision.
+#[allow(clippy::cast_precision_loss)]
+fn sample_sd(xs: &[f64]) -> Option<f64> {
+    if xs.len() < 2 {
+        return None;
+    }
+    let n = xs.len() as f64;
+    let mean = xs.iter().sum::<f64>() / n;
+    Some((xs.iter().map(|x| (x - mean) * (x - mean)).sum::<f64>() / (n - 1.0)).sqrt())
+}
+
+/// Run `opts.null_sessions` null sessions of the given construction, logging each as it lands.
+///
+/// Split out of [`null_and_controls`] so that function stays under the line limit and so the two
+/// constructions sit side by side: `rr` is the v3 rule in force by default, `ss` is v4's.
+fn run_null_sessions(
+    design: NullDesign,
     opts: &Opts,
     rng: &mut Shake256Context,
     bits: &mut ClassBits,
     log: &dyn Fn(&str),
-) -> (Controls, RawSamples, RawSamples) {
-    // v3 (METHODOLOGY-v3 §1): the null is the REAL operation — N pool-vs-pool signing sessions,
-    // each with two fresh independent 32-key pools, the same measurement count as the
-    // experiments, class randomised per measurement. Every null session must PASS on the raw
-    // statistic or the environment is too noisy for any Falcon verdict.
+) -> Vec<ExperimentResult> {
+    let (tag, what) = match design {
+        NullDesign::Rr => (
+            "null-rr",
+            "sign_compressed: fixed message; fresh pool A vs fresh pool B (null session)",
+        ),
+        NullDesign::Ss => (
+            "null-ss",
+            "sign_compressed: fixed message; ONE fresh pool, both classes drawing from it by \
+             independent index streams (v4 true-zero null session)",
+        ),
+    };
     log(&format!(
-        "running {} pool-vs-pool null sessions (real operation; fresh pools each) …",
+        "running {} {tag} null sessions (real operation; fresh pool(s) each) …",
         opts.null_sessions
     ));
-    let mut null_results = Vec::with_capacity(opts.null_sessions);
+    let mut out = Vec::with_capacity(opts.null_sessions);
     for k in 0..opts.null_sessions {
-        let raw = match run_null_rr(rng, opts.samples, bits) {
+        let run = match design {
+            NullDesign::Rr => run_null_rr(rng, opts.samples, bits),
+            NullDesign::Ss => run_null_ss(rng, opts.samples, bits),
+        };
+        let raw = match run {
             Ok(r) => r,
+            // Keep the error text: key generation, allocation and FFI failures are otherwise
+            // indistinguishable, and this line is the only diagnostic a long run leaves behind.
             Err(e) => {
                 log(&format!("null session {k} could not run: {e}"));
                 break;
             }
         };
-        let r = judge(
-            &format!("null-rr-{k}"),
-            "sign_compressed: fixed message; fresh pool A vs fresh pool B (null session)",
-            &raw,
-        );
+        let r = judge(&format!("{tag}-{k}"), what, &raw);
         // A7: one line per null session as it lands. The null is two thirds of a long session's
         // wall-clock, and it used to print its start and then nothing for hours — a crash inside
         // it was diagnosable only as "it died somewhere in the null", and a session drifting
         // towards the gate was invisible until the end.
         log(&format!(
-            "  null-rr-{k}: n={}/{} raw t={:+.2} crop={:.2}{}",
+            "  {tag}-{k}: n={}/{} raw t={:+.2} crop={:.2}{}",
             r.class0.n,
             r.class1.n,
             r.raw_t,
@@ -876,9 +1113,52 @@ fn null_and_controls(
                 ""
             }
         ));
-        null_results.push(r);
+        out.push(r);
     }
+    out
+}
+
+fn null_and_controls(
+    opts: &Opts,
+    rng: &mut Shake256Context,
+    bits: &mut ClassBits,
+    log: &dyn Fn(&str),
+) -> (Controls, RawSamples, RawSamples) {
+    // v3 (METHODOLOGY-v3 §1): the null is the REAL operation — N pool-vs-pool signing sessions,
+    // each with two fresh independent 32-key pools, the same measurement count as the
+    // experiments, class randomised per measurement. Every null session must PASS on the raw
+    // statistic or the environment is too noisy for any Falcon verdict.
+    let null_results = run_null_sessions(opts.null_design, opts, rng, bits, log);
     let (null_ok, null_crop_stats, null_reason) = fold_null(&null_results, opts.null_sessions, log);
+    let null_raw_t_sd = sample_sd(&null_results.iter().map(|r| r.raw_t).collect::<Vec<_>>());
+    // METHODOLOGY-v4 §2: this is the number the v4 validation run exists to read. Under a TRUE
+    // null it is 1; v3.1 measured 1.742 under `rr`. Printed for both designs so the two can be
+    // compared on the same machine in one session. The pre-registered bands are printed WITH it,
+    // so the reading cannot drift from the file that fixed it.
+    log(&null_raw_t_sd.map_or_else(
+        || {
+            format!(
+                "null: sd of the raw t values = UNDEFINED (only {} session(s) usable; a sample sd \
+                 needs 2). This is NOT the '<= 1.25 proceed' band — it is no reading at all.",
+                null_results.len()
+            )
+        },
+        |sd| {
+            let band = if sd <= 1.25 {
+                "<= 1.25 → v4 §2 'proceed to a verdict-session design'"
+            } else if sd <= 1.60 {
+                "1.25-1.60 → v4 §2 'partial; v4.1 must add a null-referenced raw threshold first'"
+            } else {
+                "> 1.60 → v4 §2 'STOP and re-derive — the construction does not remove the \
+                 inflation'"
+            };
+            format!(
+                "null: sd of the {} raw t values = {sd:.3}  ({band}; 1.000 under a true null, \
+                 v3.1 measured 1.742 under rr)",
+                null_results.len()
+            )
+        },
+    ));
 
     log("running control-flat …");
     let flat_raw = run_control_flat(opts.samples, bits);
@@ -931,6 +1211,9 @@ fn null_and_controls(
             null_sessions: null_results.len(),
             null_crop_stats,
             null_ok,
+            null_design: opts.null_design,
+            null_raw_t_sd,
+            null_raw_t_sd_gate: "human (METHODOLOGY-v4 §2); no verdict reads this number",
             null_reason,
             affinity_pinned: false,
             null_detail: null_results,
@@ -967,7 +1250,7 @@ fn main() -> Result<()> {
     let (mut controls, flat_raw, leaky_raw) = null_and_controls(&opts, &mut rng, &mut bits, &log);
 
     // ── Falcon ─────────────────────────────────────────────────────────────────────────────
-    let (experiments, mut raws) =
+    let (mut experiments, mut raws) =
         falcon_experiments(&fixtures, opts.samples, &mut bits, &controls, &log);
     // Record what the A/A control did IN THE ARTIFACT, not only on the console. Without this the
     // controls block reads `controls_ok: true` while every key verdict is INCONCLUSIVE.
@@ -1002,18 +1285,45 @@ fn main() -> Result<()> {
         .filter(|j| j.gated && j.result.id == "sign-rr")
         .map(|j| j.verdict)
         .fold(Verdict::Pass, Verdict::worse);
-    let session_verdict = kk_combined.worse(rr);
+    let measured_verdict = kk_combined.worse(rr);
     log(&format!(
         "sign-kk combined (>=2 of 3 rule): {kk_combined:?} from {kk:?}; sign-rr: {rr:?}"
     ));
 
+    // VALIDATION-ONLY MODE. `METHODOLOGY-v4.md` §2 says a session under `ss` is a validation run
+    // and that "nothing in session 1 is read as evidence about the signer". Until now that was
+    // prose: a reader holding only `report.json` would have seen `session_verdict: PASS` and
+    // quoted it. It is enforced here, because `ss` is NOT yet the whole v4 design — it narrows
+    // the null (correctly; that is the fix) while §2a's compensating matched crop references are
+    // not wired, so the same fixed |t| < 4.5 gate trips LESS often and the session is easier to
+    // clear. A change that makes a session easier to pass may not also be allowed to issue the
+    // verdict. Under `ss` every experiment is therefore ungated and the session verdict is
+    // INCONCLUSIVE: measurement and `null_raw_t_sd` publication only.
+    let (session_verdict, validation_only) = match opts.null_design {
+        NullDesign::Rr => (measured_verdict, false),
+        NullDesign::Ss => {
+            for j in &mut experiments {
+                j.gated = false;
+            }
+            log(&format!(
+                "VALIDATION-ONLY (--null-design ss): the measured gated verdict would have been \
+                 {measured_verdict:?}; the session verdict is INCONCLUSIVE and every experiment is \
+                 ungated, because the v4 matched crop references (METHODOLOGY-v4 §2a) are not \
+                 implemented and `ss` alone only makes the gate easier to clear. Read \
+                 null_raw_t_sd; read nothing else here as evidence about the signer."
+            ));
+            (Verdict::Inconclusive, true)
+        }
+    };
+
     let report = Report {
         methodology: METHODOLOGY,
+        // 5: `controls.null_design` and `controls.null_raw_t_sd` (METHODOLOGY-v4 §1–§2).
         // 4: every experiment carries `se_ns` / `mde80_ns` / `mde90_ns` (v3.1 power addendum).
         // Additive and `#[serde(default)]`, so a schema-3 reader still parses these reports; the
         // bump is how a reader tells "this session published its resolution" from one that could
         // not. Decision rules are unchanged from v3.
-        schema_version: 4,
+        schema_version: 5,
         samples_per_experiment: opts.samples,
         key_pool: KEY_POOL,
         message_len: MSG_LEN,
@@ -1021,6 +1331,7 @@ fn main() -> Result<()> {
         controls,
         experiments,
         session_verdict,
+        validation_only,
         reading_guide: READING_GUIDE,
     };
     write_outputs(&opts, &report, &all_raws)
@@ -1091,5 +1402,122 @@ mod tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod v4_tests {
+    // Pool sizes and session counts are tiny; no `usize` here is anywhere near 2^52.
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::cast_precision_loss
+    )]
+
+    use trelyan_pq_ffi::prng_from_seed;
+
+    use super::{KEY_POOL, index_pairs_differ_fraction, null_ss_index_pairs, sample_sd};
+
+    /// THE TRAP THE v4 NULL MUST AVOID. If both arms of a `null-ss` session drew the same index,
+    /// every measurement pair would sign with the same key, the 32-key mixture would collapse to
+    /// a fixed-key A/A comparison, and the "null" would silently be a different construction than
+    /// the one `METHODOLOGY-v4.md` §1 pre-registers. Independent uniform draws over 32 keys differ
+    /// with probability 1 − 1/32 = 0.969.
+    #[test]
+    fn null_ss_arms_draw_independent_indices() {
+        let mut rng = prng_from_seed(&[0x5A; 32]);
+        let pairs = null_ss_index_pairs(&mut rng, 20_000, KEY_POOL);
+        assert_eq!(pairs.len(), 20_000);
+        let differ = index_pairs_differ_fraction(&pairs);
+        let expect = 1.0 - 1.0 / KEY_POOL as f64;
+        assert!(
+            (differ - expect).abs() < 0.02,
+            "arms differ {differ:.4} of the time, expected ≈ {expect:.4}; a value near 0 means \
+             the two arms are correlated and the mixture has collapsed"
+        );
+        // And both arms must actually span the pool — a stream stuck on one key would also pass
+        // a naive difference check if the other arm moved.
+        for arm in [0usize, 1] {
+            let mut seen = [false; KEY_POOL];
+            for p in &pairs {
+                seen[if arm == 0 { p.0 } else { p.1 }] = true;
+            }
+            assert!(
+                seen.iter().all(|s| *s),
+                "arm {arm} did not reach every key in the pool"
+            );
+        }
+
+        // NEITHER CHECK ABOVE IS AN INDEPENDENCE TEST, and a reviewer supplied the counterexample:
+        // b := (a + 1) mod 32, forced equal to a on 1/32 of positions, has full marginal coverage
+        // AND exactly the expected differing fraction while being a deterministic function of a.
+        // Independence is a property of the JOINT distribution, so test the joint distribution.
+        let mut joint = [[0usize; KEY_POOL]; KEY_POOL];
+        for &(a, b) in &pairs {
+            joint[a][b] += 1;
+        }
+        let cells = (KEY_POOL * KEY_POOL) as f64;
+        let expected_cell = pairs.len() as f64 / cells;
+        // Pearson chi-square against uniform over the 1024 cells. Under independence with uniform
+        // marginals this is ≈ χ² on 1023 df — mean 1023, sd √(2·1023) ≈ 45 — while the shifted
+        // counterexample puts all mass on 32 cells and scores in the hundreds of thousands.
+        let chi2: f64 = joint
+            .iter()
+            .flatten()
+            .map(|&c| {
+                let d = c as f64 - expected_cell;
+                d * d / expected_cell
+            })
+            .sum();
+        assert!(
+            chi2 < 10.0f64.mul_add(45.0, 1023.0),
+            "joint index distribution is far from uniform (chi2 = {chi2:.0} on 1023 df): the two \
+             arms are not independent"
+        );
+        // A coupled construction also leaves most (a,b) combinations at exactly zero. The
+        // chi-square already catches that; assert it directly because it is the property a reader
+        // can check by eye.
+        let empty = joint.iter().flatten().filter(|&&c| c == 0).count();
+        assert_eq!(
+            empty, 0,
+            "{empty} of {cells} (a,b) combinations never occurred — the arms are coupled"
+        );
+    }
+
+    /// The v4 validation run reads exactly one number (METHODOLOGY-v4 §2); it must be the SAMPLE
+    /// sd, and a wrong divisor would shift the pre-registered 1.25 / 1.60 decision lines.
+    #[test]
+    fn sample_sd_uses_n_minus_one() {
+        // Known: for 2, 4, 4, 4, 5, 5, 7, 9 the population sd is 2 and the sample sd is 2.13809.
+        let xs = [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0];
+        let got = sample_sd(&xs).expect("8 observations");
+        assert!((got - 2.138_089_935_299_395).abs() < 1e-12, "got {got}");
+        assert!(
+            sample_sd(&[1.0, 1.0, 1.0]).expect("3 observations").abs() < 1e-12,
+            "no spread → 0, which is a real measurement"
+        );
+    }
+
+    /// **The reading must be unavailable, not zero, on fewer than two sessions.** Returning 0.0
+    /// would put `METHODOLOGY-v4.md` §2's only decision ("≤ 1.25 → proceed") in its proceed band
+    /// on no data — a check that cannot fail. The null loop breaks on the first session that
+    /// cannot run, so a session dying after one null reaches this path for real.
+    #[test]
+    fn sample_sd_is_undefined_below_two_observations() {
+        assert_eq!(
+            sample_sd(&[3.0]),
+            None,
+            "one observation is not a spread of zero"
+        );
+        assert_eq!(
+            sample_sd(&[]),
+            None,
+            "no observations is not a spread of zero"
+        );
+        assert!(
+            sample_sd(&[3.0]).is_none_or(|sd| sd > 1.25),
+            "an undefined sd must never read as the '<= 1.25 proceed' band"
+        );
     }
 }
