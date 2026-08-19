@@ -127,6 +127,11 @@ struct Controls {
     null_sessions: usize,
     null_crop_stats: Vec<f64>,
     null_ok: bool,
+    /// A6: **why** the null was accepted or rejected — `"OK"`, or the reason naming which
+    /// sessions failed which precondition. It previously existed only as a console line, so a
+    /// reader holding `report.json` alone could see `null_ok: false` and had no way to tell a
+    /// too-noisy environment from sessions that never ran.
+    null_reason: String,
     /// v2: whether the harness pinned itself to one CPU. std has no affinity API and the
     /// constitution allows no new dependency for it here, so this is `false` and stated.
     affinity_pinned: bool,
@@ -785,6 +790,48 @@ fn run_null_rr(
     ))
 }
 
+/// Fold the null sessions into `(ok, crop statistics, reason)` and log the summary.
+///
+/// Split out of [`null_and_controls`] so that function stays readable, and so the empty-null
+/// display (A8) lives next to the decision that produces it: with no usable null the min/max
+/// folds print `inf..0.00`, a range that reads like a measurement and is the empty set.
+fn fold_null(
+    results: &[ExperimentResult],
+    expected: usize,
+    log: &dyn Fn(&str),
+) -> (bool, Vec<f64>, String) {
+    let folded = if results.len() == expected {
+        null_from_sessions(results)
+    } else {
+        Err(format!(
+            "only {} of {expected} null sessions ran",
+            results.len()
+        ))
+    };
+    let (ok, stats, reason) = match folded {
+        Ok(v) => (true, v, String::from("OK")),
+        Err(reason) => (false, Vec::new(), format!("NOT OK — {reason}")),
+    };
+    let range = if stats.is_empty() {
+        "none (null rejected)".to_owned()
+    } else {
+        format!(
+            "{:.2}..{:.2}",
+            stats.iter().copied().fold(f64::INFINITY, f64::min),
+            stats.iter().copied().fold(0.0_f64, f64::max)
+        )
+    };
+    log(&format!(
+        "null: {} pool-vs-pool sessions, raw|t| max {:.2}, crop-stat range {range} → {reason}",
+        results.len(),
+        results
+            .iter()
+            .map(|r| r.raw_t.abs())
+            .fold(0.0_f64, f64::max),
+    ));
+    (ok, stats, reason)
+}
+
 fn null_and_controls(
     opts: &Opts,
     rng: &mut Shake256Context,
@@ -808,39 +855,30 @@ fn null_and_controls(
                 break;
             }
         };
-        null_results.push(judge(
+        let r = judge(
             &format!("null-rr-{k}"),
             "sign_compressed: fixed message; fresh pool A vs fresh pool B (null session)",
             &raw,
+        );
+        // A7: one line per null session as it lands. The null is two thirds of a long session's
+        // wall-clock, and it used to print its start and then nothing for hours — a crash inside
+        // it was diagnosable only as "it died somewhere in the null", and a session drifting
+        // towards the gate was invisible until the end.
+        log(&format!(
+            "  null-rr-{k}: n={}/{} raw t={:+.2} crop={:.2}{}",
+            r.class0.n,
+            r.class1.n,
+            r.raw_t,
+            r.crop_max_abs_t,
+            if r.raw_t.abs() >= falcon_ct::T_THRESHOLD {
+                "  ← TRIPS THE GATE (this session will be INCONCLUSIVE)"
+            } else {
+                ""
+            }
         ));
+        null_results.push(r);
     }
-    let null_crop_stats = if null_results.len() == opts.null_sessions {
-        null_from_sessions(&null_results)
-    } else {
-        Err(format!(
-            "only {} of {} null sessions ran",
-            null_results.len(),
-            opts.null_sessions
-        ))
-    };
-    let (null_ok, null_crop_stats, null_reason) = match null_crop_stats {
-        Ok(v) => (true, v, String::from("OK")),
-        Err(reason) => (false, Vec::new(), format!("NOT OK — {reason}")),
-    };
-    log(&format!(
-        "null: {} pool-vs-pool sessions, raw|t| max {:.2}, crop-stat range {:.2}..{:.2} → {}",
-        null_results.len(),
-        null_results
-            .iter()
-            .map(|r| r.raw_t.abs())
-            .fold(0.0_f64, f64::max),
-        null_crop_stats
-            .iter()
-            .copied()
-            .fold(f64::INFINITY, f64::min),
-        null_crop_stats.iter().copied().fold(0.0_f64, f64::max),
-        null_reason
-    ));
+    let (null_ok, null_crop_stats, null_reason) = fold_null(&null_results, opts.null_sessions, log);
 
     log("running control-flat …");
     let flat_raw = run_control_flat(opts.samples, bits);
@@ -893,6 +931,7 @@ fn null_and_controls(
             null_sessions: null_results.len(),
             null_crop_stats,
             null_ok,
+            null_reason,
             affinity_pinned: false,
             null_detail: null_results,
             // Filled in after `run_aa_control`; the block is built before the experiments run.
