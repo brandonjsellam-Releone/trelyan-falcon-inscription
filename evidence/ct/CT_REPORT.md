@@ -197,18 +197,63 @@ per experiment (40 180 per class), 20 real-operation null sessions, 2026-08-18 1
 | `verify-ctrl` *(informational)* | | 8 µs | −25.54 | +1.45 [+1.3, +1.6] | 0.048 | 0.33 µs | FAIL — **pre-stated** |
 | `keygen` *(informational)* | | 10 015 µs | −161.47 | +11 417 [+11 278, +11 556] | 0.048 | 409 µs | FAIL — **pre-stated** |
 
-### 1. The arm-layout hypothesis is excluded on the machine where the pattern was seen
+### 1. What `sign-aa` did and did not settle — **corrected after council review**
 
 `sign-aa` — the *same keypair* in both arms, in a tuple laid out exactly like a `sign-kk` pair —
-measures the arm offset at **+1.40 µs with a 95 % CI of [−3.53, +6.33] µs**. **That CI excludes
-+13.9 µs.** The control added the day before, because 8 of 9 pairs across v2/v3/v3b had put class 1
-slower, has answered its question in one session: **there is no systematic arm/layout offset of
-that size on this machine.**
+measures the arm offset at **+1.40 µs, 95 % CI [−3.53, +6.33] µs**. This session's three `sign-kk`
+pairs are **+4.05, −7.22, −6.94 µs** (one positive), taking the pooled count across all sessions
+to **9 of 12** (two-sided binomial *p* ≈ 0.15, from 8 of 9).
 
-The pattern itself also failed to reproduce. This session's three pairs are **+4.05, −7.22,
-−6.94 µs** — one positive, two negative — taking the pooled count to **9 of 12** (two-sided
-binomial *p* ≈ 0.15, no longer significant). Two independent lines of evidence, one experimental
-and one observational, point the same way.
+**A first draft of this section said that this "establishes that the +12–17 µs deltas recorded in
+v2/v3/v3b were not a systematic arm or memory-layout artefact". That was put to the six-seat
+council and five of six returned OVERSTATED. The objection is correct and the claim is
+withdrawn.** What follows is what survives.
+
+**Supported:**
+
+> In the v3.1 session, a **constant additive arm offset** in the same-key control is estimated at
+> +1.40 µs with a 95 % CI that excludes +13.9 µs. In that session, on that build and that layout,
+> an arm bias of the previously observed size is not present.
+
+**Not supported, and why (five independent objections, all upheld):**
+
+1. **Cross-session inference.** The control ran in **v3.1**; the deltas are from **v2, v3 and
+   v3b**. Concluding anything about those sessions requires assuming the harness, allocator,
+   build and layout were unchanged across them — and the version numbers are themselves evidence
+   that they were not. An artefact present in the earlier builds and perturbed or removed by v3.1
+   produces exactly this pattern: null control now, non-null deltas then. *(All five seats.)*
+2. **A same-key control is blind to content × arm interactions.** Cloning one keypair sets the
+   expected difference to zero for an offset that depends only on position or address. It cannot
+   see effects that require the two arms to hold **different key material** — cache-set conflicts,
+   page colouring, content-dependent execution interacting with arm-specific state. Those are
+   still memory-layout artefacts, and `sign-aa` is structurally unable to detect them.
+   *(Grok F2, GPT F1, DeepSeek, Hermes ART1, Kimi f3.)*
+3. **One layout draw.** Placement is a draw from a distribution over allocator and ASLR outcomes,
+   not a constant. A single `sign-aa` pair samples **one** placement; a null there does not bound
+   an artefact that appears only for unlucky alignments. No replication across restarts or
+   multiple pairs was run. *(Kimi f2.)*
+4. **The power does not reach the bottom of the band.** MDE₉₀ ≈ 14.5 µs sits *at or above* the
+   low end of 12–17 µs: a true 12 µs offset gives *t* ≈ 4.8 against a 4.5 gate — power well under
+   90 %. The **CI** excludes +13.9 µs for a constant additive offset; the **session** is not a
+   high-power refutation of a 12 µs one. *(Grok F3, GPT F2, DeepSeek.)*
+5. **Failing to detect is not equivalence.** Passing a detection test never establishes absence.
+   Saying "no effect of size *X*" requires a pre-specified equivalence margin and a two-one-sided-
+   tests procedure (Schuirmann 1987, DOI 10.1007/BF01068419), which was not pre-registered here.
+   *(GPT F2 — adopted as a v4 methodology item.)*
+6. **The naive CI assumes independence.** 82 000 timings on one laptop are serially dependent
+   (frequency scaling, interrupts, thermal drift). An iid difference-of-means interval is then too
+   narrow; a block-bootstrap or cluster-robust estimator is needed before a *sharp* exclusion is
+   asserted. This does not move the point estimate. *(Grok F5 — v4 item.)*
+
+And the non-reproduction cuts both ways: *p* ≈ 0.15 fails to reject a sign bias, which is not the
+same as showing there is none, and 9 of 12 remains directionally positive. It is also equally
+consistent with the earlier deltas having been **session-specific, non-systematic** placement
+artefacts — which is a different conclusion from "not an artefact", and one this session cannot
+distinguish.
+
+**Net:** the arm-layout hypothesis is **weakened for constant additive offsets in the current
+build, and otherwise still open.** `sign-aa` stays in every session; arm randomisation stays on
+the v4 list rather than being retired.
 
 ### 2. What the PASS licenses, exactly
 
@@ -272,8 +317,13 @@ readings having been null artefacts, as §4a and §4b already concluded.
   against this laptop's 350–733 µs, so a 20-minute run there resolves ≈ 5 µs
   (`OBSERVATION_ci-ubuntu-2026-08-18.md`). That is blocked behind the null-gate defect: the gate
   as written voids sessions on quiet machines for arithmetic reasons (`V4_BACKLOG.md` §C4).
-- The `sign-kk` arm-randomisation item is **de-prioritised** — `sign-aa` says there is nothing of
-  that size to fix — but the A/A control stays in every future session.
+- **`sign-kk` arm randomisation stays on the v4 list.** A first draft de-prioritised it on the
+  strength of `sign-aa`; the council review of §4c.1 removed that basis. Joined by three new v4
+  items the review generated: replicate the A/A control across multiple layout draws, add a
+  control with *different* keys and swapped arms (the one design that can see content × arm
+  interactions), and use cluster-robust or block-bootstrap standard errors for serially dependent
+  timings. If the goal becomes *excluding* an effect rather than failing to detect one, that needs
+  a pre-registered equivalence margin and a TOST procedure, not a bigger *n*.
 
 ## 5. METHODOLOGY v2 — what changed before the second session (implemented; see `METHODOLOGY-v2.md`)
 

@@ -55,9 +55,28 @@ as A1's regression fixture — it is a real artifact, not a synthetic one.
    the weakest joint in the secondary (crop/SHAPE) diagnostic. Class assignment is randomised
    *within* each experiment, which protects the primary statistic; it does not protect the
    null-vs-experiment comparison.
-2. **Randomise the `sign-kk` arm assignment.** The actual fix if `sign-aa` returns a non-zero Δ.
-   Note it **breaks the pre-registered three-pair combination rule as written**, so it needs a
-   new rule, not a patch.
+2. **Randomise the `sign-kk` arm assignment. — STAYS ON THE LIST.** A draft reading of the v3.1
+   session proposed retiring this because `sign-aa` came back near zero; the council review of
+   that reading (5 of 6 OVERSTATED) removed the basis, so it stands. Note it **breaks the
+   pre-registered three-pair combination rule as written**, so it needs a new rule, not a patch.
+8. **Replicate the A/A control across layout draws.** Memory placement is a draw from a
+   distribution (allocator, ASLR), not a constant. One `sign-aa` pair samples one placement, so a
+   null there cannot bound an artefact that appears only for unlucky alignments. Several `aa`
+   pairs per session, and/or across restarts.
+9. **A control with DIFFERENT keys and swapped arms.** `sign-aa` is structurally blind to
+   anything that requires the two arms to hold different key material — cache-set conflicts, page
+   colouring, content-dependent execution interacting with arm-specific state. The design that
+   sees those is the same two keys measured twice with the arms exchanged, compared pairwise.
+   This is the **only** item here that can close the artefact question rather than narrow it.
+10. **Cluster-robust or block-bootstrap standard errors.** 82 000 timings on one machine are
+    serially dependent (frequency scaling, interrupts, thermal drift), so an iid
+    difference-of-means CI is too narrow. Required before any *sharp* exclusion claim; it does not
+    move point estimates.
+11. **Equivalence testing (TOST) with a pre-registered margin**, for any question of the form
+    "is there no effect larger than *X*". Failing to detect is not equivalence, and no amount of
+    additional *n* converts one into the other (Schuirmann 1987, DOI 10.1007/BF01068419). This is
+    the correct statistical upgrade if the project ever needs to *bound* a timing difference
+    rather than fail to find one.
 3. **Equalise `aa` and `kk` storage.** `sign-aa` reproduces the *intra-pair* offset exactly; put
    both in one `Vec` so the control also matches absolute allocation and page placement.
 4. **Replace the fixed 4.5 gate on null sessions with a null-referenced threshold. — PROMOTED:
