@@ -10,14 +10,27 @@ name: rust-ci
 # to compile anything but the pinned digest — a change there must run this workflow.
 
 on:
+  # `push` is restricted to the default branch on purpose. A pull_request's path filter is
+  # evaluated against the PR's CUMULATIVE diff, not the newest commit, so on a long-lived branch
+  # that has already touched rust/** every later push re-triggers this workflow — and with an
+  # unrestricted `push` trigger it ran TWICE for the same SHA, once per event. Observed on PR #39:
+  # eight concurrent runs queued behind documentation-only commits.
   push:
+    branches: [main]
     paths: ["rust/**", "third_party/**", ".github/workflows/rust-ci.yml"]
   pull_request:
     paths: ["rust/**", "third_party/**", ".github/workflows/rust-ci.yml"]
   schedule:
-    # Weekly: cargo audit reads a database that changes without this repo changing.
+    # Weekly: cargo audit reads a database that changes without this repo changing, and the
+    # falcon-ct evidence session below now runs on this cadence rather than per-push.
     - cron: "41 5 * * 1"
   workflow_dispatch: {}
+
+# One run per ref. A superseded run reports on code nobody has any more, and this workflow is
+# expensive — three OSes, plus (on demand) a 20-minute measurement session.
+concurrency:
+  group: rust-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -125,11 +138,25 @@ jobs:
 
   falcon-ct:
     name: falcon-ct evidence session (observation, never a gate)
-    # Runs the pre-registered constant-time session (evidence/ct/METHODOLOGY.md) against the
-    # pinned signer on a shared runner and PUBLISHES the result to the job summary. It does not
-    # fail on FAIL or INCONCLUSIVE — that is what "observation, not a gate" means in the plan —
-    # and shared runners are noisy enough that INCONCLUSIVE (the flat control tripping) is an
-    # expected, honest outcome. It DOES fail if the harness itself cannot run.
+    # Runs the pre-registered constant-time session against the pinned signer on a shared runner
+    # and PUBLISHES the result to the job summary. It does not fail on FAIL or INCONCLUSIVE —
+    # that is what "observation, not a gate" means in the plan. It DOES fail if the harness
+    # itself cannot run, which also makes it the end-to-end smoke test of the harness.
+    #
+    # NO LONGER ON EVERY PUSH (2026-08-19). Two reasons, both measured:
+    #  1. It costs 20+ minutes, and on a PR branch every later commit — documentation included —
+    #     re-triggers it (see the `on:` block above).
+    #  2. Its verdict is currently INCONCLUSIVE *by construction* on this class of runner. The
+    #     null gate is a fixed |t| < 4.5 applied to a pool-vs-pool null whose spread grows as the
+    #     environment gets QUIETER: sd(t)^2 ~= 1 + (sigma_key/sigma_total)^2 * (n/32). This
+    #     runner's sigma_total is ~32 us against the laptop's 350-733 us, so 5 of 20 null sessions
+    #     tripped the gate and voided the session while BOTH synthetic controls behaved perfectly.
+    #     Written up in evidence/ct/OBSERVATION_ci-ubuntu-2026-08-18.md; the fix is drafted in
+    #     evidence/ct/METHODOLOGY-v4-DRAFT.md and is NOT yet in force.
+    # Until that lands, a per-push session burns runner time to re-derive a known INCONCLUSIVE.
+    # Weekly plus on-demand keeps the smoke test without the waste. Restore the per-push trigger
+    # when the v4 null makes a CI session capable of a verdict again.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
