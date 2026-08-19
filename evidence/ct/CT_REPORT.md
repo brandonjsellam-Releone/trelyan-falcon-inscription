@@ -1,8 +1,39 @@
-# Falcon-1024 det1024 constant-time evidence — session report
+# Falcon-1024 det1024 constant-time evidence — session reports
 
-**Session:** `session-2026-08-18-local` · **Method:** `METHODOLOGY.md` (2026-08-18, pre-registered before this run; commit `65d2c42`) · **Harness:** `rust/crates/falcon-ct` (release build) · **Target:** pinned `algorand/falcon@ce15e75b`, vendored at `third_party/falcon-det1024/src`, compiled by `trelyan-pq-ffi` with `-O3 -DFALCON_UNALIGNED=0 -fno-strict-aliasing`, `config.h` `FALCON_FPEMU=1`.
+**Target throughout:** pinned `algorand/falcon@ce15e75b`, vendored at
+`third_party/falcon-det1024/src`, compiled by `trelyan-pq-ffi` with
+`-O3 -DFALCON_UNALIGNED=0 -fno-strict-aliasing`, `config.h` `FALCON_FPEMU=1`. **Harness:**
+`rust/crates/falcon-ct` (release). The vendored primitive is never patched.
 
-## SESSION VERDICT: **FAIL** (by the pre-registered rule) — **read §3a before drawing any conclusion**
+---
+
+## Where this stands — read this first
+
+**Five sessions, four pre-registered methodologies. The current reading is §4c.**
+
+| session | method | verdict | what it is worth today |
+|---|---|---|---|
+| v1 `…-local` | `METHODOLOGY.md` | FAIL by the v1 rule | **Withdrawn.** Crop-driven; the v1 statistic (max \|t\| over ten crops against a single-test cutoff) was unfit. §3a |
+| v2 `…-v2` | `METHODOLOGY-v2.md` | SHAPE by the v2 rule | **Not interpretable.** Its null was a synthetic loop unfit for an 8 ms operation. §4a |
+| v3 `…-v3` | `METHODOLOGY-v3.md` | INCONCLUSIVE | Correct refusal: the random class split fell under the per-class floor. §4b |
+| v3b `…-v3b` | `METHODOLOGY-v3.md` | PASS | Real but **power-limited**: MDE₉₀ 72–175 µs. §4b |
+| **v3.1 `…-v31-hp82k`** | **+ `METHODOLOGY-v3.1-POWER.md`** | **PASS** | **The current result: 82 000 measurements/experiment, all five gates passed, MDE₉₀ ≈ 14.5 µs. §4c** |
+
+**Nothing in this document is a constant-time claim.** The strongest statement any session
+supports is *no per-key location difference at or above that session's stated MDE₉₀ was detected
+on this machine and build* — which is non-detection at a stated power, not absence. A timing
+session can demonstrate leakage; it cannot demonstrate its absence.
+
+Earlier sections are kept **unedited except where a correction is marked**, because the record of
+what was claimed and then withdrawn is itself the evidence that the process works. Three separate
+readings were weakened by council review before v3.1, and v3.1 then failed to reproduce the
+numbers behind two of them (§4c).
+
+---
+
+## 1st session (v1) — SESSION VERDICT: **FAIL** (by the pre-registered rule) — **withdrawn; read §3a**
+
+**Session:** `session-2026-08-18-local` · **Method:** `METHODOLOGY.md` (2026-08-18, pre-registered before this run; commit `65d2c42`).
 
 Both gated experiments distinguish their two classes at `max |t| ≥ 4.5` with both controls behaving, so by the rule fixed in METHODOLOGY v1 the word is FAIL. **This is an observation, not a gate** (METHODOLOGY §0): it blocks Phase E (the self-KAT signer as a default) and any constant-time claim for the pinned signer, and it does **not** result in any change to the vendored primitive.
 
@@ -133,6 +164,116 @@ After a second team review (5 seats, 3 "reading over-claims" / 2 "honest"), the 
 5. Environment: same i9 desktop, Windows QPC ≈ 100 ns, no core pinning, turbo uncontrolled, FPEMU-specific; **no other load during `-v3b`** (unlike `-v3`).
 
 **Consequences:** Phase E stays **blocked** — one PASS on one machine at limited power is not "a sound PASS exists"; METHODOLOGY says a PASS is not a proof, and the v2 deltas are unresolved. What this session adds: after three pre-registered iterations, the pinned det1024 signer's timing shows **no detectable location dependence on the key at the tested power** — where that power is MDE₉₀ ≈ 72–175 µs, not the ±15 µs this paragraph first claimed (corrected 2026-08-18); the earlier FAIL (v1) and SHAPE (v2) readings are non-evidentiary under the corrected statistic and null; the open question is sized (≈ 320 k measurements per experiment to resolve 15 µs; the pre-registered next session runs at 82 k for ≈ 30–42 µs). No patch to the vendored primitive; nothing here is a security claim in either direction.
+
+## 4c. Fifth session — **v3.1 high power** (`session-2026-08-18-local-v31-hp82k`)
+
+### SESSION VERDICT: **PASS**, all five pre-registered gates satisfied, at **MDE₉₀ ≈ 14.5 µs**
+
+**Method:** `METHODOLOGY-v3.md` + `METHODOLOGY-v3.1-POWER.md`, both committed **before** the run;
+**no decision rule was changed** — only the sample size moved, and upward. 82 000 measurements
+per experiment (40 180 per class), 20 real-operation null sessions, 2026-08-18 16:39–22:10
+(5 h 31 m, inside the 5.5–5.9 h predicted band), same laptop as v3b, no other load.
+
+**Gates, in the order §8 of the addendum fixed in advance:**
+
+| # | gate | result |
+|---|---|---|
+| 1 | `schema_version == 4` | ✔ the v3.1 binary ran |
+| 2 | `null_ok`, 20/20 `null_detail`, none with \|raw *t*\| ≥ 4.5 | ✔ **max 3.94**; every split within ±170 of 40 180 |
+| 3 | `controls_ok`: flat PASS, leaky FAIL | ✔ *t* = −0.15 / **−296.34** |
+| 4 | `sign-aa` PASS | ✔ |
+| 5 | `sign-aa` Δ and CI, read regardless of verdict | **+1.40 µs [−3.53, +6.33]** |
+
+| experiment | n0 / n1 | sd | raw *t* | Δmean (µs) [95 % CI] | crop *p*ₑₘₚ | **MDE₉₀** | verdict |
+|---|---|---|---|---|---|---|---|
+| **`sign-aa`** *(A/A control)* | 40152 / 40208 | 357 µs | −0.56 | **+1.40 [−3.5, +6.3]** | 0.952 | 14.5 µs | **PASS** |
+| **`sign-kk-0`** | 40114 / 40246 | 356 µs | −1.62 | +4.05 [−0.9, +9.0] | 0.571 | 14.5 µs | **PASS** |
+| **`sign-kk-1`** | 40186 / 40174 | 356 µs | +2.88 | −7.22 [−12.1, −2.3] | 0.476 | 14.5 µs | **PASS** |
+| **`sign-kk-2`** | 40196 / 40164 | 353 µs | +2.79 | −6.94 [−11.8, −2.1] | 0.476 | 14.4 µs | **PASS** |
+| **`sign-kk` combined** (≥ 2 of 3) | | | | | | | **PASS** |
+| **`sign-rr`** | 40201 / 40159 | 350 µs | +0.73 | −1.80 [−6.6, +3.0] | 0.952 | 14.3 µs | **PASS** |
+| `sign-key` *(screening)* | 40254 / 40106 | 354 µs | +2.36 | −5.91 [−10.8, −1.0] | 0.476 | 14.5 µs | PASS |
+| `sign-msg` *(screening)* | 40318 / 40042 | 356 µs | +1.83 | −4.60 [−9.5, +0.3] | 0.476 | 14.5 µs | PASS |
+| `verify-ctrl` *(informational)* | | 8 µs | −25.54 | +1.45 [+1.3, +1.6] | 0.048 | 0.33 µs | FAIL — **pre-stated** |
+| `keygen` *(informational)* | | 10 015 µs | −161.47 | +11 417 [+11 278, +11 556] | 0.048 | 409 µs | FAIL — **pre-stated** |
+
+### 1. The arm-layout hypothesis is excluded on the machine where the pattern was seen
+
+`sign-aa` — the *same keypair* in both arms, in a tuple laid out exactly like a `sign-kk` pair —
+measures the arm offset at **+1.40 µs with a 95 % CI of [−3.53, +6.33] µs**. **That CI excludes
++13.9 µs.** The control added the day before, because 8 of 9 pairs across v2/v3/v3b had put class 1
+slower, has answered its question in one session: **there is no systematic arm/layout offset of
+that size on this machine.**
+
+The pattern itself also failed to reproduce. This session's three pairs are **+4.05, −7.22,
+−6.94 µs** — one positive, two negative — taking the pooled count to **9 of 12** (two-sided
+binomial *p* ≈ 0.15, no longer significant). Two independent lines of evidence, one experimental
+and one observational, point the same way.
+
+### 2. What the PASS licenses, exactly
+
+> Across three fixed-key pairs and a pool-vs-pool control, **no difference in mean signing time
+> was detected** at the pre-registered lines (every gated raw \|t\| ≤ 2.9 against the 4.5 rule;
+> every gated crop *p*ₑₘₚ ≥ 0.476 against a real-operation null whose own crop statistic reached
+> 10.24). At this size the session would have detected a true difference of **≈ 14.5 µs** with
+> 90 % probability. Smaller differences remain neither confirmed nor excluded, though they keep a
+> smaller, non-zero detection probability. Machine-, build- and input-distribution-specific.
+
+**It does not license**, at any sample size: that the signer *is* constant-time; that the secret
+key does not leak through timing; that Falcon-1024 as a design is constant-time; or any FIPS-206
+property. This session measures **wall-clock only** — power, EM, cache and microarchitectural
+channels are entirely outside it.
+
+The session **over-delivered on resolution**: MDE₉₀ came out at 14.3–14.5 µs against a planned
+30–42 µs, because the observed sd was 350–357 µs against the 425–1 039 µs planning band. The
+laptop was quieter than during v3b. The consequence is that this session **does** resolve the
+12–17 µs range that every earlier session was blind to.
+
+### 3. Predictions scorecard — including the one that was wrong
+
+`METHODOLOGY-v3.1-POWER.md` §7 was written while the session was still in its null phase, before
+any experiment ran:
+
+| prediction | outcome |
+|---|---|
+| Null gate holds (≈ 0.1–2 % risk on this machine) | **Correct** — max \|t\| 3.94, and that it sits above a standard-normal max-of-20 is itself the predicted `sd(t) ≈ 1.1–1.4` |
+| `verify-ctrl` crosses 4.5 (E\|t\| ≈ 33) | **Correct** — *t* = −25.5 |
+| `keygen` crosses 4.5 (E\|t\| ≈ 151) | **Correct** — *t* = −161 |
+| `sign-key` near-certain FAIL (E\|t\| ≈ 12.5) | **WRONG** — *t* = 2.36, PASS |
+| P(≥ 1 `sign-kk` pair FAILs) ≈ 44 % | **No FAIL** |
+
+The two failures share one cause: both assumed v3b's *point estimates* (`sign-key` Δ = −46.4 µs;
+`sign-kk-2` Δ = +31.4 µs) were true. They were not — the observed values are −5.9 µs and −6.9 µs.
+The caveat was stated at the time ("point estimates whose v3b CIs all span zero"), and it was the
+operative fact.
+
+**This is the session's methodological result, and it is worth more than the verdict.** The
+"+12–17 µs fixed-key deltas" that three rounds of council review forced this repository to
+withdraw as claims have now **failed to reproduce at 17× the samples, including their sign**.
+Sub-threshold *t* with a CI excluding zero is hereby a documented non-replicating shape in this
+system, not a weak signal. The reviewers who insisted on withdrawal were right, and the
+pre-registered 4.5 line did the job it exists to do.
+
+### 4. Recorded before anyone reads them as a finding
+
+Two gated pairs again show sub-threshold *t* (2.88, 2.79) with CIs excluding zero — now
+**negative** (−7.22, −6.94 µs), the opposite sign to the earlier pattern. `sign-key` shows the
+same shape (−5.91 [−10.8, −1.0]). By the pre-registered rules these are **descriptive only and are
+not read**. This is the fourth consecutive session to produce this shape and the first three did
+not replicate; the standing expectation is therefore that these will not either. `sign-key`'s
+SHAPE label from v3b did not recur (crop *p*ₑₘₚ 0.476), which is consistent with the v2/v3b SHAPE
+readings having been null artefacts, as §4a and §4b already concluded.
+
+### 5. Consequences
+
+- **Phase E stays blocked** pending the council reading. One PASS, however well-powered, is one
+  machine and one build; the standing rule is that a PASS is not a proof.
+- **The next session moves machines, not sample counts.** The ubuntu CI runner's sd is ≈ 32 µs
+  against this laptop's 350–733 µs, so a 20-minute run there resolves ≈ 5 µs
+  (`OBSERVATION_ci-ubuntu-2026-08-18.md`). That is blocked behind the null-gate defect: the gate
+  as written voids sessions on quiet machines for arithmetic reasons (`V4_BACKLOG.md` §C4).
+- The `sign-kk` arm-randomisation item is **de-prioritised** — `sign-aa` says there is nothing of
+  that size to fix — but the A/A control stays in every future session.
 
 ## 5. METHODOLOGY v2 — what changed before the second session (implemented; see `METHODOLOGY-v2.md`)
 
