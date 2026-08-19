@@ -6,3 +6,14 @@
 # instead of cloning). SHA256SUMS is covered for the same reason: `sha256sum -c` reads it.
 third_party/falcon-det1024/src/**  -text
 third_party/falcon-det1024/SHA256SUMS  -text
+
+# Constant-time evidence sessions: raw measurement CSVs and their report.json are DATA, and
+# their SHA-256 is published in each session's SHA256SUMS. A Windows checkout with
+# core.autocrlf=true would rewrite LF to CRLF and every published hash would stop matching on a
+# fresh clone — the same failure mode already fixed for the vendored Falcon tree above. The blobs
+# are already stored LF, so this only prevents conversion on checkout; it changes nothing in the
+# index.
+evidence/ct/**/*.csv         -text
+evidence/ct/**/report.json   -text
+evidence/ct/**/SHA256SUMS    -text
+evidence/ct/**/console.log   -text
