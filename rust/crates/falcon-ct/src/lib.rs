@@ -131,9 +131,11 @@ pub struct ExperimentResult {
     /// `max |t|` over the NINE crops only (excluding raw) — the v2 SECONDARY diagnostic.
     #[serde(default)]
     pub crop_max_abs_t: f64,
-    /// Empirical *p* of `crop_max_abs_t` against the session's flat-control null:
-    /// (number of null sessions with a crop statistic ≥ observed + 1) / (N + 1). `None` if no
-    /// null was supplied (v1 judging).
+    /// Empirical *p* of `crop_max_abs_t` against the session's empirical null:
+    /// (number of null sessions with a crop statistic ≥ observed + 1) / (N + 1). The null is N
+    /// pool-vs-pool sessions of the REAL operation since v3 (v2's synthetic flat loop was found
+    /// unfit for an 8 ms operation). **`None` means the diagnostic did not run** — v1 judging, or
+    /// a rejected/empty null — in which case the verdict is INCONCLUSIVE and never PASS.
     #[serde(default)]
     pub crop_empirical_p: Option<f64>,
     // ── v3.1 power fields. Descriptive, never decision criteria. ──
@@ -488,19 +490,46 @@ pub fn judge_v2(
 ) -> ExperimentResult {
     let mut r = judge(id, description, raw);
     let n = null_crop_stats.len();
+    // v2's `distinguishable` means "in LOCATION": the raw statistic only.
+    r.distinguishable = r.raw_t.abs() >= T_THRESHOLD;
+
+    // NO NULL, NO SECONDARY VERDICT. With an empty null the arithmetic below would compute
+    // p = (0+1)/(0+1) = 1.0 — a PASS-shaped number derived from nothing — and the SHAPE arm,
+    // guarded by `n > 0`, could never fire, so every experiment fell through to PASS with a
+    // confident-looking `crop_empirical_p: 1.0` beside it.
+    //
+    // Observed live, not hypothesised: the ubuntu CI session of 2026-08-18 (five of twenty null
+    // sessions tripped the raw gate, so the null was rejected and this vector was empty) printed
+    //     sign-kk-0 … crop max|t| = 38.17  p_emp = 1.000
+    // and reported the `sign-aa` control as PASS with its shape arm never run. The gated
+    // experiments were saved by the control rule, which forces INCONCLUSIVE when the null is
+    // rejected — but `sign-aa` is read on its own isolated verdict, so the control that gates the
+    // session was the one the defect could mislabel.
+    //
+    // A check that cannot fail is worse than no check. Fail closed instead: no `p`, and
+    // INCONCLUSIVE, which is what "the diagnostic did not run" actually means.
+    if n == 0 {
+        r.crop_empirical_p = None;
+        r.isolated_verdict = if r.distinguishable {
+            // The PRIMARY statistic stands on its own and never depended on the null.
+            Verdict::Fail
+        } else {
+            Verdict::Inconclusive
+        };
+        return r;
+    }
+
     let ge = null_crop_stats
         .iter()
         .filter(|&&s| s >= r.crop_max_abs_t)
         .count();
     let p = (ge as f64 + 1.0) / (n as f64 + 1.0);
     r.crop_empirical_p = Some(p);
-    // v2's `distinguishable` means "in LOCATION": the raw statistic only.
-    r.distinguishable = r.raw_t.abs() >= T_THRESHOLD;
     r.isolated_verdict = if !r.enough_samples {
         Verdict::Inconclusive
     } else if r.distinguishable {
         Verdict::Fail
-    } else if n > 0 && p < 1.0 / n as f64 {
+    } else if p < 1.0 / n as f64 {
         Verdict::Shape
     } else {
         Verdict::Pass
@@ -603,6 +632,69 @@ mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
     use super::*;
+
+    /// Regression for the defect the ubuntu CI session of 2026-08-18 exhibited: with the null
+    /// rejected, `judge_v2` used to emit `crop_empirical_p = 1.0` — computed from nothing — and
+    /// fall through to PASS, printing `crop max|t| = 38.17` beside `p_emp = 1.000`. The control
+    /// that gates the whole session (`sign-aa`) is read on its isolated verdict, so it was the
+    /// one the defect could mislabel.
+    #[test]
+    fn an_empty_null_yields_no_p_and_no_pass() {
+        let mut rng = Xs(0xdead_beef_0123_4567);
+        // Two classes with identical distributions: the raw statistic is null, and under a
+        // working null this would be a legitimate PASS.
+        let flat: Vec<(u8, u64)> = (0..8_000)
+            .map(|i| (u8::from(i % 2 == 1), 8_000_000 + rng.next() % 100_000))
+            .collect();
+        let raw = RawSamples { samples: flat };
+
+        // A null WIDER than this sample's own crop statistic, so the crop arm is quiet and the
+        // legitimate answer is PASS. (Null values below the observed statistic would correctly
+        // give SHAPE — a different arm, and not the one this test is about.)
+        let with_null = judge_v2("x", "", &raw, &[6.0, 7.5, 5.5, 8.0, 6.5]);
+        assert_eq!(
+            with_null.isolated_verdict,
+            Verdict::Pass,
+            "sanity: with a real, wide null this same data is a legitimate PASS (crop stat {:.2})",
+            with_null.crop_max_abs_t
+        );
+        assert_eq!(with_null.crop_empirical_p, Some(1.0));
+
+        let without = judge_v2("x", "", &raw, &[]);
+        assert_eq!(
+            without.crop_empirical_p, None,
+            "an empty null must yield NO empirical p — 1.0 from zero samples is a number that              looks like evidence and is not"
+        );
+        assert_eq!(
+            without.isolated_verdict,
+            Verdict::Inconclusive,
+            "no null means the secondary diagnostic did not run, which is INCONCLUSIVE, not PASS"
+        );
+        assert!(
+            without.raw_t.abs() < T_THRESHOLD && without.crop_max_abs_t > 0.0,
+            "the statistics themselves are still computed and reported"
+        );
+    }
+
+    /// The PRIMARY statistic never depended on the null, so a real location difference must still
+    /// FAIL even when the secondary diagnostic is unavailable. Fail-closed must not become
+    /// fail-silent in the direction that hides a signal.
+    #[test]
+    fn an_empty_null_does_not_suppress_a_real_fail() {
+        let mut rng = Xs(0x0f0f_0f0f_0f0f_0f0f);
+        let leaky: Vec<(u8, u64)> = (0..8_000)
+            .map(|i| {
+                let class = i % 2 == 1;
+                let base = if class { 9_000_000 } else { 8_000_000 };
+                (u8::from(class), base + rng.next() % 100_000)
+            })
+            .collect();
+        let raw = RawSamples { samples: leaky };
+        let r = judge_v2("leaky", "", &raw, &[]);
+        assert!(r.distinguishable, "a 1 ms shift is a location difference");
+        assert_eq!(r.isolated_verdict, Verdict::Fail);
+        assert_eq!(r.crop_empirical_p, None, "still no p from an empty null");
+    }
 
     #[test]
     fn inverse_normal_cdf_matches_published_quantiles() {
