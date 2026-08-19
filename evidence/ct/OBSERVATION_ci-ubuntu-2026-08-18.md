@@ -100,6 +100,27 @@ not "how many samples" but "on what machine, and with the null gate fixed so a q
 not punished for being quiet". Both must be pre-registered before that session runs — and the
 gate must be decided **before** a size or machine change, not after seeing a result (§C4).
 
+### Why the local 82 k session was allowed to continue
+
+It was running when this was found, and the obvious reaction — kill it, it is outclassed six-fold
+by a twenty-minute job — is wrong for two reasons, recorded here so the decision is visible
+rather than inertial.
+
+1. **It answers a question this runner cannot.** The +13.9 µs class-1 pattern is a property of
+   *the laptop's* nine `sign-kk` pairs. `sign-aa` on ubuntu says there is no arm offset **on
+   ubuntu**, where the allocator, alignment, scheduler and a 23× tighter distribution are all
+   different. Only the local `sign-aa`, at ±10 µs, tests the hypothesis on the machine where the
+   pattern was observed. That is the session's unique payload, and no faster machine substitutes
+   for it.
+2. **It is the like-for-like successor to v3b.** Same machine, same build, same rules, 17× the
+   samples. Comparability across a series is worth something, and it is the only way to say
+   whether v3b's readings were power-limited or environment-limited.
+
+Aborting a pre-registered session on a preliminary that does not bear on its own validity is also
+the habit that pre-registration exists to prevent — the discretion is easy to justify each time
+and corrosive in aggregate. The correct response to §4 is that **the session after this one moves
+machines**, not that this one is discarded halfway.
+
 ---
 
 *Provenance: GitHub Actions run 32184522617, job `falcon-ct evidence session (observation, never
