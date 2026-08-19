@@ -50,7 +50,12 @@ const READING_GUIDE: &str = "v3. Primary: raw Welch |t| >= 4.5 => FAIL (a LOCATI
     only if >= 2 of 3 pairs SHAPE; else PASS. INCONCLUSIVE = a control or the null misbehaved, \
     or too few samples; never PASS. Descriptive stats (dmean, CI, p) are NOT decision criteria. \
     Gated: sign-kk (combined) and sign-rr. Screening/informational: sign-key, sign-msg, \
-    verify-ctrl, keygen. POWER (v3.1): each experiment reports se_ns and mde80_ns/mde90_ns = \
+    verify-ctrl, keygen, and sign-aa. CONTROL (v3.1): sign-aa signs with the SAME keypair in both \
+    arms, laid out exactly as a sign-kk pair, so its true difference is zero by construction and \
+    any signal is harness/layout/environment, never a key effect. Only a PASS on sign-aa lets the \
+    key verdicts be read — FAIL, SHAPE or INCONCLUSIVE there forces every key verdict to \
+    INCONCLUSIVE (see controls.aa_verdict / controls.aa_ok). It can only downgrade, never lift. \
+    Read its dmean and CI whatever its verdict: its gate fires only at |t| >= 4.5. POWER (v3.1): each experiment reports se_ns and mde80_ns/mde90_ns = \
     (4.5 + z_power) * SE — the smallest true mean difference it would have flagged at that \
     probability. A PASS therefore reads 'nothing at or above mde90_ns was detected', NOT 'the \
     means are equal' and NOT 'no leak exists'; smaller effects keep a smaller, non-zero \
@@ -115,8 +120,10 @@ struct Controls {
     /// flat PASSED and leaky FAILED — the precondition for any Falcon verdict.
     #[serde(rename = "controls_ok")]
     ok: bool,
-    /// v2: the crop statistics of the N flat-control null sessions (the empirical null), or
-    /// empty if a null session itself failed the raw statistic (environment too noisy).
+    /// The crop statistics of the N null sessions — the empirical null — or empty if a null
+    /// session failed the raw statistic (environment too noisy). v3 replaced v2's synthetic flat
+    /// loop with N pool-vs-pool sessions of the REAL signing operation; the flat loop survives
+    /// only as an informational control.
     null_sessions: usize,
     null_crop_stats: Vec<f64>,
     null_ok: bool,
@@ -132,6 +139,19 @@ struct Controls {
     /// the session auditable. Serialising them costs nothing in the timed region — it happens
     /// after the last measurement.
     null_detail: Vec<ExperimentResult>,
+    /// v3.1 A/A layout control (§2a): its verdict, and whether it let the session speak.
+    ///
+    /// `None` until the control has run — the `Controls` block is built before the experiments.
+    /// Written here because the downgrade was otherwise **invisible in the artifact**: the gate is
+    /// applied through a local `flat_for_rule` inside `falcon_experiments`, so a failed A/A
+    /// control left `controls_ok: true` and `flat: PASS` in `report.json` while every key verdict
+    /// read INCONCLUSIVE, with the `sign-aa` row as the only trace of why. A reader checking the
+    /// controls block alone would have found the downgrade unexplained.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    aa_verdict: Option<Verdict>,
+    /// `false` when the A/A control forced every key verdict to INCONCLUSIVE.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    aa_ok: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -608,8 +628,10 @@ fn falcon_experiments(
         let raw = run_sign_kk(f, pair, samples, bits);
         push(
             id,
-            "sign_compressed: fixed message M0; fixed key K_a vs fixed key K_b — the per-key \
-             timing fingerprint measured directly (v2 primary design)",
+            "sign_compressed: fixed key K_a vs fixed key K_b, with four fixed messages rotated \
+             in the SAME order for both classes (v3 §2), so the comparison is key-only and \
+             message-balanced. Gated. This describes the design, not a finding: a per-key timing \
+             difference is what the experiment tests for, never what it presupposes.",
             true,
             raw,
         );
@@ -873,6 +895,9 @@ fn null_and_controls(
             null_ok,
             affinity_pinned: false,
             null_detail: null_results,
+            // Filled in after `run_aa_control`; the block is built before the experiments run.
+            aa_verdict: None,
+            aa_ok: None,
         },
         flat_raw,
         leaky_raw,
@@ -900,11 +925,17 @@ fn main() -> Result<()> {
         opts.out.display()
     ));
 
-    let (controls, flat_raw, leaky_raw) = null_and_controls(&opts, &mut rng, &mut bits, &log);
+    let (mut controls, flat_raw, leaky_raw) = null_and_controls(&opts, &mut rng, &mut bits, &log);
 
     // ── Falcon ─────────────────────────────────────────────────────────────────────────────
     let (experiments, mut raws) =
         falcon_experiments(&fixtures, opts.samples, &mut bits, &controls, &log);
+    // Record what the A/A control did IN THE ARTIFACT, not only on the console. Without this the
+    // controls block reads `controls_ok: true` while every key verdict is INCONCLUSIVE.
+    if let Some(aa) = experiments.iter().find(|j| j.result.id == "sign-aa") {
+        controls.aa_verdict = Some(aa.verdict);
+        controls.aa_ok = Some(aa.verdict == Verdict::Pass);
+    }
     let mut all_raws = vec![
         ("control-flat".to_owned(), flat_raw),
         ("control-leaky".to_owned(), leaky_raw),
