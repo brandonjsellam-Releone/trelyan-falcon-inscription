@@ -30,6 +30,21 @@ gate. The fix is structural: **match each reference to the class structure of wh
 crops, SHAPE rule (crop exceeds *every* reference session), `sign-kk` ≥ 2-of-3 combination,
 session = worst of `kk_combined` and `sign-rr`, A/A downgrade-only gate, INCONCLUSIVE never PASS.
 
+### `ss` makes the gate EASIER to clear, and therefore may not issue a verdict
+
+Corrected after the full-team review of the implementation (2026-08-19). An earlier claim — in
+`METHODOLOGY-v4-DRAFT.md` and in my own commit messages — said v4 "makes sessions harder to pass,
+never easier". **That is true of the SHAPE arm and false of the gate.** A narrower null trips the
+fixed `|t| < 4.5` line *less* often, so `ss` lets sessions through that `rr` would have voided —
+which is exactly the intended correction (they were being voided for arithmetic reasons), but it
+is still a liberalisation, and it arrives *before* §2a's compensating matched references exist.
+
+So, mechanically enforced in the harness rather than promised here: **a session run with
+`--null-design ss` cannot issue a Falcon verdict.** Every experiment is marked ungated,
+`session_verdict` is INCONCLUSIVE, and `report.json` carries `validation_only: true`. The only
+reading is `controls.null_raw_t_sd`. This restriction lifts when §2a is implemented and
+pre-registered in v4.1 — not before.
+
 **`sign-rr` is no longer held to a fixed threshold on the crop arm** — under v3 it was judged
 against a null with its own construction, which made that coherent; under v4 it is judged against
 `null-rr` empirically, which is the same thing stated honestly. Its *raw* statistic is still held
@@ -54,6 +69,11 @@ threshold. That decision is deferred, written down, and will be made before any 
   | ≤ 1.25 | `null-ss` behaves as a true null at this scale → proceed to a verdict session design |
   | 1.25 – 1.60 | partial: the dominant term is removed but residual dependence is material → v4.1 must add a null-referenced raw threshold before any verdict session |
   | > 1.60 | the same-pool construction does **not** remove the inflation → the mechanism in §0 is wrong or incomplete; **stop and re-derive** before spending another hour |
+  | **undefined** (fewer than two usable sessions) | **not a reading at all, and specifically NOT the "proceed" band.** The harness reports `null_raw_t_sd: null` rather than `0.0`, because a false zero would land this decision in its proceed band on no data |
+
+  **These lines are applied by a human, not by the harness** — `report.json` says so in
+  `controls.null_raw_t_sd_gate`, so a `null_ok: true` can never be mistaken for "§2 was
+  satisfied". The mechanical protection is `validation_only` above, not this table.
 
   (1.742 is v3.1's value under `rr`; the χ² 95 % band for an sd estimated from 20 values is
   roughly ×0.76–×1.46, so these lines are deliberately coarse.)
