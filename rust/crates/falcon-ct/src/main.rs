@@ -189,6 +189,18 @@ struct Controls {
     /// `false` when the A/A control forced every key verdict to INCONCLUSIVE.
     #[serde(skip_serializing_if = "Option::is_none")]
     aa_ok: Option<bool>,
+    /// v4.1 §2: the `null-rr` reference bank for `sign-rr` (full judged summaries), present
+    /// only under `--null-design ss`. Raw samples ARE written (`raw-null-rr-ref-<k>.csv`).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    rr_detail: Vec<ExperimentResult>,
+    /// S4 (review): the REQUESTED bank sizes, so the artifact shows the operator's choice next
+    /// to what completed. Banks are all-or-nothing, so a mismatch cannot occur silently — but
+    /// the exchangeable rank floor is 1/(N+1), which makes N itself part of the decision rule,
+    /// and it must be readable from the artifact.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    aa_repeats_requested: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rr_sessions_requested: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -199,6 +211,12 @@ struct Judged {
     verdict: Verdict,
     /// Whether this experiment participates in the session verdict (keygen and verify do not).
     gated: bool,
+    /// `sign-rr` only, `--null-design ss` only: the v4.1 §2 three-state raw reading
+    /// (`clears` / `inconclusive_pool_offset` / `fail_beyond_reference`) against the matched
+    /// `null-rr` bank. **Reported, not enforced** in this increment — `ss` sessions are
+    /// validation-only and issue no verdicts, and under `rr` the v3 rule stands untouched.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rr_raw_state: Option<&'static str>,
 }
 
 /// Which construction plays the **environment gate** null (METHODOLOGY-v4 §1).
@@ -359,15 +377,73 @@ fn check_v4_options(o: &Opts) -> Result<()> {
              rules) they would be silently ignored, which is worse than an error"
         ));
     }
-    if o.aa_repeats.is_some_and(|n| n != 1) || o.rr_sessions.is_some() {
+    // S2 (review): the gating A/A control is a CONDITIONED draw and is excluded from the
+    // sign-kk bank, so the bank is exactly the repeats — and a one-member reference bank is a
+    // rank test against a single value. ss therefore requires an explicit bank size of >= 2.
+    if o.null_design == NullDesign::Ss && o.aa_repeats.is_none_or(|n| n < 2) {
         return Err(anyhow!(
-            "--aa-repeats / --rr-sessions are accepted by the parser but NOT yet implemented: the \
-             v4 §2a matched crop references (repeated sign-aa for sign-kk, null-rr for sign-rr) \
-             are the next increment. Refusing rather than running one A/A session while you \
-             believe twenty ran. Use --null-design ss on its own to exercise the v4 gate null."
+            "--null-design ss requires --aa-repeats N with N >= 2: the sign-kk crop reference \
+             bank is built from the repeats ONLY (the gating control is a conditioned draw and \
+             is excluded), and a bank needs at least two unconditioned members. The v4 \
+             validation session uses --aa-repeats 20 (METHODOLOGY-v4 §2)."
         ));
     }
     Ok(())
+}
+
+/// The crop-reference banks each experiment family is judged against (METHODOLOGY-v4.1 §2a:
+/// **match each reference to the class structure of what it judges**).
+///
+/// Under `rr` (v3, the default) every family points at the gate null — byte-identical judging to
+/// v3, which a test asserts. Under `ss`: `sign-kk-*` is judged against the repeated-`sign-aa`
+/// bank (point-mass A/A, true zero), `sign-rr` against the `null-rr` bank (its own
+/// construction), and screening/informational lines against the gate null, as before.
+struct CropRefs {
+    /// The environment-gate null's crop statistics (v3: `null-rr`; v4: `null-ss`).
+    gate: Vec<f64>,
+    /// `sign-kk-*` crop reference. == `gate` under `rr`.
+    kk: Vec<f64>,
+    /// `sign-rr` crop reference. == `gate` under `rr`.
+    rr_crop: Vec<f64>,
+    /// `sign-rr` RAW reference bank (|t| of each `null-rr` reference session), for the v4.1 §2
+    /// three-state raw rule. `None` under `rr`, where the fixed 4.5 rule stands alone.
+    rr_raw: Option<Vec<f64>>,
+}
+
+/// v4.1 §2: the three-state raw reading for `sign-rr` under the matched-reference design.
+///
+/// A fixed 4.5 threshold is invalid for `sign-rr` — random finite-pool offsets are part of its
+/// null and grow with the sample count — so the raw statistic is read against the matched
+/// `null-rr` bank. **The middle state is the point**: a value beyond 4.5 but inside the
+/// reference bank's range may not PASS (nothing that failed the old rule may pass the new one)
+/// and may not FAIL (the reference says pool offsets alone reach there). Strict `>` against
+/// every reference; ties do not fire, same as the crop rule.
+///
+/// In this increment the state is **reported, not enforced**: `ss` sessions are validation-only
+/// and issue no verdicts, and under `rr` the v3 rule stands untouched. Pure so it can be tested
+/// against its truth table without timing anything.
+fn rr_raw_state(raw_abs_t: f64, reference_raw: &[f64]) -> &'static str {
+    // A statistic that is not a number, or a bank with no members, supports NO statement about
+    // references. The review caught the earlier version labelling |t| ≥ 4.5 against an EMPTY
+    // bank as `fail_beyond_reference` — asserting "beyond every reference" with zero references
+    // — and NaN would have fallen into the same arm because every IEEE comparison on it is
+    // false. Banks are all-or-nothing upstream, so these states indicate a harness fault, and
+    // they must read as one.
+    if raw_abs_t.is_nan() {
+        return "invalid_statistic";
+    }
+    if reference_raw.is_empty() {
+        return "no_reference_bank";
+    }
+    if raw_abs_t < falcon_ct::T_THRESHOLD {
+        "clears"
+    } else if reference_raw.iter().any(|&r| raw_abs_t <= r) {
+        // Beyond the fixed line, but not beyond every matched reference: a pool offset of this
+        // size occurs under the no-leak null. Cannot PASS; cannot FAIL.
+        "inconclusive_pool_offset"
+    } else {
+        "fail_beyond_reference"
+    }
 }
 
 /// A class-bit source over the audited SHAKE PRNG: one byte per bit, no buffering games.
@@ -563,7 +639,20 @@ fn run_sign_kk(f: &Fixtures, pair: usize, samples: usize, bits: &mut ClassBits) 
 /// A FAIL here means the harness distinguishes its own arms and no key verdict in the session
 /// may be believed (it can only downgrade a verdict, never lift one).
 fn run_sign_aa(f: &Fixtures, samples: usize, bits: &mut ClassBits) -> RawSamples {
-    let (ka, kb) = &f.aa;
+    run_sign_aa_pair(&f.aa, &f.msgs, samples, bits)
+}
+
+/// One A/A session over an explicit pair — the shared body of the gating control (pair =
+/// `Fixtures::aa`) and the v4.1 §1 repeated-`sign-aa` reference bank (fresh pair per repeat,
+/// each "matched in every respect other than key identity": same tuple layout, same message
+/// rotation, same measurement count).
+fn run_sign_aa_pair(
+    pair: &(Keypair, Keypair),
+    msgs: &[Vec<u8>],
+    samples: usize,
+    bits: &mut ClassBits,
+) -> RawSamples {
+    let (ka, kb) = pair;
     let mut out = [0u8; SIG_COMPRESSED_MAXSIZE];
     let mut i = 0usize;
     measure(
@@ -571,7 +660,7 @@ fn run_sign_aa(f: &Fixtures, samples: usize, bits: &mut ClassBits) -> RawSamples
         || bits.next(),
         |class| {
             let sk = if class { &kb.sk } else { &ka.sk };
-            let m: &[u8] = &f.msgs[i % KK_MESSAGES];
+            let m: &[u8] = &msgs[i % KK_MESSAGES];
             i += 1;
             let _ = std::hint::black_box(sign_compressed(sk, m, &mut out));
         },
@@ -723,6 +812,7 @@ fn run_aa_control(
         Judged {
             verdict,
             gated: false,
+            rr_raw_state: None,
             result: aa,
         },
         raw,
@@ -730,65 +820,185 @@ fn run_aa_control(
     )
 }
 
-/// The Falcon experiments in METHODOLOGY-v2 §2 order, each judged (v2) against the controls
-/// and the empirical null.
-fn falcon_experiments(
-    f: &Fixtures,
-    samples: usize,
-    bits: &mut ClassBits,
-    controls: &Controls,
+/// Run exactly `n` sessions through `run` — **all or nothing**.
+///
+/// A failed session PROPAGATES as the error, naming the tag and index; it never yields a short
+/// bank. The review of this increment found the truncating version relabelled "could not
+/// collect references" as statistical evidence: an empty raw bank made `rr_raw_state` say
+/// `fail_beyond_reference` — *beyond every reference* — when there were no references at all.
+/// A reference bank either exists at its pre-registered size or the run stops.
+///
+/// The counting seam is also deliberate: a reviewer of the previous increment required a test
+/// proving that `--aa-repeats N` / `--rr-sessions N` change EXECUTION, not just parsing — this
+/// function is where that is provable without timing anything.
+fn collect_sessions<F>(
+    n: usize,
+    tag: &str,
     log: &dyn Fn(&str),
-) -> (Vec<Judged>, Vec<(String, RawSamples)>) {
-    type Runner = fn(&Fixtures, usize, &mut ClassBits) -> RawSamples;
-    let mut judged = Vec::new();
-    let mut raws = Vec::new();
-
-    // v3.1 A/A layout control, before anything else is judged (see `run_aa_control`).
-    let (aa_judged, aa_raw, flat_for_rule) = run_aa_control(f, samples, bits, controls, log);
-    judged.push(aa_judged);
-    raws.push(("sign-aa".to_owned(), aa_raw));
-
-    let mut push = |id: String, description: &str, gated: bool, raw: RawSamples| {
-        let r = judge_v2(&id, description, &raw, &controls.null_crop_stats);
-        judged.push(Judged {
-            verdict: apply_controls(
-                r.isolated_verdict,
-                flat_for_rule,
-                controls.leaky.isolated_verdict,
-            ),
-            gated,
-            result: r,
-        });
-        raws.push((id, raw));
-    };
-
-    // ── gated (v2 §2): sign-kk × KK_PAIRS, then sign-rr ────────────────────────────────────
-    for pair in 0..KK_PAIRS {
-        let id = format!("sign-kk-{pair}");
-        log(&format!("running {id} (gated) …"));
-        let raw = run_sign_kk(f, pair, samples, bits);
-        push(
-            id,
-            "sign_compressed: fixed key K_a vs fixed key K_b, with four fixed messages rotated \
-             in the SAME order for both classes (v3 §2), so the comparison is key-only and \
-             message-balanced. Gated. This describes the design, not a finding: a per-key timing \
-             difference is what the experiment tests for, never what it presupposes.",
-            true,
-            raw,
-        );
+    mut run: F,
+) -> Result<Vec<RawSamples>>
+where
+    F: FnMut(usize) -> Result<RawSamples>,
+{
+    let mut out = Vec::with_capacity(n);
+    for k in 0..n {
+        match run(k) {
+            Ok(raw) => out.push(raw),
+            Err(e) => {
+                log(&format!("{tag} session {k} could not run: {e}"));
+                return Err(e.context(format!(
+                    "{tag} reference session {k} of {n} failed; a reference bank is \
+                     all-or-nothing (a short bank silently changes the empirical rule)"
+                )));
+            }
+        }
     }
-    log("running sign-rr (gated) …");
-    let raw = run_sign_rr(f, samples, bits);
-    push(
-        "sign-rr".to_owned(),
-        "sign_compressed: fixed message M0; key from pool A vs key from pool B — symmetric \
-         mixture control (v2)",
-        true,
-        raw,
-    );
+    Ok(out)
+}
 
-    // ── screening / informational (v1 designs, demoted in v2) ──────────────────────────────
-    let plan: [(&str, &str, bool, Runner); 4] = [
+/// [`CropRefs`] for the default `rr` design: every family points at the gate null, so v3
+/// judging is unchanged. Pure and public-to-tests so the selection identity is asserted on the
+/// PRODUCTION path, not on a hand-built copy (the review caught the earlier test doing that).
+fn refs_for_rr(gate_crops: &[f64]) -> CropRefs {
+    CropRefs {
+        gate: gate_crops.to_vec(),
+        kk: gate_crops.to_vec(),
+        rr_crop: gate_crops.to_vec(),
+        rr_raw: None,
+    }
+}
+
+/// Build the v4.1 §2a reference banks and the [`CropRefs`] the experiments are judged against.
+///
+/// Under `rr` this runs NOTHING new — [`refs_for_rr`]. Under `ss` it runs the `sign-aa`
+/// reference repeats and the `null-rr` reference sessions, **all-or-nothing** each
+/// ([`collect_sessions`]): a failed reference session stops the run rather than shrinking a
+/// bank.
+///
+/// **The gating A/A control is NOT a bank member.** The review's statistical finding: sessions
+/// that get to use the bank are exactly those whose control passed the gate, so the control's
+/// crop statistic is a *conditioned* draw — including it makes the reference anti-conservative.
+/// The `sign-kk` bank is therefore built only from the unconditioned repeats, and `ss` requires
+/// `--aa-repeats ≥ 2` (enforced in `check_v4_options`) so the bank never has fewer than two
+/// members.
+///
+/// Raw retention is symmetric on the diff's own terms now: BOTH banks' raw samples are written
+/// as CSVs (`raw-sign-aa-<k>.csv`, `raw-null-rr-ref-<k>.csv`) — they are the references the new
+/// fields are judged against, and they are small at validation scale.
+fn build_reference_banks(
+    f: &Fixtures,
+    opts: &Opts,
+    rng: &mut Shake256Context,
+    bits: &mut ClassBits,
+    gate_crops: &[f64],
+    log: &dyn Fn(&str),
+) -> Result<ReferenceBanks> {
+    if opts.null_design == NullDesign::Rr {
+        return Ok(ReferenceBanks {
+            refs: refs_for_rr(gate_crops),
+            aa_extra: Vec::new(),
+            bank_raws: Vec::new(),
+            rr_detail: Vec::new(),
+        });
+    }
+    // A/A reference bank: `check_v4_options` guarantees Some(n >= 2) under ss. Fresh keypair
+    // per repeat; the ids start at 1 because sign-aa (unnumbered) is the gate control.
+    let repeats = opts
+        .aa_repeats
+        .ok_or_else(|| anyhow!("--null-design ss requires --aa-repeats (checked at parse)"))?;
+    log(&format!(
+        "running {repeats} sign-aa reference repeats (v4.1 §1 crop reference bank for sign-kk) …"
+    ));
+    let aa_session_raws = collect_sessions(repeats, "sign-aa-ref", log, |_| {
+        let pair_key = gen_keypair(rng)?;
+        let pair = (pair_key.clone(), pair_key);
+        Ok(run_sign_aa_pair(&pair, &f.msgs, opts.samples, bits))
+    })?;
+    let mut bank_raws = Vec::new();
+    let mut aa_judged = Vec::new();
+    for (i, raw) in aa_session_raws.into_iter().enumerate() {
+        let k = i + 1;
+        let r = judge_v2(
+            &format!("sign-aa-{k}"),
+            "v4.1 §1 A/A reference repeat: a FRESH keypair cloned into both arms, matched to \
+             sign-kk in everything but key identity. Unconditioned reference bank member — \
+             informational, never gated, and NOT the gating control (whose statistic is a \
+             conditioned draw and is excluded from the bank).",
+            &raw,
+            gate_crops,
+        );
+        log(&format!(
+            "  sign-aa-{k}: raw t={:+.2} crop={:.2}",
+            r.raw_t, r.crop_max_abs_t
+        ));
+        bank_raws.push((format!("sign-aa-{k}"), raw));
+        aa_judged.push(r);
+    }
+    let aa_bank: Vec<f64> = aa_judged.iter().map(|r| r.crop_max_abs_t).collect();
+    // null-rr reference bank for sign-rr (raw + crop, one bank for both — v4.1 §2).
+    let rr_n = opts.rr_sessions.unwrap_or(opts.null_sessions);
+    log(&format!(
+        "running {rr_n} null-rr reference sessions (v4.1 §2 raw+crop reference for sign-rr) …"
+    ));
+    let rr_session_raws = collect_sessions(rr_n, "null-rr-ref", log, |_| {
+        run_null_rr(rng, opts.samples, bits)
+    })?;
+    let mut rr_detail = Vec::new();
+    for (k, raw) in rr_session_raws.into_iter().enumerate() {
+        let r = judge(
+            &format!("null-rr-ref-{k}"),
+            "sign_compressed: fresh pool A vs fresh pool B — sign-rr's matched reference \
+             (v4.1 §2); used empirically, never against a fixed threshold",
+            &raw,
+        );
+        log(&format!(
+            "  null-rr-ref-{k}: raw t={:+.2} crop={:.2}",
+            r.raw_t, r.crop_max_abs_t
+        ));
+        bank_raws.push((format!("null-rr-ref-{k}"), raw));
+        rr_detail.push(r);
+    }
+    let refs = CropRefs {
+        gate: gate_crops.to_vec(),
+        kk: aa_bank,
+        rr_crop: rr_detail.iter().map(|r| r.crop_max_abs_t).collect(),
+        rr_raw: Some(rr_detail.iter().map(|r| r.raw_t.abs()).collect()),
+    };
+    Ok(ReferenceBanks {
+        refs,
+        aa_extra: aa_judged,
+        bank_raws,
+        rr_detail,
+    })
+}
+
+/// Everything [`build_reference_banks`] produces, named so the signatures stay legible.
+struct ReferenceBanks {
+    refs: CropRefs,
+    /// The judged A/A reference repeats (informational rows; the gating control is separate and
+    /// NOT among them).
+    aa_extra: Vec<ExperimentResult>,
+    /// BOTH banks' raw samples, written as `raw-sign-aa-<k>.csv` / `raw-null-rr-ref-<k>.csv` —
+    /// they are the references the new fields are judged against.
+    bank_raws: Vec<(String, RawSamples)>,
+    /// The `null-rr` reference summaries, destined for `controls.rr_detail`.
+    rr_detail: Vec<ExperimentResult>,
+}
+
+/// What [`falcon_experiments`] hands back to `main`.
+struct ExperimentsOutput {
+    judged: Vec<Judged>,
+    raws: Vec<(String, RawSamples)>,
+    rr_detail: Vec<ExperimentResult>,
+}
+
+/// A screening/informational experiment runner.
+type Runner = fn(&Fixtures, usize, &mut ClassBits) -> RawSamples;
+
+/// The screening / informational lines (v1 designs, demoted in v2) — data, not control flow.
+/// They keep the GATE null as their crop reference under both designs (v4.1 §3 reuse rule 3).
+const fn screening_plan() -> [(&'static str, &'static str, bool, Runner); 4] {
+    [
         (
             "sign-key",
             "sign_compressed: fixed message; fixed key K0 vs key drawn from a pool of 32 — v1 \
@@ -817,16 +1027,108 @@ fn falcon_experiments(
             false,
             run_keygen,
         ),
-    ];
-    for (id, description, gated, run) in plan {
+    ]
+}
+
+/// The Falcon experiments in METHODOLOGY-v2 §2 order, each judged (v2) against its matched
+/// reference bank (METHODOLOGY-v4.1 §2a; under the default `rr` every bank IS the gate null,
+/// so v3 judging is unchanged).
+fn falcon_experiments(
+    f: &Fixtures,
+    opts: &Opts,
+    rng: &mut Shake256Context,
+    bits: &mut ClassBits,
+    controls: &Controls,
+    log: &dyn Fn(&str),
+) -> Result<ExperimentsOutput> {
+    let samples = opts.samples;
+    let mut judged = Vec::new();
+    let mut raws = Vec::new();
+
+    // v3.1 A/A layout control, before anything else is judged (see `run_aa_control`).
+    let (aa_judged, aa_raw, flat_for_rule) = run_aa_control(f, samples, bits, controls, log);
+    judged.push(aa_judged);
+    raws.push(("sign-aa".to_owned(), aa_raw));
+
+    // v4.1 §2a reference banks (no-ops under rr).
+    let mut banks = build_reference_banks(f, opts, rng, bits, &controls.null_crop_stats, log)?;
+    let refs = banks.refs;
+    for r in banks.aa_extra {
+        judged.push(Judged {
+            verdict: r.isolated_verdict,
+            gated: false,
+            rr_raw_state: None,
+            result: r,
+        });
+    }
+    raws.append(&mut banks.bank_raws);
+
+    let mut push = |id: String, description: &str, gated: bool, raw: RawSamples, bank: &[f64]| {
+        let r = judge_v2(&id, description, &raw, bank);
+        let rr_state = if id == "sign-rr" {
+            refs.rr_raw
+                .as_deref()
+                .map(|bank| rr_raw_state(r.raw_t.abs(), bank))
+        } else {
+            None
+        };
+        judged.push(Judged {
+            verdict: apply_controls(
+                r.isolated_verdict,
+                flat_for_rule,
+                controls.leaky.isolated_verdict,
+            ),
+            gated,
+            rr_raw_state: rr_state,
+            result: r,
+        });
+        raws.push((id, raw));
+    };
+
+    // ── gated (v2 §2): sign-kk × KK_PAIRS, then sign-rr ────────────────────────────────────
+    for pair in 0..KK_PAIRS {
+        let id = format!("sign-kk-{pair}");
+        log(&format!("running {id} (gated) …"));
+        let raw = run_sign_kk(f, pair, samples, bits);
+        push(
+            id,
+            "sign_compressed: fixed key K_a vs fixed key K_b, with four fixed messages rotated \
+             in the SAME order for both classes (v3 §2), so the comparison is key-only and \
+             message-balanced. Gated. This describes the design, not a finding: a per-key timing \
+             difference is what the experiment tests for, never what it presupposes.",
+            true,
+            raw,
+            &refs.kk,
+        );
+    }
+    log("running sign-rr (gated) …");
+    let raw = run_sign_rr(f, samples, bits);
+    push(
+        "sign-rr".to_owned(),
+        "sign_compressed: fixed message M0; key from pool A vs key from pool B — symmetric \
+         mixture control (v2). Under --null-design ss its crop AND raw statistics are read \
+         against the matched null-rr reference bank (v4.1 §2); see rr_raw_state.",
+        true,
+        raw,
+        &refs.rr_crop,
+    );
+
+    // ── screening / informational (v1 designs, demoted in v2) ──────────────────────────────
+    for (id, description, gated, run) in screening_plan() {
         log(&format!(
             "running {id}{} …",
             if gated { "" } else { " (informational)" }
         ));
         let raw = run(f, samples, bits);
-        push(id.to_owned(), description, gated, raw);
+        // Screening and informational lines keep the GATE null as their crop reference under
+        // both designs (v4.1 §3 reuse rule 3).
+        push(id.to_owned(), description, gated, raw, &refs.gate);
     }
-    (judged, raws)
+    Ok(ExperimentsOutput {
+        judged,
+        raws,
+        rr_detail: banks.rr_detail,
+    })
 }
 
 fn write_outputs(opts: &Opts, report: &Report, raws: &[(String, RawSamples)]) -> Result<()> {
@@ -1220,6 +1522,11 @@ fn null_and_controls(
             // Filled in after `run_aa_control`; the block is built before the experiments run.
             aa_verdict: None,
             aa_ok: None,
+            rr_detail: Vec::new(),
+            aa_repeats_requested: opts.aa_repeats,
+            rr_sessions_requested: opts
+                .rr_sessions
+                .or_else(|| (opts.null_design == NullDesign::Ss).then_some(opts.null_sessions)),
         },
         flat_raw,
         leaky_raw,
@@ -1250,8 +1557,9 @@ fn main() -> Result<()> {
     let (mut controls, flat_raw, leaky_raw) = null_and_controls(&opts, &mut rng, &mut bits, &log);
 
     // ── Falcon ─────────────────────────────────────────────────────────────────────────────
-    let (mut experiments, mut raws) =
-        falcon_experiments(&fixtures, opts.samples, &mut bits, &controls, &log);
+    let out = falcon_experiments(&fixtures, &opts, &mut rng, &mut bits, &controls, &log)?;
+    let (mut experiments, mut raws) = (out.judged, out.raws);
+    controls.rr_detail = out.rr_detail;
     // Record what the A/A control did IN THE ARTIFACT, not only on the console. Without this the
     // controls block reads `controls_ok: true` while every key verdict is INCONCLUSIVE.
     if let Some(aa) = experiments.iter().find(|j| j.result.id == "sign-aa") {
@@ -1323,7 +1631,9 @@ fn main() -> Result<()> {
         // Additive and `#[serde(default)]`, so a schema-3 reader still parses these reports; the
         // bump is how a reader tells "this session published its resolution" from one that could
         // not. Decision rules are unchanged from v3.
-        schema_version: 5,
+        // 6: v4.1 §2a matched reference banks — sign-aa-<k> repeat rows, controls.rr_detail and
+        //    rr_raw_state on sign-rr (all additive; absent under the default rr design).
+        schema_version: 6,
         samples_per_experiment: opts.samples,
         key_pool: KEY_POOL,
         message_len: MSG_LEN,
@@ -1417,7 +1727,11 @@ mod v4_tests {
 
     use trelyan_pq_ffi::prng_from_seed;
 
-    use super::{KEY_POOL, index_pairs_differ_fraction, null_ss_index_pairs, sample_sd};
+    use super::{
+        KEY_POOL, NullDesign, Opts, index_pairs_differ_fraction, null_ss_index_pairs, rr_raw_state,
+        sample_sd,
+    };
+    use falcon_ct::RawSamples;
 
     /// THE TRAP THE v4 NULL MUST AVOID. If both arms of a `null-ss` session drew the same index,
     /// every measurement pair would sign with the same key, the 32-key mixture would collapse to
@@ -1483,6 +1797,128 @@ mod v4_tests {
             empty, 0,
             "{empty} of {cells} (a,b) combinations never occurred — the arms are coupled"
         );
+    }
+
+    /// v4.1 §2 truth table for the sign-rr three-state raw reading. The middle state is the
+    /// design's point: beyond the fixed line but inside the matched reference's range may
+    /// neither PASS nor FAIL.
+    #[test]
+    fn rr_raw_state_truth_table() {
+        let bank = [1.2, 3.7, 5.1, 2.0];
+        // Below the fixed 4.5 line: clears, whatever the bank says.
+        assert_eq!(rr_raw_state(0.4, &bank), "clears");
+        assert_eq!(rr_raw_state(4.4999, &bank), "clears");
+        // Beyond 4.5 but not beyond every reference (5.1 >= 4.8): pool offsets reach here
+        // under the no-leak null — cannot PASS, cannot FAIL.
+        assert_eq!(rr_raw_state(4.8, &bank), "inconclusive_pool_offset");
+        // A TIE with the bank maximum does not fire — strict >, same as the crop rule.
+        assert_eq!(rr_raw_state(5.1, &bank), "inconclusive_pool_offset");
+        // Beyond the fixed line AND beyond every reference.
+        assert_eq!(rr_raw_state(5.100_000_1, &bank), "fail_beyond_reference");
+        assert_eq!(rr_raw_state(20.0, &bank), "fail_beyond_reference");
+        // REVIEW S1: an empty bank supports NO statement about references — the earlier
+        // version returned fail_beyond_reference here ("beyond every reference", with zero
+        // references), and the review correctly called that a relabelled collection failure.
+        // Banks are all-or-nothing upstream, so these are harness-fault states.
+        assert_eq!(rr_raw_state(4.6, &[]), "no_reference_bank");
+        assert_eq!(rr_raw_state(0.5, &[]), "no_reference_bank");
+        // NaN compares false with everything under IEEE, which previously dropped it into the
+        // fail arm. A statistic that is not a number is not a failure beyond references.
+        assert_eq!(rr_raw_state(f64::NAN, &bank), "invalid_statistic");
+        assert_eq!(rr_raw_state(f64::NAN, &[]), "invalid_statistic");
+    }
+
+    /// The reviewer requirement from increment 1: bank COUNTS must provably change execution,
+    /// not just parse. `collect_sessions` is the seam every bank runs through; this proves the
+    /// requested count is the executed count — and (REVIEW S1) that a failing session
+    /// PROPAGATES as an error rather than yielding a short bank, because a short bank silently
+    /// changes the empirical rule.
+    #[test]
+    fn bank_counts_drive_execution_and_failures_propagate() {
+        let log = |_: &str| {};
+        let mut calls = 0usize;
+        let out = super::collect_sessions(7, "t", &log, |_k| {
+            calls += 1;
+            Ok(RawSamples {
+                samples: vec![(0u8, 1u64), (1u8, 2u64)],
+            })
+        })
+        .expect("all sessions succeed");
+        assert_eq!(
+            calls, 7,
+            "7 requested sessions must mean 7 executed sessions"
+        );
+        assert_eq!(out.len(), 7);
+
+        let mut calls2 = 0usize;
+        let err = super::collect_sessions(10, "t", &log, |k| {
+            calls2 += 1;
+            if k == 3 {
+                Err(anyhow::anyhow!("boom"))
+            } else {
+                Ok(RawSamples {
+                    samples: vec![(0u8, 1u64)],
+                })
+            }
+        })
+        .expect_err("a failed reference session must be an error, never a short bank");
+        assert_eq!(calls2, 4, "collection stops AT the failure");
+        assert!(
+            err.to_string().contains("all-or-nothing"),
+            "the error names the rule: {err}"
+        );
+    }
+
+    /// Under the default `rr` design the reference banks are all the gate null and no raw bank
+    /// exists — v3 judging unchanged. REVIEW S3: this now pins the PRODUCTION selection
+    /// function (`refs_for_rr`, the exact value `build_reference_banks` returns under rr),
+    /// not a hand-built copy of it.
+    #[test]
+    fn rr_design_banks_are_all_the_gate_null() {
+        let gate = vec![1.0, 2.5, 3.75];
+        let refs = super::refs_for_rr(&gate);
+        assert_eq!(refs.gate, gate);
+        assert_eq!(
+            refs.kk, gate,
+            "sign-kk judged against the gate null under rr"
+        );
+        assert_eq!(
+            refs.rr_crop, gate,
+            "sign-rr crop judged against the gate null under rr"
+        );
+        assert!(
+            refs.rr_raw.is_none(),
+            "no raw bank under rr: the fixed 4.5 rule stands alone and rr_raw_state is never computed"
+        );
+    }
+
+    /// REVIEW ("not established"): the CLI guards, asserted in prose, now asserted in tests —
+    /// the whole truth table of `check_v4_options`.
+    #[test]
+    fn v4_option_guards() {
+        use super::check_v4_options as chk;
+        let mk = |design: NullDesign, aa: Option<usize>, rr: Option<usize>| Opts {
+            samples: 4800,
+            out: std::path::PathBuf::from("unused"),
+            json_only: false,
+            null_sessions: 20,
+            null_design: design,
+            aa_repeats: aa,
+            rr_sessions: rr,
+        };
+        // rr: both options refused by PRESENCE, even at default-looking values.
+        assert!(chk(&mk(NullDesign::Rr, None, None)).is_ok());
+        assert!(chk(&mk(NullDesign::Rr, Some(1), None)).is_err());
+        assert!(chk(&mk(NullDesign::Rr, Some(20), None)).is_err());
+        assert!(chk(&mk(NullDesign::Rr, None, Some(20))).is_err());
+        // zero = a reference from no sessions.
+        assert!(chk(&mk(NullDesign::Ss, Some(0), None)).is_err());
+        assert!(chk(&mk(NullDesign::Ss, Some(20), Some(0))).is_err());
+        // ss REQUIRES aa-repeats >= 2 (S2: the bank is the repeats only).
+        assert!(chk(&mk(NullDesign::Ss, None, None)).is_err());
+        assert!(chk(&mk(NullDesign::Ss, Some(1), None)).is_err());
+        assert!(chk(&mk(NullDesign::Ss, Some(2), None)).is_ok());
+        assert!(chk(&mk(NullDesign::Ss, Some(20), Some(20))).is_ok());
     }
 
     /// The v4 validation run reads exactly one number (METHODOLOGY-v4 §2); it must be the SAMPLE
