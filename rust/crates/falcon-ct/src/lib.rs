@@ -559,7 +559,10 @@ pub fn judge_raw_only(id: &str, description: &str, raw: &RawSamples) -> Experime
     let mut r = judge(id, description, raw);
     r.distinguishable = r.raw_t.abs() >= T_THRESHOLD;
     r.crop_empirical_p = None;
-    r.isolated_verdict = if !r.enough_samples {
+    // REVIEW S8 (2026-08-20): NaN compares false with everything, so a degenerate series
+    // (e.g. zero variance in both classes) would fall through `>= T_THRESHOLD` into Pass —
+    // a fail-open. A statistic that is not a finite number supports no verdict.
+    r.isolated_verdict = if !r.enough_samples || !r.raw_t.is_finite() {
         Verdict::Inconclusive
     } else if r.distinguishable {
         Verdict::Fail
@@ -976,11 +979,37 @@ mod tests {
         );
         // Contrast: judged v2-style against a tight real-op bank, the same series would have
         // been dragged into the crop arm — the exact category error the ruling removes.
-        let v2 = judge_v2("control-flat", "x", &flat, &[0.0001]);
-        assert!(
-            v2.crop_empirical_p.is_some(),
-            "sanity: v2 judging runs the crop arm against a bank"
+        // REVIEW S6: the pin must be TWO-SIDED — the same series through the old judging
+        // against a tight multi-element real-op-style bank must be DEMOTED by the crop arm
+        // (the live failure's mechanism), while raw-only Passes it. If someone reverts the
+        // production wiring to judge_v2, this contrast is what goes red.
+        // The bank is built strictly BELOW the series' own crop statistic — a bank drawn
+        // from a different (tighter) DGP, which is precisely how the real-op bank related to
+        // the flat control in the live session.
+        let c = judge("control-flat", "x", &flat).crop_max_abs_t;
+        assert!(c > 0.0, "sanity: the crop statistic exists");
+        let tight_bank = [c * 0.5, c * 0.6, c * 0.7];
+        let v2 = judge_v2("control-flat", "x", &flat, &tight_bank);
+        assert_eq!(
+            v2.isolated_verdict,
+            Verdict::Shape,
+            "the same flat series must be dragged into the crop arm under v2 judging              (crop {} vs a bank strictly below it) — the exact category error the ruling removes",
+            v2.crop_max_abs_t
         );
+
+        // REVIEW S8 follow-up: `welch_t` is TOTAL (degenerate inputs yield a finite value —
+        // pinned by `welch_t_handles_degenerate_inputs_without_nan_or_infinity`), so the
+        // `is_finite` guard in `judge_raw_only` is unreachable through real samples today; it
+        // exists so INCONCLUSIVE-never-PASS survives any future `welch_t` change. What IS
+        // checkable here: a constant series is genuinely flat and must Pass with a finite t.
+        let constant = RawSamples {
+            samples: (0..9600u64)
+                .map(|i| (u8::from(i % 2 == 1), 5_000))
+                .collect(),
+        };
+        let r = judge_raw_only("control-flat", "x", &constant);
+        assert!(r.raw_t.is_finite(), "welch_t is total: {}", r.raw_t);
+        assert_eq!(r.isolated_verdict, Verdict::Pass);
 
         // The leaky control still fails loudly on the raw line alone.
         let leaky = RawSamples {
