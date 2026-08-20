@@ -537,6 +537,38 @@ pub fn judge_v2(
     r
 }
 
+/// **Raw-only judging for SYNTHETIC controls** — the interim ruling of 2026-08-20, from the
+/// six-seat review of the v4.1 validation session (transcript committed beside it).
+///
+/// The defect it corrects: the synthetic flat control was crop-judged against a bank of REAL
+/// signing operations (under `--null-design ss`, the null-ss sessions) and came out "Shape" at
+/// raw t = 2.99, flipping the whole session's controls to NOT OK. A synthetic loop and an 8 ms
+/// signature do not share a crop nuisance distribution — judging one against the other is the
+/// same mismatched-reference error METHODOLOGY-v4.1 exists to prevent, pointed at ourselves.
+///
+/// The rule: a synthetic control's verdict comes from the fixed raw line ONLY.
+/// `|raw t| >= 4.5` ⇒ FAIL (the leaky control must do exactly this); below it ⇒ PASS; too few
+/// samples ⇒ INCONCLUSIVE. The crop statistic remains in the artifact as a descriptive number,
+/// and `crop_empirical_p` is `None` — the crop diagnostic DID NOT RUN, and nothing downstream
+/// may cite it as if it had. Whether a crop-shape validation of the controls returns later —
+/// with its own matched synthetic reference family AND a synthetic-shape positive control with
+/// a numeric fire condition — is an open design choice that belongs to its own
+/// pre-registration, not to this function.
+#[must_use]
+pub fn judge_raw_only(id: &str, description: &str, raw: &RawSamples) -> ExperimentResult {
+    let mut r = judge(id, description, raw);
+    r.distinguishable = r.raw_t.abs() >= T_THRESHOLD;
+    r.crop_empirical_p = None;
+    r.isolated_verdict = if !r.enough_samples {
+        Verdict::Inconclusive
+    } else if r.distinguishable {
+        Verdict::Fail
+    } else {
+        Verdict::Pass
+    };
+    r
+}
+
 // ── runner ─────────────────────────────────────────────────────────────────────────────────
 
 /// Time `op(class)` `total` times with a randomised class per measurement.
@@ -915,6 +947,60 @@ mod tests {
                 flat_res.max_abs_t
             );
         }
+    }
+
+    /// INTERIM RULING 2026-08-20 (six-seat review of the v4.1 validation session): synthetic
+    /// controls are judged on the raw line only. The regression this pins is the live failure:
+    /// a flat operation whose CROP statistic would exceed every member of a real-operation
+    /// bank must still PASS, because the crop diagnostic does not run for synthetic controls.
+    #[test]
+    fn synthetic_controls_are_judged_on_the_raw_line_only() {
+        // A flat series: identical work both classes, raw t ~ 0 — but heavy alternation gives
+        // it a crop profile unlike a real signature (the live session's flat control read
+        // "Shape" against the null-ss bank at raw t = 2.99).
+        let flat = RawSamples {
+            samples: (0..9600u64)
+                .map(|i| (u8::from(i % 2 == 1), 1_000 + (i % 13) * 3))
+                .collect(),
+        };
+        let r = judge_raw_only("control-flat", "x", &flat);
+        assert!(
+            r.raw_t.abs() < T_THRESHOLD,
+            "flat by construction: {}",
+            r.raw_t
+        );
+        assert_eq!(r.isolated_verdict, Verdict::Pass);
+        assert_eq!(
+            r.crop_empirical_p, None,
+            "the crop diagnostic must not have run"
+        );
+        // Contrast: judged v2-style against a tight real-op bank, the same series would have
+        // been dragged into the crop arm — the exact category error the ruling removes.
+        let v2 = judge_v2("control-flat", "x", &flat, &[0.0001]);
+        assert!(
+            v2.crop_empirical_p.is_some(),
+            "sanity: v2 judging runs the crop arm against a bank"
+        );
+
+        // The leaky control still fails loudly on the raw line alone.
+        let leaky = RawSamples {
+            samples: (0..9600u64)
+                .map(|i| {
+                    let class = u8::from(i % 2 == 1);
+                    (class, 1_000 + u64::from(class) * 500 + i % 7)
+                })
+                .collect(),
+        };
+        let r = judge_raw_only("control-leaky", "x", &leaky);
+        assert_eq!(r.isolated_verdict, Verdict::Fail);
+        assert_eq!(r.crop_empirical_p, None);
+
+        // Too few samples: INCONCLUSIVE, never PASS.
+        let short = RawSamples {
+            samples: (0..100u64).map(|i| (u8::from(i % 2 == 1), 1_000)).collect(),
+        };
+        let r = judge_raw_only("control-flat", "x", &short);
+        assert_eq!(r.isolated_verdict, Verdict::Inconclusive);
     }
 
     #[test]

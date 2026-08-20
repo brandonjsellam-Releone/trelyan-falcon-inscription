@@ -26,8 +26,8 @@ use std::{fs, path::PathBuf};
 
 use anyhow::{Context, Result, anyhow};
 use falcon_ct::{
-    ExperimentResult, RawSamples, Verdict, apply_controls, judge, judge_v2, measure,
-    null_from_sessions, to_csv,
+    ExperimentResult, RawSamples, Verdict, apply_controls, judge, judge_raw_only, judge_v2,
+    measure, null_from_sessions, to_csv,
 };
 use serde::Serialize;
 use trelyan_pq_ffi::{
@@ -67,7 +67,12 @@ const READING_GUIDE: &str = "v3. Primary: raw Welch |t| >= 4.5 => FAIL (a LOCATI
     probability. A PASS therefore reads 'nothing at or above mde90_ns was detected', NOT 'the \
     means are equal' and NOT 'no leak exists'; smaller effects keep a smaller, non-zero \
     detection probability. mde is descriptive and decides nothing. Not a proof; machine- and \
-    build-specific.";
+    build-specific. CONTROLS (interim ruling 2026-08-20, from the six-seat review of the v4.1 \
+    validation session): the SYNTHETIC controls (control-flat, control-leaky) are judged on the \
+    raw |t| >= 4.5 line ONLY — their crop diagnostic does not run (crop_empirical_p is null), \
+    because a synthetic loop and the real signing operation do not share a crop null and \
+    judging one against the other is a mismatched reference. Their crop_max_abs_t remains as a \
+    descriptive number that decides nothing.";
 
 #[derive(Serialize)]
 struct Environment {
@@ -1462,25 +1467,30 @@ fn null_and_controls(
         },
     ));
 
+    // INTERIM RULING (2026-08-20, six-seat review of the v4.1 validation session): synthetic
+    // controls are judged on the raw line ONLY (`judge_raw_only`). Crop-judging a synthetic
+    // loop against a bank of REAL signing operations is a mismatched reference — observed
+    // live: the flat control read "Shape" at raw t = 2.99 against the null-ss bank and flipped
+    // controls to NOT OK. Whether a crop-shape control validation returns (with its own
+    // synthetic reference family + a positive shape control) is a future pre-registration.
     log("running control-flat …");
     let flat_raw = run_control_flat(opts.samples, bits);
-    let flat = judge_v2(
+    let flat = judge_raw_only(
         "control-flat",
-        "identical synthetic work for both classes",
+        "identical synthetic work for both classes; raw-line verdict only (interim ruling \
+         2026-08-20 — the crop diagnostic does not run for synthetic controls)",
         &flat_raw,
-        &null_crop_stats,
     );
     log("running control-leaky …");
     let leaky_raw = run_control_leaky(opts.samples, bits);
-    let leaky = judge_v2(
+    let leaky = judge_raw_only(
         "control-leaky",
-        "class-dependent synthetic work (40k vs 60k iterations)",
+        "class-dependent synthetic work (40k vs 60k iterations); raw-line verdict only \
+         (interim ruling 2026-08-20)",
         &leaky_raw,
-        &null_crop_stats,
     );
-    // v2: the flat control must PASS on the raw statistic (SHAPE would also mean the null is
-    // not representative → treat as not ok), the leaky control must FAIL on the raw statistic,
-    // and the null itself must be ok.
+    // The flat control must PASS and the leaky control must FAIL — both on the raw statistic
+    // alone — and the null itself must be ok.
     let ok = null_ok
         && flat.isolated_verdict == Verdict::Pass
         && leaky.isolated_verdict == Verdict::Fail;
