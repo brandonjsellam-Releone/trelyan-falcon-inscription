@@ -1,5 +1,53 @@
 # v4.1 validation session — the one pre-registered reading, and the v3.1 re-judgment
 
+> **⚠️ CORRECTION — 2026-08-20, same day, after the six-seat team review (red → blue → apex;
+> transcript: `REVIEW_v41-validation-council_2026-08-20.md`). This artifact is QUARANTINED for
+> decision use. §§3–5 below are superseded where they conflict with the following.**
+>
+> 1. **This was not the pre-registered experiment.** The registration assumed the release
+>    harness; what ran was the debug process (App Control block). Pinned `opt_level(3)` C makes
+>    the *sign function's bytes* identical, not the *timing experiment*: heap regime, image
+>    size, I-cache/I-TLB placement, allocator, and ASLR are process-image properties — exactly
+>    the quantities the crop machinery measures. My "class-independent overhead" line was
+>    asserted, not measured. **`null_raw_t_sd = 1.045` is a low-information, point-estimate
+>    band call on the debug image only** (95% CI on the true SD at n=20 ≈ [0.80, 1.53], which
+>    spans the proceed line). It licenses nothing about the release harness, this aa bank, or
+>    any re-judgment. Process flaw recorded: on hitting the App Control block the right move
+>    was to stop, not to keep collecting and apply the bands to a different process.
+> 2. **The v3.1 SHAPE annotation is WITHDRAWN (held, not issued).** Three independent reasons,
+>    each sufficient: (i) the bank and v3.1 are non-exchangeable — n=4800 vs n≈82k; if the crop
+>    statistic is t-like, a fixed nuisance yielding crop ≈1.4 at 4800 yields ≈5.8 at 82k
+>    (√17.08 ≈ 4.13), i.e. the branch keys 5.8405/5.3584 and the bank max 3.0133 are not on a
+>    common scale, and the pre-registered branches were built on that scale error; (ii) the
+>    bank carries the unpriced debug deviation of point 1; (iii) "3-of-3" counted kk-0
+>    (3.475 vs bank max 3.0133 — a 0.46 margin on a max-of-20 statistic) which the branch keys
+>    never anticipated, and my "conditional on §6.1" clause was a post-data addition to a keyed
+>    branch. **The audit line is: the third branch fired; stop.** v3.1's PASS remains what it
+>    always was — non-detection at its stated power — untouched in either direction by this
+>    session. Any future re-judgment requires a bank matched to v3.1 in executable, profile,
+>    count, crop pipeline, and schedule.
+> 3. **Controls, interim ruling (dated, in force now):** synthetic flats are no longer
+>    crop-judged against the real-operation bank (the category error §4 recorded); the leaky
+>    control stays on the raw `|t| ≥ 4.5` line; option (c) is rejected outright. Whether
+>    crop-shape is part of the *control* hypothesis — (a) raw-only vs (b) a dedicated
+>    reference family *plus a synthetic-shape positive control with a numeric fire condition* —
+>    is a genuine design choice the apex left open; it gets its own pre-registration. Until
+>    that exists, controls cannot gate an ss session.
+> 4. **The §5 order is replaced.** Next experiment = a **release-harness (frozen, hashed
+>    intended binary) replicate** of null-ss × 20 + the aa bank, same n, named frequency/
+>    pinning policy — OR a dated prospective amendment declaring the debug harness the official
+>    one, followed by new banks under a new pre-registration; never retroactive acceptance of
+>    a favourable off-spec run. Only after that: a fully specified §6.1 (three arms:
+>    same-object ss / specified deep clones with logged addresses / distinct-key
+>    counterbalanced known-zero crossover; equivalence margin and power pre-declared; an
+>    inconclusive equivalence result is not a pass), then a matched-count v3.1 re-judgment
+>    against *that* bank, then verdict-session design, then the founder gate. The in-session
+>    kk crops (7.23/8.75) remain barred from tuning any margin or threshold.
+>
+> What survives of this session: the arithmetic branch call on the debug image; the empirical
+> demonstration that a *null* rr reference can exceed the fixed 4.5 crop line (v4 §0); the
+> flat-control category error, now fixed; and 54 hashed raw files for any future forensics.
+
 **Session:** `session-2026-08-20-local-v41-validation` · 2026-08-20 · local (same laptop as all
 prior local sessions) · `--null-design ss --samples 4800 --null-sessions 20 --aa-repeats 20`
 (rr-sessions defaulted to 20) · harness at commit `b7ea95a` · VALIDATION-ONLY by construction
