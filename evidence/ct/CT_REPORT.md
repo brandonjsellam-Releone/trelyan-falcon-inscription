@@ -9,7 +9,7 @@
 
 ## Where this stands — read this first
 
-**Five sessions, four pre-registered methodologies. The current reading is §4c.**
+**Six sessions, five pre-registered methodologies. The current reading is §4c as annotated by §4d.**
 
 | session | method | verdict | what it is worth today |
 |---|---|---|---|
@@ -17,7 +17,8 @@
 | v2 `…-v2` | `METHODOLOGY-v2.md` | SHAPE by the v2 rule | **Not interpretable.** Its null was a synthetic loop unfit for an 8 ms operation. §4a |
 | v3 `…-v3` | `METHODOLOGY-v3.md` | INCONCLUSIVE | Correct refusal: the random class split fell under the per-class floor. §4b |
 | v3b `…-v3b` | `METHODOLOGY-v3.md` | PASS | Real but **power-limited**: MDE₉₀ 72–175 µs. §4b |
-| **v3.1 `…-v31-hp82k`** | **+ `METHODOLOGY-v3.1-POWER.md`** | **PASS** | **The current result: 82 000 measurements/experiment, all five gates passed, MDE₉₀ ≈ 14.5 µs. §4c** |
+| **v3.1 `…-v31-hp82k`** | **+ `METHODOLOGY-v3.1-POWER.md`** | **PASS** | **The current result: 82 000 measurements/experiment, all five gates passed, MDE₉₀ ≈ 14.5 µs. §4c** — a SHAPE annotation from the v4.1 session was issued and **withdrawn the same day** by the team review (§4d); v3.1 is untouched in either direction |
+| v4.1 `…-v41-validation` | `METHODOLOGY-v4.md` + `-v4.1.md` | INCONCLUSIVE (validation-only, by construction) | **Quarantined for decision use** (ran on the debug harness — not the pre-registered process). What survives: `null_raw_t_sd = 1.045` as a low-information band call *on the debug image*, and a **null** rr reference exceeding the fixed 4.5 crop line (confirming v4 §0). §4d |
 
 **Nothing in this document is a constant-time claim.** The strongest statement any session
 supports is *no per-key location difference at or above that session's stated MDE₉₀ was detected
@@ -324,6 +325,47 @@ readings having been null artefacts, as §4a and §4b already concluded.
   interactions), and use cluster-robust or block-bootstrap standard errors for serially dependent
   timings. If the goal becomes *excluding* an effect rather than failing to detect one, that needs
   a pre-registered equivalence margin and a TOST procedure, not a bigger *n*.
+
+## 4d. Sixth session — **v4.1 validation** (`session-2026-08-20-local-v41-validation`) — read the session's CORRECTION first
+
+**2026-08-20 · `--null-design ss --samples 4800 --null-sessions 20 --aa-repeats 20` · harness
+`b7ea95a` · VALIDATION-ONLY by construction.** The session's `READING.md` carries a same-day
+**CORRECTION** from the six-seat team review (transcript committed beside it); this section
+states only what survived it.
+
+**What happened, in order.** Windows App Control began hash-blocking freshly built release
+executables that morning; the session was run anyway on the **debug-profile harness** on the
+argument that the vendored C core is pinned `opt_level(3)` (identical sign-function machine
+code). The team review rejected the transfer: heap regime, image size, I-cache placement,
+allocator and ASLR are process-image properties — the very quantities the crop machinery
+measures — and "class-independent overhead" was asserted, not measured. **Recorded as a
+process flaw: on hitting the block, the right move was to stop, not to keep collecting and
+apply pre-registered bands to a different process.**
+
+**What survives.** `null_raw_t_sd = 1.045` is the arithmetic band call (≤ 1.25) **on the debug
+image only**, and low-information at that (n=20 ⇒ 95% CI on the true SD ≈ [0.80, 1.53]). It is
+*consistent with* the v4 diagnosis that the 1.742 inflation under the v3 pool-null was
+design-induced, and proves nothing about the release harness. A **null** rr reference produced
+crop 5.19 > 4.5 — empirical confirmation of v4 §0 against the fixed line. The flat-control
+category error (synthetic flat crop-judged against the real-operation bank → spurious "Shape")
+was found and is fixed by the interim ruling in the CORRECTION.
+
+**What was issued and withdrawn the same day.** A pre-registered three-branch re-judgment of
+v3.1 against this session's aa bank fired its third branch (max(C_aa) = 3.0133 < 5.3584), and a
+SHAPE annotation on §4c was written — then **withdrawn** by the review: the bank and v3.1 are
+non-exchangeable (n=4800 vs 82k — for a t-like crop statistic the branch keys and the bank max
+are not on a common scale, so the branches were pre-registered on a scale error; plus the
+debug-image deviation; plus post-hoc counting of kk-0 at a 0.46 margin on a max-of-20).
+**v3.1 is untouched in either direction.** The audit line: *the third branch fired; stop.*
+
+**The path forward, as ruled** (detail in the CORRECTION and transcript): (1) a release-harness
+(frozen, hashed binary) replicate of the null-ss × 20 + aa bank — or a dated prospective
+amendment making the debug harness official, with new banks; (2) the controls pre-registration
+((a) raw-only vs (b) dedicated family + a synthetic-shape *positive* control — apex left it
+genuinely open); (3) a fully specified §6.1 three-arm clone-fidelity experiment with
+pre-declared equivalence margin and power; (4) a matched-count v3.1 re-judgment against the
+new bank; (5) verdict-session design; (6) the founder gate. The in-session kk crops
+(7.23/8.75) are barred from tuning any margin or threshold.
 
 ## 5. METHODOLOGY v2 — what changed before the second session (implemented; see `METHODOLOGY-v2.md`)
 
