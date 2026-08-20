@@ -52,6 +52,36 @@ crossing probability only at ≈ 14% (one-sided 95%).
 - Every experiment remains ungated and INCONCLUSIVE (`validation_only: true`) — unchanged.
 - The in-session kk crop values, whatever they are, do not tune any margin or threshold.
 
+## 3a. Amendment (2026-08-20, same day, still prospective — from the team review of commit 6df6999; closes the review's S1–S5 before any run exists)
+
+1. **The instrument is pinned NOW, not at launch (S1).** The governed binary is built from the
+   commit that contains this amendment, with `cargo build --release --locked -p falcon-ct`,
+   default features, no RUSTFLAGS, on the pinned stable toolchain recorded in the session dir
+   (`rustc -Vv` output). **The reading:** `null_raw_t_sd` is the sample standard deviation
+   (n−1 denominator) of the raw (uncropped) Welch *t* values of the 20 null-ss sessions, as the
+   binary serialises in `controls.null_raw_t_sd`.
+2. **One-run rule (S2).** The governed run is the FIRST launch of the pinned binary after the
+   unblock. Every attempt — including aborted or failed ones — gets its own kept directory and
+   appears in the record; `rustc -Vv`, the exe SHA-256, and a process list are captured into
+   the session dir BEFORE measurement. The reading is published whatever it is. Load or
+   environment problems discovered after the fact are recorded as limitations, never as
+   voidance; §4 voidance applies only to discrepancies declared BEFORE `report.json` exists.
+3. **Blindness (S3).** The quarantined debug session's banks are already content-addressed in
+   git (commit b19a719). Until the controls pre-registration and the §6.1 design are committed,
+   those bank values are not re-inspected, quoted, or used to choose any threshold, margin, or
+   bank size in those documents — the documents are written from the methodology, not from the
+   numbers.
+4. **Reading hygiene (S4).** The reading exists only if the replicate's own controls are OK
+   under the interim ruling (flat Pass and leaky Fail on the raw line, null ok) AND all 20
+   null-ss sessions completed and parse; otherwise the session reports "no reading" — no
+   manual session drops. **The partial band (1.25–1.60) is a NO-PROCEED**: it does not open
+   any next step; it means "stop and design a higher-precision calibration under a new
+   pre-registration."
+5. **The founder branch is dated (S5).** Brandon's A-or-B choice is recorded (in the session
+   dir or the task log) BEFORE any governed launch. If Branch A runs and reads "stop", that
+   stop carries to Branch B — B's new pre-registration starts blind to BOTH the debug session
+   and A's banks, under the same rule as (3).
+
 ## 4. Deviation rule (this morning's lesson, written down)
 
 If ANY element of §1 cannot be met as stated — different binary, profile, commit, machine, or
