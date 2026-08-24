@@ -294,7 +294,7 @@ jobs:
         # /EXPORT is load-bearing, not tidiness. MSVC exports NOTHING from a DLL without
         # __declspec(dllexport) or explicit /EXPORT, whereas ELF and Mach-O export every
         # non-static symbol. The upstream Falcon sources carry no dllexport annotations, and
-        # S2.6 forbids editing the audited reference to add them - so the exports are declared
+        # S2.6 forbids editing the pinned reference to add them - so the exports are declared
         # here, at link time, instead.
         #
         # Without this the DLL built, linked, and loaded, and had an EMPTY export table: every
@@ -305,7 +305,7 @@ jobs:
         # reporting green, and the cross-platform reproducibility claim it exists to support
         # (reviewer Q11/Q7) held only on Linux and macOS.
         #
-        # The four names are exactly the SDK's audited binding surface, so the Windows export
+        # The four names are exactly the SDK's allow-listed binding surface, so the Windows export
         # table is the allowlist: adding a binding without exporting it fails loudly here.
         run: |
           cd falcon-src

@@ -3,14 +3,18 @@
 > [!IMPORTANT]
 > **This is a dated record of the 1 June 2026 run, not a statement about the current tree.**
 > On **2026-06-16** (`2ec798e`) `contracts/inscription.py` changed and the emitted TEAL was
-> regenerated, and the suite grew from **20 to 22 tests**. Those 22 tests have **no recorded
-> localnet run**; CI does not execute `contracts/test_inscription.py` (it has no localnet).
+> regenerated. The suite now defines **25 tests**, and they DO run in CI: the `contract-tests`
+> job in `.github/workflows/ci.yml` starts `algokit localnet`, waits for algod to become
+> healthy, runs the suite against a real AVM, and fails if fewer than 20 tests execute.
+> **Corrected 2026-08-24** — this paragraph previously said the suite was 22 tests with no
+> recorded localnet run and that CI had no localnet. All three were false, and the error ran in
+> the understating direction: it told reviewers the project had less assurance than it has.
 > The weekly `verify-live` job checks the deployed app's **bytecode fingerprint**, which proves
 > the live app matches the committed TEAL — it does **not** re-run this functional suite.
 > Re-run on localnet and supersede this record before relying on it as current evidence.
 
 **Artifact under test:** `contracts/inscription.py` *(as of 1 June 2026 — since changed)*
-**Suite:** `contracts/test_inscription.py` — **20 / 20 passing** on Algorand localnet *(suite is now 22 tests)*
+**Suite:** `contracts/test_inscription.py` — **20 / 20 passing** on Algorand localnet *(historical: the suite now defines 25 tests)*
 **Toolchain:** algokit localnet · AVM target v12 · PuyaPy 5.8.1 · deterministic Falcon-1024
 (`contracts/falcon_det1024.py`, native `falcon_verify` opcode)
 
@@ -78,7 +82,7 @@ read fails — never returns a zero record).
 ## 3. Council hardening applied (full 6-model review of the tested contract)
 
 The contract was reviewed by the full TRELYAN council (Gemini, OpenAI, Hermes, watsonx, Mistral,
-Grok) *after* it first reached 12/12. Three concrete changes resulted, now in the 20-test suite:
+Grok) *after* it first reached 12/12. Three concrete changes resulted, and are in the suite today:
 
 1. **A2 — native genesis (Mistral, must-fix).** `_build_message` binds `Global.genesis_hash`;
    `create()` no longer takes/stores a genesis argument. Removes the only deploy-time value that could

@@ -75,7 +75,7 @@ construction (all CI runners are little-endian x86-64) rather than machine-exerc
 | Write-once: a cell cannot be re-inscribed; Update/Delete OnCompletions blocked | invariants I1–I5, `THREAT_MODEL_AND_TRACEABILITY.md` |
 | Deterministic signing is RFC-6979/Ed25519-style (`SHAKE256(logn‖privkey‖data)`), **not** a zeroed nonce | `contracts/falcon_det1024.py`; spec §1 |
 | det-compressed signature: typically ~1222–1233 B (KAT goldens), ≤1423 B; compressed average ≈1262 B; padded fixed 1280 B; pubkey 1793 B | `TRELYAN_PROTOCOL_SPEC_v0.2.md` §param; `verify.html` |
-| localnet suite 20/20 **as of 2026-06-01** (register→inscribe→read-back + attack-rejection vectors); suite is now **22 tests, no recorded localnet run** since the 2026-06-16 contract change — CI has no localnet, so this is not re-checked automatically | `contracts/test_inscription.py`, `LOCALNET_VALIDATION_2026-06-01.md` |
+| localnet suite **25 tests, run in CI on every push** against a real AVM — job `contract-tests` (`.github/workflows/ci.yml`) starts `algokit localnet`, runs the suite, and fails if fewer than 20 tests execute. Observed green in 1m6s. This row previously reported a smaller suite, claimed there was no recorded localnet run, and stated that CI had no localnet. All three were false and all three understated the assurance actually in place; corrected 2026-08-24 | `contracts/test_inscription.py`, `.github/workflows/ci.yml` |
 
 ---
 

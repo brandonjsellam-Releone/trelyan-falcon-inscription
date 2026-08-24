@@ -93,8 +93,12 @@ jobs:
           grep -q "vendored Falcon tree verified against pin ce15e75b" test.log \
             || { echo "::error::the ffi build script did not report the pin verification"; exit 1; }
       # A green "0 tests ran" is indistinguishable from a green suite in the checks list. The
-      # workspace has 11 tests today; 8 is a floor that survives churn but not a harness that
-      # silently stopped collecting. The KAT file must be among them, by name.
+      # workspace defines 48 tests today; 40 is a floor that survives churn but NOT a harness
+      # that silently stopped collecting. The floor was 8 against a comment claiming 11 tests --
+      # stale by a factor of four, so it would have sat green while 40 of 48 tests vanished,
+      # which is precisely the failure it exists to catch (found by the 2026-08-24 audit).
+      # Raise this with the suite; a floor far below the real count is a check that cannot fail.
+      # The KAT file must be among them, by name.
       - name: Assert the suite — and the KAT — actually ran
         shell: bash
         run: |
@@ -102,8 +106,8 @@ jobs:
           passed=$(grep -oE '^test result: ok\. [0-9]+ passed' test.log \
                    | grep -oE '[0-9]+' | awk '{s+=$1} END {print s+0}')
           echo "tests passed: ${passed:-0}"
-          if [ "${passed:-0}" -lt 8 ]; then
-            echo "::error::only ${passed:-0} tests ran; expected 8+. A collection failure reads as a pass."
+          if [ "${passed:-0}" -lt 40 ]; then
+            echo "::error::only ${passed:-0} tests ran; expected 40+. A collection failure reads as a pass."
             exit 1
           fi
           grep -q "signatures_are_byte_identical_to_the_committed_goldens ... ok" test.log \

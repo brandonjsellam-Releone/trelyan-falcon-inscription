@@ -577,7 +577,7 @@ pub fn judge_raw_only(id: &str, description: &str, raw: &RawSamples) -> Experime
 /// Time `op(class)` `total` times with a randomised class per measurement.
 ///
 /// `next_class_bit` supplies the class for each measurement (the binary draws it from the
-/// audited SHAKE PRNG; tests may pass a deterministic sequence). Only the call to `op` is inside
+/// pinned SHAKE PRNG; tests may pass a deterministic sequence). Only the call to `op` is inside
 /// the timed region; the closure must do its own preparation outside (the binary pre-generates
 /// key pools and messages, and picks by index inside `op` — a slice index is a few nanoseconds
 /// against a millisecond signature).

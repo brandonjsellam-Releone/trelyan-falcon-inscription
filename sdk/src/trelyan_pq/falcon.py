@@ -4,7 +4,7 @@ trelyan_pq.falcon — Deterministic Falcon-1024 signer in the EXACT encoding Alg
 
 Why this module exists: generic liboqs / pqcrypto Falcon does NOT interoperate with the AVM
 opcode (randomized signatures, wrong header) and gets rejected on-chain. This is a thin,
-audited-shape ctypes wrapper over the `algorand/falcon` C library — the same code path
+narrow ctypes wrapper over the `algorand/falcon` C library — the same code path
 Algorand uses — exposing keygen / sign / verify.
 
 Build the shared library once and point FALCON_DET1024_LIB at it:

@@ -2,8 +2,8 @@
 
 **Project:** TRELYAN — Falcon-1024 Inscription (open reference implementation).
 **Repo:** `github.com/brandonjsellam-Releone/trelyan-falcon-inscription` · MIT (`LICENSE`).
-**Status:** Reference implementation. Last localnet validation 20/20 on 2026-06-01; contract changed
-2026-06-16 and the suite is now 22 tests with no recorded localnet run. Deployed to **Algorand TestNet**
+**Status:** Reference implementation. The **25-test** localnet suite runs in CI on every push against
+a real AVM (job `contract-tests`, observed green in 1m6s). Deployed to **Algorand TestNet**
 (app `763809096`). **UNAUDITED — not for MainNet value.** Falcon here provides a **signature**
 (integrity / authenticity), **not** encryption — no confidentiality is claimed.
 **Date:** 2026-06-17.
@@ -162,8 +162,8 @@ auditor spends week one on the real surface, not rediscovery.
 | Reference contract | `contracts/inscription.py` | The TEAL-source-of-truth (Algorand Python / PuyaPy 5.8.1 → AVM v12). Inline `AUDIT-NOTE A1–A9`. |
 | Compiled output | `contracts/out/` | Approval/clear TEAL + ARC-56 app spec (diff against your own compile). |
 | Off-chain signer | `contracts/falcon_det1024.py` | Deterministic Falcon-1024 ctypes signer/verifier; the byte-exact `M` builder. |
-| Localnet suite | `contracts/test_inscription.py` | 22 tests: register→inscribe→read-back + attack-rejection vectors. Last recorded localnet run was the 20-test suite on 2026-06-01; not re-run since. |
-| Published SDK | `sdk/src/trelyan_pq/` | `trelyan-pq` 0.1.0 (PyPI): `message.py`, `falcon.py`, `seal.py`. |
+| Localnet suite | `contracts/test_inscription.py` | **25 tests**: register→inscribe→read-back + attack-rejection vectors. Runs in CI on every push against a real AVM (`contract-tests`); the job fails if fewer than 20 execute. |
+| Published SDK | `sdk/src/trelyan_pq/` | `trelyan-pq` — 0.1.0 is the only release on PyPI; in-tree version is 0.1.1 (corrective, metadata only). `message.py`, `falcon.py`, `seal.py`. |
 | Signature KAT | `sdk/tests/test_signature_kat.py`, `sdk/tests/vectors/det1024_kat.json` | Byte-identity goldens (begin `ba00`); 3-OS reproduction in CI. |
 | Seeded fuzz / differential oracle | `sdk/tests/test_signature_fuzz.py` | Off-chain↔on-chain encoding differential (seed 1469, 300 iters). |
 | Pinned-build verifier | `sdk/ci/verify_pinned_digest.py` | Recomputes the 27-file tree + `deterministic.c` digests + FP-emulation pin. |

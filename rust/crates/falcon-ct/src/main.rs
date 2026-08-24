@@ -451,7 +451,7 @@ fn rr_raw_state(raw_abs_t: f64, reference_raw: &[f64]) -> &'static str {
     }
 }
 
-/// A class-bit source over the audited SHAKE PRNG: one byte per bit, no buffering games.
+/// A class-bit source over the pinned SHAKE PRNG: one byte per bit, no buffering games.
 struct ClassBits(Shake256Context);
 impl ClassBits {
     fn next(&mut self) -> bool {

@@ -6,8 +6,8 @@ and improve the pattern.
 
 ## Project status (honest)
 
-- **Reference implementation.** Last localnet validation 20/20 on 2026-06-01; the contract
-  changed 2026-06-16 and the suite is now 22 tests with no recorded localnet run. Deployed +
+- **Reference implementation.** The **25-test** localnet suite runs in CI on every push against a
+  real AVM (job `contract-tests`; fails if fewer than 20 execute). Deployed +
   verified on Algorand TestNet. **Not externally audited; not on MainNet.**
 - **Currently solo-maintained** by Brandon J. Sellam. The project is actively
   **seeking a co-maintainer** (cryptography / Algorand smart-contract review).

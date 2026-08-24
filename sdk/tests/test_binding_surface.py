@@ -1,5 +1,5 @@
 """
-Guard: the C binding surface stays inside the audited subset of algorand/falcon.
+Guard: the C binding surface stays inside the allow-listed subset of algorand/falcon.
 
 WHY THIS TEST EXISTS
 ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -44,7 +44,11 @@ import pytest
 _SDK_SRC = pathlib.Path(__file__).resolve().parents[1] / "src" / "trelyan_pq"
 _FALCON_PY = _SDK_SRC / "falcon.py"
 
-# The audited binding surface. Every symbol TRELYAN is permitted to call in the pinned build.
+# The allow-listed binding surface. Every symbol TRELYAN is permitted to call in the pinned
+# build. NOT an audit: no audit of algorand/falcon is referenced anywhere in this repo, and the
+# note above documents a CONFIRMED out-of-bounds read in this same pinned tree. What makes the
+# acceptance sound is that the defective function is not in this list -- an allow-list, not a
+# clean bill of health.
 _ALLOWED = frozenset({
     "shake256_init_prng_from_system",
     "falcon_det1024_keygen",
@@ -87,12 +91,12 @@ def _bound_symbols() -> set[str]:
     return found
 
 
-def test_binding_surface_is_exactly_the_audited_set():
+def test_binding_surface_is_exactly_the_allow_listed_set():
     bound = _bound_symbols()
 
     unexpected = bound - _ALLOWED
     assert not unexpected, (
-        "New C symbol(s) bound that are outside the audited surface: "
+        "New C symbol(s) bound that are outside the allow-listed surface: "
         f"{sorted(unexpected)}.\n"
         + "".join(
             f"  - {s}: {_QUARANTINED[s]}\n" for s in sorted(unexpected) if s in _QUARANTINED

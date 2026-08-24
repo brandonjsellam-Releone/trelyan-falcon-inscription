@@ -52,4 +52,4 @@ print(t.hexdigest())
 EOF
 ```
 
-Why this matters for a deterministic signer: det1024 signatures are a pure function of the key and the message, so any build divergence in the floating-point sampler is a correctness *and* security concern. Pinning the source is the first layer; cross-platform signature-level known-answer tests in CI are the second (roadmap item, pre-MainNet); the SDK's sign-once key lifecycle is the third.
+Why this matters for a deterministic signer: det1024 signatures are a pure function of the key and the message, so any build divergence in the floating-point sampler is a correctness *and* security concern. Pinning the source is the first layer; cross-platform signature-level known-answer tests in CI are the second (**implemented** — job `signature-kat` in `.github/workflows/ci.yml` builds the pinned library and runs the byte-identity KAT on Linux, macOS and Windows); the SDK's sign-once key lifecycle is the third.

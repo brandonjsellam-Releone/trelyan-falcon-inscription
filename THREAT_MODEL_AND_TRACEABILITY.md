@@ -2,7 +2,7 @@
 
 Companion to `LOCALNET_VALIDATION_2026-06-01.md`. Built at the council's request so a formal auditor
 does not spend week one reconstructing the trust surface, the invariant→test mapping, or the
-reproduction steps. **Scope honesty up front:** the 20-test suite *exercises* the listed execution
+reproduction steps. **Scope honesty up front:** the localnet suite *exercises* the listed execution
 paths and *rejects the exercised attack vectors* on a live localnet AVM. It does **not** constitute a
 proof of the invariants over all histories, encodings, or upgrade paths — that inductive/exhaustive
 argument is exactly what we are engaging Runtime Verification to provide.

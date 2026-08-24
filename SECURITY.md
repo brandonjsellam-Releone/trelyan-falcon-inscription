@@ -1,9 +1,9 @@
 # Security Policy
 
 TRELYAN — Falcon-1024 Inscription (open reference). This repository is a
-**reference implementation**. Its last localnet validation was 20/20 on
-2026-06-01; the contract has since changed and the suite is now 22 tests with
-no recorded localnet run (see `LOCALNET_VALIDATION_2026-06-01.md`). It is
+**reference implementation**. Its 25-test localnet suite runs in CI on every
+push against a real AVM (job `contract-tests`; the job fails if fewer than 20
+tests execute — see `LOCALNET_VALIDATION_2026-06-01.md`). It is
 deployed to **Algorand TestNet**, but it is **not externally audited and is not
 intended for MainNet value**. Treat it as a reference, not production-ready software.
 

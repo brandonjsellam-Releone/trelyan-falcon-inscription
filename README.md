@@ -11,8 +11,8 @@ post‑quantum authorization in their own contract.
 > deployment is a real, publicly verifiable post‑quantum inscription. Reproducible via
 > `contracts/deploy_testnet.py`.
 
-**Status (honest):** last localnet validation was **20/20 on 2026-06-01**; the contract changed on
-2026-06-16 and the suite is now **22 tests with no recorded localnet run** (see
+**Status (honest):** the **25-test** localnet suite runs in CI on every push against a real AVM —
+job `contract-tests` starts `algokit localnet` and fails if fewer than 20 tests execute (see
 [`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md)). **Deployed + verified on
 TestNet** — the weekly job checks the live app's bytecode fingerprint against the committed TEAL.
 **Not yet externally audited; not on MainNet.** Treat as a reference, not production‑ready. MIT licensed.
@@ -50,7 +50,7 @@ next team a week. This repo solves both, with the reasoning written down:
 ## What's here
 - `contracts/inscription.py` — the reference contract (Algorand Python / PuyaPy, AVM v12).
 - `contracts/falcon_det1024.py` — off‑chain deterministic Falcon‑1024 signer (ctypes over `algorand/falcon`).
-- `contracts/test_inscription.py` — the 20‑test localnet suite.
+- `contracts/test_inscription.py` — the 25‑test localnet suite (run in CI against a real AVM).
 - `contracts/deploy_testnet.py` — one‑command end‑to‑end TestNet demo (deploy → mint → register → inscribe → verify).
 - `TRELYAN_PROTOCOL_SPEC_v0.2.md`, `THREAT_MODEL_AND_TRACEABILITY.md`, `LOCALNET_VALIDATION_2026-06-01.md`,
   `FALCON_ENCODING_2026-06-01.md`, `FALCON_BUDGET_2026-06-01.md` — spec, threat model + invariant→test→code

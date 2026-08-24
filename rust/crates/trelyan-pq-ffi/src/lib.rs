@@ -119,7 +119,7 @@ unsafe extern "C" {
     fn falcon_det1024_get_salt_version(sig: *const c_void) -> c_int;
 }
 
-/// A SHAKE256 PRNG seeded from the operating system's CSPRNG — the same path the audited
+/// A SHAKE256 PRNG seeded from the operating system's CSPRNG — the same path the
 /// ctypes SDK uses (`getentropy` / `/dev/urandom` / `BCryptGenRandom` per `config.h`).
 ///
 /// # Errors
@@ -155,7 +155,7 @@ pub fn prng_from_seed(seed: &[u8]) -> Shake256Context {
 /// Only valid on a context produced by [`prng_from_system`] or [`prng_from_seed`] (both leave the
 /// context in output mode). Used by the constant-time evidence harness for class selection and
 /// random messages, so that the harness needs no RNG dependency of its own and draws from the
-/// same audited SHAKE PRNG the signer's key generation uses.
+/// same pinned SHAKE PRNG the signer's key generation uses.
 pub fn prng_extract(sc: &mut Shake256Context, out: &mut [u8]) {
     // SAFETY: `sc` is a live, correctly sized context that one of the two constructors flipped
     // into output mode; `out` is exclusively borrowed and valid for `out.len()` bytes, which is
