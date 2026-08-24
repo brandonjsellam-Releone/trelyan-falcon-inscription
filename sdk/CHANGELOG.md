@@ -3,6 +3,27 @@
 All notable changes to `trelyan-pq` are documented here. Versions follow SemVer;
 pre-1.0 the public API may change.
 
+## [0.1.1] — 2026-08-24
+Corrective release. **Metadata only — no code, no API, no wire-format change.**
+
+### Fixed
+- **Removed `fn-dsa` and `fips-206` from the published PyPI keywords.** Those terms asserted, on
+  the public index, exactly what `THREAT_MODEL_AND_TRACEABILITY.md` forbids: `det1024` can never
+  be FIPS 206 conformant as specified, because NIST's FN-DSA status update states FN-DSA will
+  allow **only randomized signing**, and this signer is deterministic by design — deterministic
+  compressed Falcon-1024 is what the on-chain `falcon_verify` opcode verifies. Published PyPI
+  metadata cannot be edited in place, so 0.1.0 carries the terms permanently; this release is the
+  correction. Found by the 2026-08-24 repository audit.
+- Reconciled the package version, which had drifted: `pyproject.toml` declared `0.2.2` while
+  `__init__.py`, this changelog and both Dockerfiles said `0.1.0`, and only `0.1.0` was ever
+  published. All five locations now agree.
+
+### Added
+- `sdk/tests/test_public_claims.py` — parses the built manifest and fails if any published field
+  claims FIPS 206 / FN-DSA conformance, across spellings. Carries a self-test proving the detector
+  still bites, because every other assertion in it is a negative that would pass silently if the
+  matcher broke.
+
 ## [0.1.0] — 2026-06-03
 Initial release.
 

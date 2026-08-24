@@ -28,7 +28,7 @@ FROM python:3.13-slim@sha256:c33f0bc4364a6881bed1ec0cc2665e6c53c87a43e774aaeab88
 ARG FALCON_COMMIT=ce15e75bceb372867daf6b8e81918ab6978686eb
 # Pinned toolchain versions (2026). ziglang wheel bundles clang+lld and needs no system cc.
 ARG ZIGLANG_VERSION=0.13.0
-ARG TRELYAN_PQ_VERSION=0.1.0
+ARG TRELYAN_PQ_VERSION=0.1.1
 
 # curl + tar to fetch the pinned source tarball; ca-certificates for the https fetch.
 # (No build-essential / gcc: we compile via `python -m ziglang cc`.)
@@ -81,8 +81,12 @@ ENV FALCON_DET1024_LIB=/trelyan/libfalcondet1024.so
 
 # --- 4. Install the SDK (dev extra) -------------------------------------------------------------
 # Editable install from the in-tree source so the byte-identity KAT runs against THIS checkout.
-# (Dockerfile.verify pins trelyan-pq==0.1.0 from PyPI for the on-chain check; the version in-tree
-# is the same 0.1.0 — kept here as a label for parity.)
+# (Dockerfile.verify pins trelyan-pq from PyPI for the on-chain check; TRELYAN_PQ_VERSION above
+# is that pin, surfaced as a label. It is NOT an assertion that the in-tree source equals the
+# published wheel -- the 2026-08-24 audit found this comment claiming a parity that did not hold,
+# because pyproject had drifted to 0.2.2 while every other location said 0.1.0. The in-tree
+# version is authoritative for THIS image; sdk/tests/test_public_claims.py guards what the
+# manifest may claim.)
 LABEL trelyan.trelyan_pq_version="${TRELYAN_PQ_VERSION}"
 RUN python -m pip install --no-cache-dir -e "sdk[dev]"
 

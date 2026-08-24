@@ -4,14 +4,20 @@ build-backend = "hatchling.build"
 
 [project]
 name = "trelyan-pq"
-version = "0.2.2"
+version = "0.1.1"
 description = "Post-quantum (Falcon-1024) inscription tooling for Algorand: a deterministic signer in the exact encoding the native falcon_verify opcode accepts, on-chain message construction, and the pubkey-box-commit / 2048-byte arg-cap helpers."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Brandon J. Sellam" }]
+# NO "fn-dsa" / "fips-206" HERE. THREAT_MODEL_AND_TRACEABILITY.md states that det1024 can
+# never be FIPS 206 conformant as specified -- FN-DSA allows only randomized signing, and this
+# signer is deterministic because that is what the on-chain falcon_verify opcode verifies. PyPI
+# keywords are public material, so listing those terms asserted in public exactly what the threat
+# model forbids. Published PyPI metadata CANNOT be edited in place, which is why this must never
+# ship again: a wrong keyword here is only correctable by a new release.
 keywords = [
-  "algorand", "post-quantum", "falcon", "falcon-1024", "fn-dsa", "fips-206",
+  "algorand", "post-quantum", "falcon", "falcon-1024", "falcon-det1024",
   "lattice", "cryptography", "pqc", "falcon_verify", "inscriptions", "avm",
 ]
 classifiers = [
