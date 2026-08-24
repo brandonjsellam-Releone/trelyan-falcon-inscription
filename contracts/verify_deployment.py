@@ -112,7 +112,30 @@ def recompile_from_source(source: pathlib.Path, out_dir: pathlib.Path) -> None:
         raise CheckError(f"puya failed: {exc.stderr.decode(errors='replace')[:500]}") from exc
 
 
-def load_declared(manifest: pathlib.Path) -> tuple[int, str]:
+def _rederive_declared(commit: str, teal_path: pathlib.Path, compile_url: str, timeout: int):
+    """Assemble the committed TEAL AT `commit` and return its fingerprint, or None if unavailable.
+
+    Returns None (rather than raising) when git or the commit is not reachable -- e.g. a shallow
+    CI checkout. That is a deliberate downgrade, not a silent pass: the caller still compares the
+    chain to the declared hash, it simply cannot additionally prove the declared hash's lineage.
+    A mismatch, by contrast, always raises.
+    """
+    if not commit:
+        return None
+    rel = teal_path.name
+    try:
+        blob = subprocess.run(
+            ["git", "show", f"{commit}:contracts/out/{rel}"],
+            cwd=REPO_ROOT.parent, capture_output=True, timeout=timeout, check=True,
+        ).stdout
+    except (subprocess.SubprocessError, OSError, FileNotFoundError):
+        print("    note  could not read the artifact at that commit (shallow clone?); "
+              "declared-hash lineage NOT re-derived this run")
+        return None
+    return sha512_256(assemble(blob, compile_url, timeout))
+
+
+def load_declared(manifest: pathlib.Path) -> tuple[int, str, str]:
     """Return (app_id, expected sha512_256) from the deployment manifest.
 
     The manifest DECLARES what is deployed. Comparing the chain against it answers a different
@@ -125,7 +148,11 @@ def load_declared(manifest: pathlib.Path) -> tuple[int, str]:
         raise CheckError(f"deployment manifest not found: {manifest}")
     try:
         data = json.loads(manifest.read_text(encoding="utf-8"))
-        return int(data["app_id"]), str(data["approval_program"]["sha512_256"])
+        return (
+            int(data["app_id"]),
+            str(data["approval_program"]["sha512_256"]),
+            str(data.get("deployed_commit", "")),
+        )
     except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
         # Fail as "could not check" (2), never as agreement. A malformed manifest must not be
         # able to produce a pass.
@@ -158,11 +185,21 @@ def main() -> int:
         # This does NOT involve the committed source at all, so it stays green while a
         # redeploy is pending and goes red only if the chain serves something undeclared.
         try:
-            declared_app, declared_hash = load_declared(args.manifest)
+            declared_app, declared_hash, declared_commit = load_declared(args.manifest)
             if declared_app != args.app_id:
                 raise CheckError(
                     f"manifest declares app {declared_app} but --app-id is {args.app_id}; "
                     "refusing to compare a program against another application's record"
+                )
+            # NON-CIRCULARITY: re-derive the declared hash from the SOURCE at the commit the
+            # manifest names, before comparing anything to the chain. Without this the declared
+            # check would compare the chain against a number that came off the chain.
+            provenance = _rederive_declared(declared_commit, args.teal, compile_url, args.timeout)
+            if provenance is not None and provenance != declared_hash:
+                raise CheckError(
+                    f"manifest hash {declared_hash} does NOT match what commit "
+                    f"{declared_commit[:12]} assembles to ({provenance}). The manifest has been "
+                    "edited, or names the wrong commit. Do not proceed on this file."
                 )
             deployed = fetch_deployed(args.app_id, args.algod, args.timeout)
             deployed_hash = sha512_256(deployed)

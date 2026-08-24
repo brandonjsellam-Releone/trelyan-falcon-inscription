@@ -57,41 +57,66 @@ def box_refs(cell_id: int):
 
 
 MIN_AVM_VERSION = 12
+FALCON_PUBKEY_LEN = 1793          # falcon_verify arg 2 is [1793]byte
+FALCON_SIG_MAXLEN = 1423          # deterministic compressed maximum
 
-# A two-line program that assembles ONLY on a node whose assembler knows AVM v12. The contract's
-# approval program is #pragma version 12 and calls falcon_verify (0x85), so this is the capability
-# the deployment actually depends on.
-_AVM_PROBE = "#pragma version {v}" + chr(10) + "int 1" + chr(10)
+
+def _avm_probe_source() -> str:
+    """A program that assembles ONLY on a node whose assembler knows falcon_verify.
+
+    Arguments are correctly SIZED (not merely present) because falcon_verify is typed on exact
+    array lengths: an empty operand is rejected with a type error even by a node that fully
+    supports the opcode, which would make the probe fail everywhere and prove nothing.
+    """
+    sig = "0x" + "ba" + "00" * (FALCON_SIG_MAXLEN - 1)
+    pubkey = "0x" + "0a" + "00" * (FALCON_PUBKEY_LEN - 1)
+    return chr(10).join((
+        f"#pragma version {MIN_AVM_VERSION}",
+        'byte "probe"',
+        f"byte {sig}",
+        f"byte {pubkey}",
+        "falcon_verify",
+    )) + chr(10)
 
 
 def _assert_node_supports_falcon_verify(algod) -> None:
-    """Refuse to deploy against a node whose assembler predates AVM v12.
+    """Refuse to deploy against a node whose assembler does not know falcon_verify.
 
-    Probes the CAPABILITY rather than parsing a version string. The first version of this check
-    parsed `suggested_params().consensus_version` expecting it to end in "/v41" -- but TestNet
-    actually reports a spec-repo COMMIT SHA:
+    WHAT THIS PROVES, EXACTLY: the target node's assembler accepts `#pragma version 12` AND
+    recognises the `falcon_verify` opcode with its real operand types. That is an ASSEMBLER-level
+    capability.
 
-        https://github.com/algorandfoundation/specs/tree/268b63433a907455d439995bf916f6b296018f4f
+    WHAT IT DOES NOT PROVE: that consensus enables the opcode at EXECUTION time. Assembly and
+    execution are different layers, and a node could in principle assemble a program the network
+    will not run. Proving the execution layer needs a simulate call against a funded account,
+    which this pre-flight deliberately does not do -- it must stay cheap enough to run before
+    every deploy. Adversarial review made this distinction, and the docstring states it rather
+    than letting the print line imply more than was checked.
 
-    so that check refused every real deployment. Its unit tests passed because they used invented
-    inputs. Asking the node to assemble the pragma we depend on cannot drift with a string format.
+    Two earlier versions of this check were wrong, which is why it is written this way:
+      1. It parsed `consensus_version` expecting ".../v41". TestNet reports a spec-repo COMMIT
+         SHA, so it refused every real deployment. Its unit tests passed on invented inputs.
+      2. It compiled `#pragma version 12` + `int 1`, which proves the assembler takes v12 but
+         says NOTHING about falcon_verify -- while printing "falcon_verify is available". That
+         was a new false claim introduced by a fix for false claims.
 
-    Fail-closed: an unreachable node, or any non-success answer, REFUSES. "Could not determine"
-    must never be treated as "capable" -- that is how a check becomes decorative.
+    Fail-closed: any failure REFUSES. "Could not determine" is never "capable".
     """
     if os.environ.get("TRELYAN_SKIP_AVM_CHECK") == "1":
-        print("  ! AVM pre-flight SKIPPED by TRELYAN_SKIP_AVM_CHECK")
+        # Not silently fail-open: this is an explicit, announced override.
+        print("  ! AVM pre-flight SKIPPED by TRELYAN_SKIP_AVM_CHECK -- capability NOT verified")
         return
     try:
-        algod.compile(_AVM_PROBE.format(v=MIN_AVM_VERSION))
+        algod.compile(_avm_probe_source())
     except Exception as exc:  # noqa: BLE001 - any failure here must refuse, not proceed
         sys.exit(
-            f"This node cannot assemble #pragma version {MIN_AVM_VERSION}, so it does not support "
-            f"falcon_verify: {type(exc).__name__}: {exc}. Refusing to deploy -- the create "
-            "transaction would be accepted and the contract would then fail at the opcode. "
-            "Point at an up-to-date node, or set TRELYAN_SKIP_AVM_CHECK=1 deliberately."
+            f"This node's assembler does not accept a falcon_verify program at "
+            f"#pragma version {MIN_AVM_VERSION}: {type(exc).__name__}: {exc}. Refusing to deploy "
+            "-- the create transaction would be accepted and the contract would then fail at the "
+            "opcode. Point at an up-to-date node, or set TRELYAN_SKIP_AVM_CHECK=1 deliberately."
         )
-    print(f"  ok  node assembles AVM v{MIN_AVM_VERSION}; falcon_verify is available")
+    print(f"  ok  node assembler accepts falcon_verify at AVM v{MIN_AVM_VERSION} "
+          "(assembler-level; execution not probed)")
 
 
 def main() -> None:

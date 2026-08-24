@@ -1,14 +1,19 @@
 {
   "_comment": [
-    "WHAT IS ACTUALLY DEPLOYED. This file DECLARES the on-chain program, so CI can tell two very",
-    "different situations apart: (a) the chain runs a program we recorded and a redeploy is",
-    "pending -- a known, bounded state; and (b) the chain runs a program NOBODY declared -- an",
-    "alarm, because it means an unexpected deployment, a wrong app id, or a compromised endpoint.",
-    "Before this file existed only (a) was detectable, and it was indistinguishable from (b).",
+    "WHAT IS ACTUALLY DEPLOYED, and where this hash CAME FROM.",
     "",
-    "This does NOT relax the committed-source gate. verify_deployment.py still defaults to",
-    "--against committed and still exits 1 on drift. This adds a second, independent assertion.",
-    "Do not edit a hash here to make a check pass: the correct response to a mismatch is to find",
+    "PROVENANCE MATTERS MORE THAN THE VALUE. A hash copied off the chain and then compared back",
+    "to the chain proves nothing -- that is exactly the tautology verify_deployment.py was written",
+    "to replace (its predecessor pinned a constant lifted from the deployed program). Adversarial",
+    "review caught the first version of this file doing the same thing.",
+    "",
+    "So the hash below is DERIVED, not observed: it is what commit a806f63's committed TEAL",
+    "artifact assembles to. That it also equals what the chain serves is the FINDING, not the",
+    "definition. `verify_deployment.py --against declared` re-derives it from that commit before",
+    "trusting it, so editing this value to match a chain would fail the provenance check rather",
+    "than silence it.",
+    "",
+    "Do not edit a hash here to make a check pass. The correct response to a mismatch is to find",
     "out what got deployed."
   ],
   "network": "testnet",
@@ -19,7 +24,13 @@
   "approval_program": {
     "bytes": 660,
     "sha512_256": "d24d9071209f526a2075542d9408295d78f83ca5ed4c8cc233000130dcc97d44",
-    "avm_version": 12
+    "avm_version": 12,
+    "provenance": {
+      "derived_by": "assembling the committed TEAL artifact at the commit named in deployed_commit",
+      "artifact_path": "contracts/out/TrelyanInscription.approval.teal",
+      "method": "algod POST /v2/teal/compile, then sha512_256 of the returned bytecode",
+      "NOT_derived_by": "reading the program off the chain (that would make the declared check circular)"
+    }
   },
   "creator": "2HBKLP2X3UF4KBRUACEQMCCH3JWA27CDNYD7K46MJI5Z6JUVVRPWSEEQDM",
   "verified_at": "2026-08-24",
