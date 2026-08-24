@@ -56,6 +56,44 @@ def box_refs(cell_id: int):
     return [b"k_" + k, b"o_" + k, b"i_" + k]
 
 
+MIN_AVM_VERSION = 12
+
+# A two-line program that assembles ONLY on a node whose assembler knows AVM v12. The contract's
+# approval program is #pragma version 12 and calls falcon_verify (0x85), so this is the capability
+# the deployment actually depends on.
+_AVM_PROBE = "#pragma version {v}" + chr(10) + "int 1" + chr(10)
+
+
+def _assert_node_supports_falcon_verify(algod) -> None:
+    """Refuse to deploy against a node whose assembler predates AVM v12.
+
+    Probes the CAPABILITY rather than parsing a version string. The first version of this check
+    parsed `suggested_params().consensus_version` expecting it to end in "/v41" -- but TestNet
+    actually reports a spec-repo COMMIT SHA:
+
+        https://github.com/algorandfoundation/specs/tree/268b63433a907455d439995bf916f6b296018f4f
+
+    so that check refused every real deployment. Its unit tests passed because they used invented
+    inputs. Asking the node to assemble the pragma we depend on cannot drift with a string format.
+
+    Fail-closed: an unreachable node, or any non-success answer, REFUSES. "Could not determine"
+    must never be treated as "capable" -- that is how a check becomes decorative.
+    """
+    if os.environ.get("TRELYAN_SKIP_AVM_CHECK") == "1":
+        print("  ! AVM pre-flight SKIPPED by TRELYAN_SKIP_AVM_CHECK")
+        return
+    try:
+        algod.compile(_AVM_PROBE.format(v=MIN_AVM_VERSION))
+    except Exception as exc:  # noqa: BLE001 - any failure here must refuse, not proceed
+        sys.exit(
+            f"This node cannot assemble #pragma version {MIN_AVM_VERSION}, so it does not support "
+            f"falcon_verify: {type(exc).__name__}: {exc}. Refusing to deploy -- the create "
+            "transaction would be accepted and the contract would then fail at the opcode. "
+            "Point at an up-to-date node, or set TRELYAN_SKIP_AVM_CHECK=1 deliberately."
+        )
+    print(f"  ok  node assembles AVM v{MIN_AVM_VERSION}; falcon_verify is available")
+
+
 def main() -> None:
     mn = os.environ.get("DEPLOYER_MNEMONIC")
     if not mn:
@@ -64,6 +102,20 @@ def main() -> None:
     algorand = AlgorandClient.testnet()
     deployer = algorand.account.from_mnemonic(mnemonic=mn)
     print(f"deployer: {deployer.address}")
+
+    # PRE-FLIGHT: refuse to deploy against a node too old to have falcon_verify.
+    #
+    # The contract's approval program is #pragma version 12 and calls falcon_verify (opcode 0x85),
+    # which requires AVM v12. Before this check, suggested_params() was called and ONLY .gh was
+    # read -- .consensus_version was fetched and discarded, and no minimum-version assertion
+    # existed anywhere in the repository. AVM v12 was therefore assumed from whatever node TestNet
+    # happened to resolve to, and a too-old node surfaced as an unhandled exception AFTER the
+    # create transaction had already been submitted.
+    #
+    # This runs BEFORE the first transaction, so a capability mismatch costs nothing and reports
+    # the reason rather than an opaque failure from deep inside the SDK. (Found by the 2026-08-24
+    # audit as its highest-risk finding.)
+    _assert_node_supports_falcon_verify(algorand.client.algod)
 
     gh = algorand.client.algod.suggested_params().gh
     genesis = bytes(gh) if isinstance(gh, (bytes, bytearray)) and len(gh) == 32 else base64.b64decode(gh)
