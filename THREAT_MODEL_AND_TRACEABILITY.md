@@ -5,7 +5,10 @@ does not spend week one reconstructing the trust surface, the invariant→test m
 reproduction steps. **Scope honesty up front:** the localnet suite *exercises* the listed execution
 paths and *rejects the exercised attack vectors* on a live localnet AVM. It does **not** constitute a
 proof of the invariants over all histories, encodings, or upgrade paths — that inductive/exhaustive
-argument is exactly what we are engaging Runtime Verification to provide.
+argument is exactly the kind of work a formal-methods firm (e.g. Runtime Verification) would
+provide. **No such firm is engaged.** No audit or formal-verification engagement has been
+scheduled, quoted or paid for; earlier wording here implied an active engagement and did not
+survive the 2026-08-24 audit.
 
 ---
 

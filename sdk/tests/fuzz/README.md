@@ -8,7 +8,7 @@ single golden signature. They are a superset in breadth, not a replacement — k
 | Harness | Layer | Engine | Targets |
 |---|---|---|---|
 | `fuzz_encoding_atheris.py` | pure-python / ctypes | Atheris (libFuzzer for CPython) | `build_message()` construction/parsing, the `0xBA` header + salt-version + `<=1423` length envelope, and `FalconDet1024.verify()` |
-| `fuzz_falcon_verify.cc` | C | libFuzzer + ASan/UBSan | the C `falcon_det1024_verify_compressed` decoder (memory safety) on mutated sig / pubkey / message bytes |
+| `fuzz_falcon_verify.cc` | **C++** (see tier note below) | libFuzzer + ASan/UBSan | the C `falcon_det1024_verify_compressed` decoder (memory safety) on mutated sig / pubkey / message bytes |
 
 Both use the **real** API: `trelyan_pq.build_message`, `trelyan_pq.FalconDet1024.verify`, the
 constants `DET_COMPRESSED_HEADER` (0xBA), `CURRENT_SALT_VERSION` (0), `SIG_COMPRESSED_MAXSIZE`
@@ -68,7 +68,7 @@ clone corrupts the digest via autocrlf).
 ```bash
 FALCON_SRC=/path/to/algorand-falcon          # extracted tarball root
 
-clang -g -O1 -std=c11 \
+clang++ -g -O1 -std=c++17 \
   -fsanitize=fuzzer,address,undefined \
   -fno-sanitize-recover=undefined \
   -DFALCON_UNALIGNED=0 -DFALCON_FPEMU=1 -DFALCON_FPNATIVE=0 \
@@ -113,3 +113,29 @@ mkdir -p sdk/tests/fuzz/corpus_verify
   known-good signature/message pair to give the coverage-guided fuzzers a fast start.
 - The C harness asserts memory safety only (no forgery-resistance / never-accept assertion); the
   python harness asserts never-accept on attacker bytes because it controls all inputs.
+
+### Tier note: this harness is C++, and that is a declared exception
+
+`fuzz_falcon_verify.cc` is **C++**, not C — the `.cc` extension puts clang in C++ mode, and the file
+itself says so (`extern "C"` so the C++ link resolves the unmangled symbol). It was previously
+labelled "C" here, and the documented build passed `-std=c11` to a C++ translation unit, which the
+clang driver rejects: anyone copying the block got a build error rather than a fuzzer. Both are
+fixed above.
+
+The TRELYAN constitution §0 admits Lean/F*/Jasmin, Rust, C11, Python/TEAL/Solidity and build glue,
+and forbids "every other language — including for quick scripts, tests, demos, or examples". C++ is
+in no tier. The four vendored Go files under `third_party/` are disclosed and justified in
+`third_party/falcon-det1024/PROVENANCE.md`; this file was **not** disclosed anywhere, which the
+2026-08-24 audit flagged.
+
+It is recorded here rather than silently kept:
+
+- **What it is:** a libFuzzer entry point (`LLVMFuzzerTestOneInput`) over the vendored C decoder.
+  It is TRELYAN-authored, lives under `sdk/tests/`, and is **test-only** — no build step, image,
+  wheel or CI job compiles it, and nothing ships it.
+- **Why C++ at all:** libFuzzer harnesses are conventionally `.cc`, and ASan/UBSan integration is
+  the point of the harness.
+- **The honest position:** this needs Brandon's decision, not a silent exception. Either grant a
+  documented tier exception for test-only fuzz harnesses, **or** port it to Rust `cargo-fuzz`,
+  which the constitution permits outright and which the repo already has a Rust workspace for.
+  Until that decision, treat this file as a known, disclosed deviation.

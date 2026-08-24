@@ -2,7 +2,7 @@
 
 **Date:** 1 June 2026 · **Scope:** `inscription.py` + `TRELYAN_PROTOCOL_SPEC_v0.2.md` +
 the Falcon/metadata/budget memos + the three off-chain Python files. An independent review
-(separate reviewer, fresh read) was run **before** handing to Runtime Verification, to catch
+(separate reviewer, fresh read) was run in preparation for an external audit (no firm engaged), to catch
 errors and doc-vs-code mismatches ourselves. This logs what it found and what we did — so RV sees
 the full provenance and changelog.
 
@@ -32,7 +32,24 @@ documentation-vs-code mismatches and missing guards, not forgery/bypass.
 ## What remains open (legitimately needs a live run)
 `A4` (intra-group write visibility), `A8` (sig-encoding round-trip on-chain), `A2` (native genesis
 source), and budget-mode confirmation — all require a localnet/TestNet run, which awaits the
-contract compiling (dev VM is down this week). These are disclosed in `AUDIT_READINESS_PACK.md` §5.
+contract compiling (dev VM is down this week). **These four remain OPEN and are disclosed here, in this file.** An earlier revision deferred them
+to `AUDIT_READINESS_PACK.md` §5 — a document that has never existed in any commit (verified
+2026-08-24). For roughly two months they therefore read as handled while being, in fact,
+undisclosed: a reader following the pointer found nothing, and nothing said so.
+
+Current status of the four:
+
+| Item | What it needs | Status |
+|---|---|---|
+| `A4` intra-group write visibility | localnet/TestNet run | The 25-test suite now runs on a real LocalNet AVM in CI (`contract-tests`). Whether it covers A4 specifically is **not yet confirmed** — do not assume it does. |
+| `A8` sig-encoding round-trip on-chain | localnet/TestNet run | Same. The suite docstring claims it closes A1; A8 is not named. |
+| `A2` native genesis source | localnet/TestNet run | Same; `Global.genesis_hash` is bound at `inscription.py:310`. |
+| budget-mode confirmation | localnet/TestNet run | Same. |
+
+The blocker recorded above ("dev VM is down this week") no longer applies — CI has run the suite on
+LocalNet since. What is still missing is a **per-item mapping** from each of A2/A4/A8/budget to the
+specific test that closes it. Until that mapping exists these stay open, and this table is the
+disclosure.
 
 ## Bottom line
 The cryptographic core is sound and the contract's authorization gate is complete and correctly

@@ -51,7 +51,12 @@ COPY scripts/ scripts/
 # A clone applies the runner's core.autocrlf, which can rewrite the C sources LF->CRLF and change
 # their bytes (deterministic.c -> e005ebda instead of the pinned 601390dc), failing the digest gate
 # for a non-substantive reason. The tarball is LF on every OS and is exactly what the pin was
-# computed from. Mirrors ci.yml "Fetch pinned Falcon source".
+# computed from. NOTE: ci.yml no longer has a "Fetch pinned Falcon source" step - all three
+# consumers now stage the vendored tree offline ("Stage the vendored pinned Falcon tree
+# (commit ce15e75, no network)"). This image still fetches over the network, so it is NOT
+# the hermetic, no-network path README describes; the digest check below is what makes the
+# fetched tree trustworthy. Flagged by the 2026-08-24 audit; switching this to COPY from
+# third_party/falcon-det1024/src would make the container genuinely hermetic.
 RUN curl -sL "https://github.com/algorand/falcon/archive/${FALCON_COMMIT}.tar.gz" | tar xz \
  && mv "falcon-${FALCON_COMMIT}" falcon-src
 

@@ -15,8 +15,13 @@ start on day one without reconstructing the trust surface.
 
 > **Relationship to existing docs.** This file is the *security-audit* scope sheet (what an external
 > firm should attack and confirm). It does **not** replace:
-> - `AUDIT_READINESS_PACK.md` / `AUDITOR_HANDOFF.md` — the *formal-verification* brief (the I1–I5 /
->   C1–C5 proof obligations and the A1–A9 known-items ledger). Read that for the proof-of-invariants ask.
+> - **There is no separate formal-verification brief.** Earlier revisions of this file pointed at
+>   `AUDIT_READINESS_PACK.md` and `AUDITOR_HANDOFF.md` for the I1–I5 / C1–C5 obligations and an
+>   A1–A9 ledger. **Neither file has ever existed in any commit** (verified 2026-08-24 across the
+>   full history). The material that does exist is the invariant matrix in
+>   `THREAT_MODEL_AND_TRACEABILITY.md` §6 — and it is an invariant-to-**test** matrix, not a set of
+>   proof obligations. Do not expect a proof artifact: this repository has no Lean, F* or Jasmin
+>   layer, and claims none.
 > - `THREAT_MODEL_AND_TRACEABILITY.md` — actors, trust boundaries, and the invariant→test→code matrix.
 > - `SECURITY.md` — disclosure policy and the in/out-of-scope statement this sheet refines.
 > - `REVIEWER.md` — the 5-minute, read-only reproduction (the **reproduction entry**, below).
@@ -27,7 +32,7 @@ start on day one without reconstructing the trust surface.
 ## 1. One paragraph (honest)
 
 A Cell holder binds an off-chain artifact to the Algorand ledger by having a smart contract verify a
-**deterministic Falcon-1024** signature — via the AVM native `falcon_verify` opcode (`0x85`, AVM v12 /
+**deterministic Falcon-1024** signature — via the AVM native `falcon_verify` opcode (`0x85`, AVM v12; the exact consensus/go-algorand pairing below is marked **[OPEN — version disputed]** in the spec and public sources conflict — treat the AVM version as the load-bearing fact) /
 consensus v41 / go-algorand v4.3.0, published cost `costly(1700)`) — over a domain-separated message,
 then writing a **write-once** record into box storage. The Falcon public key is committed once per Cell
 at mint and read from chain state at inscribe, so it never rides in the call arguments. The value is
@@ -138,7 +143,7 @@ histories — that gap is exactly the engagement.
 ## 4. Known open items (disclosed, with disposition)
 
 These are the residuals a finite localnet suite cannot close. Carried from
-`THREAT_MODEL_AND_TRACEABILITY.md` §6 and `AUDIT_READINESS_PACK.md` §5 (A1–A9). We surface them so an
+`THREAT_MODEL_AND_TRACEABILITY.md` §6. (An earlier version also cited `AUDIT_READINESS_PACK.md` §5; that file never existed.) We surface them so an
 auditor spends week one on the real surface, not rediscovery.
 
 | # | Item | Disposition (2026-06-17) | What the auditor confirms |
@@ -172,7 +177,7 @@ auditor spends week one on the real surface, not rediscovery.
 | CI | `.github/workflows/ci.yml` | wire-format / verify-live / signature-kat (3-OS) / testnet-e2e + a sanitizer (alignment/UBSan) gate. |
 | Encoding / budget / arg-order memos | `contracts/FALCON_ENCODING_2026-06-01.md`, `contracts/FALCON_BUDGET_2026-06-01.md`, `contracts/A1_RESOLUTION_2026-06-01.md` | How encoding, opcode cost, and argument order were pinned, with sources. |
 | Threat model & traceability | `THREAT_MODEL_AND_TRACEABILITY.md` | Actors, boundaries, invariant→test→code matrix, reproduction, TestNet checklist. |
-| Formal-verification brief | `AUDIT_READINESS_PACK.md`, `AUDITOR_HANDOFF.md` | The I1–I5 / C1–C5 proof obligations + A1–A9 ledger. |
+| Invariant→test matrix | `THREAT_MODEL_AND_TRACEABILITY.md` §6 | The I1–I5 / C1–C5 invariants and the tests that exercise them. **Not** proof obligations, and **not** a formal-verification brief — no such document exists. |
 | Spec | `TRELYAN_PROTOCOL_SPEC_v0.2.md` | Message (§4), checks (§5), threat model (§6), honesty ledger. |
 | Disclosure policy | `SECURITY.md` | Private reporting + the test-vector-key note. |
 

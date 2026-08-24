@@ -125,6 +125,11 @@ def sign_compressed(privkey: bytes, data: bytes) -> bytes:
     if rc != 0:
         raise RuntimeError(f"falcon_det1024_sign_compressed failed (rc={rc})")
     out = sig.raw[:sig_len.value]
+    # Guard emptiness BEFORE indexing. A zero-length return previously raised IndexError from
+    # out[0] instead of the AssertionError this check exists to raise -- still fail-closed, but it
+    # reported the wrong fault and pointed a reader at the wrong line.
+    if not out:
+        raise AssertionError("signer returned an empty signature; expected a 0xBA-headed compressed signature")
     if out[0] != DET_COMPRESSED_HEADER:
         raise AssertionError(f"unexpected header byte {out[0]:#04x}; expected {DET_COMPRESSED_HEADER:#04x}")
     return out
