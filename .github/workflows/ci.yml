@@ -141,6 +141,39 @@ jobs:
         # Exit 2 = could not check (network, missing artifact). Distinct on purpose: an
         # unreachable node must never be reported as agreement, nor as drift.
 
+  deployed-app-is-declared:
+    name: Deployed app is the program DEPLOYMENT.json declares
+    # A DIFFERENT question from the job above, and the reason both exist.
+    #
+    #   deployed-app-matches-committed  ->  does the chain run what the committed source builds?
+    #                                       Currently RED, correctly: a806f63 is deployed, the
+    #                                       committed contract is 2ec798e. That red is the finding.
+    #   deployed-app-is-declared (this) ->  does the chain run a program we RECORDED?
+    #                                       Expected GREEN. Goes red only if the chain serves
+    #                                       something nobody declared.
+    #
+    # Before contracts/DEPLOYMENT.json existed, those two situations were indistinguishable: a
+    # pending redeploy and an unexpected deployment produced the identical red. Splitting them
+    # means the known-stale state stays legible while an UNDECLARED program - wrong app id,
+    # surprise deploy, or an endpoint that is not telling the truth - now has its own alarm that
+    # is quiet today and would fire the moment it stopped being true.
+    #
+    # This does NOT relax the gate above. Nothing here is continue-on-error, and the committed
+    # check keeps its exact prior default behaviour (verified: still exits 1 on the current drift).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - name: Compare the deployed program to DEPLOYMENT.json
+        run: python contracts/verify_deployment.py --against declared
+        # Exit 0 = the chain is the declared program.
+        # Exit 1 = UNDECLARED program on chain. Establish what got deployed; never "fix" this by
+        #          editing the manifest hash.
+        # Exit 2 = could not check (network, missing or malformed manifest). Distinct on purpose:
+        #          a manifest that fails to parse must never be reported as agreement.
+
   signature-kat:
     name: Signature byte-identity KAT (pinned Falcon build, 3 OSes)
     # Build-divergence control (reviewer Q11/Q7): the SAME committed golden signatures must be

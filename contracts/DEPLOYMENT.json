@@ -1,0 +1,35 @@
+{
+  "_comment": [
+    "WHAT IS ACTUALLY DEPLOYED. This file DECLARES the on-chain program, so CI can tell two very",
+    "different situations apart: (a) the chain runs a program we recorded and a redeploy is",
+    "pending -- a known, bounded state; and (b) the chain runs a program NOBODY declared -- an",
+    "alarm, because it means an unexpected deployment, a wrong app id, or a compromised endpoint.",
+    "Before this file existed only (a) was detectable, and it was indistinguishable from (b).",
+    "",
+    "This does NOT relax the committed-source gate. verify_deployment.py still defaults to",
+    "--against committed and still exits 1 on drift. This adds a second, independent assertion.",
+    "Do not edit a hash here to make a check pass: the correct response to a mismatch is to find",
+    "out what got deployed."
+  ],
+  "network": "testnet",
+  "app_id": 763809096,
+  "algod_reference": "https://testnet-api.algonode.cloud",
+  "deployed_commit": "a806f634cf1b288605015b2d4c5b1988226bcb20",
+  "deployed_commit_short": "a806f63",
+  "approval_program": {
+    "bytes": 660,
+    "sha512_256": "d24d9071209f526a2075542d9408295d78f83ca5ed4c8cc233000130dcc97d44",
+    "avm_version": 12
+  },
+  "creator": "2HBKLP2X3UF4KBRUACEQMCCH3JWA27CDNYD7K46MJI5Z6JUVVRPWSEEQDM",
+  "verified_at": "2026-08-24",
+  "pending_redeploy": {
+    "pending": true,
+    "superseding_commit": "2ec798ed18334ad45634041635d0371e8a06c1a4",
+    "superseding_commit_short": "2ec798e",
+    "delta_bytes": 7,
+    "what_changed": "register_cell gained: assert op.getbyte(committed_pubkey.native, 0) == 0x0A -- a Falcon-1024 (logn=10) public-key header check, at the only point a key enters state.",
+    "risk_while_pending": "Contained. register_cell is admin-gated; PUBKEY_LEN is still enforced on the live app; falcon_verify rejects a malformed key at use time. The missing assert makes a bad key unusable rather than unregisterable, and admits no forgery. TestNet only, labelled UNAUDITED - not for MainNet value.",
+    "resolution": "Redeploy from the committed artifact and update this file, or record a decision to keep 763809096 on a806f63 permanently."
+  }
+}

@@ -49,6 +49,8 @@ DEFAULT_SOURCE = REPO_ROOT / "inscription.py"
 
 # TestNet deployment under review. Not a security constant - changing it only
 # changes which application is inspected, never what "correct" means.
+NL = chr(10)  # newline without a backslash literal; see repo shell-escaping notes
+DEFAULT_MANIFEST = REPO_ROOT / "DEPLOYMENT.json"
 DEFAULT_APP_ID = 763809096
 DEFAULT_ALGOD = "https://testnet-api.algonode.cloud"
 
@@ -110,6 +112,26 @@ def recompile_from_source(source: pathlib.Path, out_dir: pathlib.Path) -> None:
         raise CheckError(f"puya failed: {exc.stderr.decode(errors='replace')[:500]}") from exc
 
 
+def load_declared(manifest: pathlib.Path) -> tuple[int, str]:
+    """Return (app_id, expected sha512_256) from the deployment manifest.
+
+    The manifest DECLARES what is deployed. Comparing the chain against it answers a different
+    question from the committed-source check, and one nothing else here asks: is the chain running
+    a program we recorded at all? A mismatch means an undeclared deployment, a wrong app id, or a
+    lying endpoint - each of which is more serious than known drift, and none of which the
+    committed-source comparison can distinguish from ordinary staleness.
+    """
+    if not manifest.exists():
+        raise CheckError(f"deployment manifest not found: {manifest}")
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+        return int(data["app_id"]), str(data["approval_program"]["sha512_256"])
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        # Fail as "could not check" (2), never as agreement. A malformed manifest must not be
+        # able to produce a pass.
+        raise CheckError(f"malformed deployment manifest {manifest}: {exc}") from exc
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--app-id", type=int, default=DEFAULT_APP_ID)
@@ -121,10 +143,51 @@ def main() -> int:
     parser.add_argument("--source", type=pathlib.Path, default=DEFAULT_SOURCE)
     parser.add_argument("--recompile", action="store_true",
                         help="re-derive the TEAL artifact from inscription.py first (requires puya)")
+    parser.add_argument("--against", choices=("committed", "declared"), default="committed",
+                        help="committed (default): does the chain run what the committed source "
+                             "builds? declared: does the chain run the program DEPLOYMENT.json "
+                             "records? The default is unchanged from before this flag existed.")
+    parser.add_argument("--manifest", type=pathlib.Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--timeout", type=int, default=30)
     args = parser.parse_args()
 
     compile_url = args.compile_url or args.algod
+
+    if args.against == "declared":
+        # Independent question: is the chain running the program DEPLOYMENT.json records?
+        # This does NOT involve the committed source at all, so it stays green while a
+        # redeploy is pending and goes red only if the chain serves something undeclared.
+        try:
+            declared_app, declared_hash = load_declared(args.manifest)
+            if declared_app != args.app_id:
+                raise CheckError(
+                    f"manifest declares app {declared_app} but --app-id is {args.app_id}; "
+                    "refusing to compare a program against another application's record"
+                )
+            deployed = fetch_deployed(args.app_id, args.algod, args.timeout)
+            deployed_hash = sha512_256(deployed)
+        except CheckError as exc:
+            print(f"{NL}COULD NOT CHECK: {exc}", file=sys.stderr)
+            return 2
+
+        print(f"[1] declared in         {args.manifest.name}")
+        print(f"    declared bytecode   sha512_256 {declared_hash}")
+        print(f"[2] deployed app {args.app_id} via {args.algod}")
+        print(f"    actual bytecode     {len(deployed)} B   sha512_256 {deployed_hash}")
+        print()
+        if deployed_hash == declared_hash:
+            print(f"MATCH - application {args.app_id} is the program DEPLOYMENT.json declares.")
+            return 0
+        print(f"UNDECLARED - application {args.app_id} is serving a program nobody recorded.")
+        print(f"  DEPLOYMENT.json declares : {declared_hash}")
+        print(f"  chain is actually serving: {deployed_hash}  ({len(deployed)} B)")
+        print()
+        print("  This is NOT ordinary drift. Ordinary drift means the chain lags the committed")
+        print("  source by a known delta. This means the chain is running something that was")
+        print("  never recorded: an unexpected deployment, the wrong app id, or an endpoint")
+        print("  that is not telling the truth. Establish what got deployed before doing")
+        print("  anything else, and do NOT edit the manifest to make this pass.")
+        return 1
 
     try:
         if args.recompile:
