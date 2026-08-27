@@ -119,6 +119,52 @@ def test_fixture_is_populated_when_required():
     )
 
 
+# --- CI guard: fail (don't skip) if the LIBRARY is absent, which is the thing being tested ------
+def test_the_library_is_available_when_required():
+    """`TRELYAN_REQUIRE_KAT=1` must arm the BYTE-IDENTITY tests, not only the fixture.
+
+    Found 2026-08-16. The gate above asserts `_populated()` — a statement about the JSON
+    fixture. The byte-identity tests are gated by a DIFFERENT mark,
+    `requires_lib = skipif(not _lib_available(), ...)`, which `TRELYAN_REQUIRE_KAT` never
+    touched. So the env var armed the fixture check and left the actual cryptographic
+    comparison free to skip.
+
+    Demonstrated, before this test existed:
+
+        FALCON_DET1024_LIB=/nonexistent/... TRELYAN_REQUIRE_KAT=1 pytest tests/test_signature_kat.py
+        -> 5 passed, 2 skipped   EXIT=0
+
+    Exit 0 is what three reviewer-facing entry points read as success:
+
+      * `scripts/verify_all.sh` then prints "[PASS] Axis C — committed goldens re-sign
+        byte-identically (build-divergence control)" having compared ZERO signature bytes,
+        and REVIEWER.md hands that command to the external auditor under "proves determinism".
+      * `make verify-kat` exits 0. It gated only on FALCON_DET1024_LIB being a NON-EMPTY
+        STRING, never on the library loading, and did not set TRELYAN_REQUIRE_KAT at all.
+      * `Dockerfile.repro` builds green, under a comment asserting that "a green build can
+        never silently mean the byte-identity KAT was skipped" — exactly the property it
+        lacked.
+
+    This is not hypothetical: ci.yml records an empty-export-table DLL in the first person
+    ("all thirteen lib-gated tests 'skipped'"). ci.yml compensates with an independent
+    `grep -q "FALCON_DET1024_LIB not" pytest-full.log`; the three entry points above have no
+    equivalent, and a grep over a log is a weaker control than an assertion anyway.
+
+    `test_interop_algo_pqc_kit_kat.py` already does exactly this for the interop KAT. This is
+    the same control, applied to the KAT that actually gates releases.
+    """
+    if os.environ.get("TRELYAN_REQUIRE_KAT") != "1":
+        pytest.skip("set TRELYAN_REQUIRE_KAT=1 (CI does) to require a loadable Falcon library")
+    assert _lib_available(), (
+        "TRELYAN_REQUIRE_KAT=1 was set, so the byte-identity KAT must actually RUN — but the "
+        "Falcon library did not load, so every byte-identity test would have skipped and the "
+        "run would have exited 0 having compared no signature bytes. Set FALCON_DET1024_LIB to "
+        "a loadable libfalcondet1024 built from the pinned source (see PINNED_BUILD.md). If you "
+        "genuinely intend to run without the library, unset TRELYAN_REQUIRE_KAT — but then do "
+        "not report the result as a byte-identity check."
+    )
+
+
 # --- pure-Python fixture integrity (no lib): runs once the fixture is populated ------------------
 @requires_fixture
 def test_committed_vectors_are_internally_consistent():

@@ -87,9 +87,16 @@ LABEL trelyan.trelyan_pq_version="${TRELYAN_PQ_VERSION}"
 RUN python -m pip install --no-cache-dir -e "sdk[dev]"
 
 # --- 5. Byte-identity KAT vs the committed golden -----------------------------------------------
-# TRELYAN_REQUIRE_KAT=1 makes this FAIL (not skip) if the fixture is still the unpopulated sentinel,
-# so a green build can never silently mean the byte-identity KAT was skipped. Mirrors ci.yml
-# "Run the signature KAT". Runs at BUILD time so `docker build` itself proves the offline axes.
+# TRELYAN_REQUIRE_KAT=1 makes this FAIL (not skip) on an unpopulated fixture OR an unloadable
+# Falcon library, so a green build cannot silently mean the byte-identity KAT was skipped.
+#
+# That sentence was previously written as a claim while only the fixture half was true: the
+# byte-identity tests are gated by a separate `requires_lib` mark which this variable did not
+# touch, so an unloadable library gave "5 passed, 2 skipped", exit 0, and a green image. The
+# library half is now asserted by test_the_library_is_available_when_required.
+#
+# Mirrors ci.yml "Run the signature KAT". Runs at BUILD time so `docker build` itself proves the
+# offline axes.
 ENV TRELYAN_REQUIRE_KAT=1
 RUN cd sdk && pytest tests/test_signature_kat.py -v
 

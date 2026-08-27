@@ -21,7 +21,12 @@ verify-onchain:
 
 verify-kat:
 > @test -n "$(FALCON_DET1024_LIB)" || { echo "set FALCON_DET1024_LIB=/path/to/libfalcon_det1024.so"; exit 2; }
-> FALCON_DET1024_LIB="$(FALCON_DET1024_LIB)" python -m pytest sdk/tests/test_signature_kat.py -v
+# TRELYAN_REQUIRE_KAT=1 is REQUIRED here, not optional. Without it the byte-identity tests are
+# free to skip on an unloadable library and this target exits 0 having compared no signature
+# bytes. The -n test above checks only that the variable is a NON-EMPTY STRING -- it says
+# nothing about whether the path loads -- so it is kept purely for a friendlier early
+# message; the real predicate is asserted by test_the_library_is_available_when_required.
+> TRELYAN_REQUIRE_KAT=1 FALCON_DET1024_LIB="$(FALCON_DET1024_LIB)" python -m pytest sdk/tests/test_signature_kat.py -v
 
 verify-digest:
 > @test -n "$(TREE)" || { echo "set TREE=/path/to/pinned/falcon/source/tree"; exit 2; }
