@@ -226,6 +226,11 @@ class TrelyanInscription(ARC4Contract):
         assert op.getbyte(committed_pubkey.native, UInt64(0)) == UInt64(0x0A), "bad committed pubkey header (logn=10)"
         # 1,024 cell hard cap (spec §2)
         assert self.cells_registered < TOTAL_CELLS, "all 1024 cells registered"
+        # Same absorbing-state guard as update_owner, at the OTHER point an owner enters state.
+        # Minting straight to the zero address would brick the cell at registration, before any
+        # owner ever holds it. Both writers are covered so the invariant is "no cell is ever
+        # owned by the zero address", not "one path happens to check".
+        assert controlling_owner.bytes != Global.zero_address.bytes, "controlling owner cannot be the zero address"
         # register-once: committed key and owner must not already exist
         assert cid not in self.committed_pubkey, "cell already registered"
         assert cid not in self.controlling_owner, "cell already registered (owner)"
@@ -337,6 +342,46 @@ class TrelyanInscription(ARC4Contract):
         assert cid in self.controlling_owner, "cell not registered"
         assert self.controlling_owner[cid] == Txn.sender.bytes, "only controlling owner"
         assert cid not in self.inscriptions, "already inscribed; owner frozen"
+        # TCE-76: the CALLER must still hold the cell ASA.
+        #
+        # Without this, a seller who transferred the Cell ASA but remained the recorded
+        # controlling_owner could still reassign control of a cell someone else now holds --
+        # including to an address with no known key, permanently bricking it. The zero-address
+        # guard below closes only the member of that family reached by accident; this closes
+        # the deliberate path at its source, by requiring the mover to have something to lose.
+        #
+        # Chosen over a check on the DESTINATION (balance(new_owner) == 1) deliberately: that
+        # would close the whole unsignable family but redefine controlling_owner as "must be
+        # the current holder", forbidding a delegate, an escrow, or assigning control before
+        # the NFT moves. This constrains WHO MAY MOVE control, not WHERE it may point.
+        #
+        # Same operand order and idiom as C1 in inscribe (see there for why clawback/freeze
+        # being cleared at register_cell is what makes a balance check trustworthy at all).
+        _bal, _held = op.AssetHoldingGet.asset_balance(Txn.sender, cell)
+        assert _held and _bal == UInt64(1), "caller does not hold the cell"
+        # The DESTINATION was previously unvalidated: any 32 bytes were written. The zero
+        # address is an absorbing state — both remaining movers (inscribe C1 and this method)
+        # require controlling_owner[cid] == Txn.sender.bytes, which no key can ever satisfy for
+        # it. Re-registration is blocked by the register-once guards above, on_update/on_delete
+        # hard-fail (I5), and there is no admin override, so the cell becomes permanently
+        # un-inscribable — one of only 1,024, dead, with no remedy short of minting a
+        # replacement. THREAT_MODEL_AND_TRACEABILITY.md lists "commit a malformed key (brick a
+        # cell)" as a defended attack and register_cell applies exactly this reasoning to the
+        # OTHER field committed at mint; the owner pointer was simply missed.
+        # Reachable by griefing AND by accident — algosdk encodes a default-constructed
+        # arc4.Address as 32 zero bytes, which satisfied the only check present (ARC-4 len == 32).
+        # SCOPE, because this guard is narrower than it looks and an auditor will ask.
+        # On Algorand the address IS the ed25519 public key, so what makes a destination
+        # absorbing is "no known scalar" -- not the bit pattern. Any 32 bytes with no known
+        # key is equally terminal: 0x00..01, a hash-derived burn address, an always-reject
+        # LogicSig address, an immutable app account that cannot inner-call here. This
+        # guard closes ONE member of that family. It is worth having because that member is
+        # the one reached BY ACCIDENT -- algosdk encodes a default-constructed arc4.Address
+        # as 32 zero bytes -- but it does NOT establish "the owner can always sign".
+        # Closing the family needs a holder check on the destination (balance == 1), which
+        # changes what controlling_owner MEANS (no delegate who does not hold the NFT), so
+        # it is a design decision, not a bug fix. Tracked separately in the risk register.
+        assert new_owner.bytes != Global.zero_address.bytes, "new owner cannot be the zero address"
         self.controlling_owner[cid] = new_owner.bytes
 
     # -------------------------------------------------------------------------

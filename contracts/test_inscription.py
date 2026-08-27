@@ -22,6 +22,7 @@ RE-generated after recompile; `pip install algokit-utils pytest`.
 import base64
 import hashlib
 import pytest
+from algosdk import encoding as algo_encoding
 
 import falcon_det1024
 from trelyan_client import TrelyanInscriptionFactory  # generated
@@ -476,6 +477,89 @@ def test_update_owner_only_owner(algorand, deployed, accounts):
     register(client, admin, cell, pk)
     with pytest.raises(Exception):           # only the current controlling_owner may reassign
         client.send.update_owner(args=(cell, mallory.address), params=CommonAppCallParams(sender=mallory.address))
+
+
+# DERIVED, not written down. My first draft of this file hard-coded the base32 literal and got
+# it wrong (too many 'A's, 73 chars against the real 58) -- the exact defect shape this
+# repository's risk register is about: a constant nobody re-derives. encode_address(bytes(32))
+# is the definition, so it cannot drift from what the contract compares against.
+ZERO_ADDRESS = algo_encoding.encode_address(bytes(32))
+
+
+def test_update_owner_requires_the_caller_to_still_hold_the_cell(algorand, deployed, accounts):
+    """TCE-76: a seller who transferred the ASA must not keep the power to brick the cell.
+
+    The recorded controlling_owner and the ASA holder can diverge - this suite already documents
+    that in test_recorded_owner_who_no_longer_holds_is_rejected, for inscribe. update_owner had no
+    such requirement, so a seller who had handed over the NFT could still reassign control of the
+    buyer's cell, including to an address with no known key, permanently bricking it.
+
+    The zero-address guard closes only the member of that family reached BY ACCIDENT. This closes
+    the deliberate path, by requiring the mover to have something to lose.
+    """
+    client, app_id, admin = deployed
+    _, mallory = accounts
+    pk, _ = falcon_keypair()
+    cell = mint_cell(algorand, admin, admin)
+    register(client, admin, cell, pk)
+
+    # Admin holds the cell, so reassigning control to mallory is allowed.
+    client.send.update_owner(args=(cell, mallory.address),
+                             params=CommonAppCallParams(sender=admin.address))
+
+    # Admin is no longer the controlling owner, so this must fail on the OWNER check regardless.
+    with pytest.raises(Exception):
+        client.send.update_owner(args=(cell, admin.address),
+                                 params=CommonAppCallParams(sender=admin.address))
+
+    # mallory IS the recorded owner but does NOT hold the ASA (admin still does), so the new
+    # holder check must reject her even though the owner check passes.
+    with pytest.raises(Exception):
+        client.send.update_owner(args=(cell, mallory.address),
+                                 params=CommonAppCallParams(sender=mallory.address))
+
+
+def test_update_owner_rejects_the_zero_address(algorand, deployed, accounts):
+    """The zero address is an ABSORBING state, so writing it destroys the cell permanently.
+
+    Both remaining movers (inscribe C1 and update_owner) require
+    controlling_owner[cid] == Txn.sender.bytes, which no key can ever satisfy for the zero
+    address. Re-registration is blocked by the register-once guards, on_update/on_delete
+    hard-fail (I5), and there is no admin override -- so the cell is un-inscribable forever,
+    one of only 1,024, with no remedy short of minting a replacement.
+
+    Reachable by griefing AND by accident: algosdk encodes a default-constructed
+    arc4.Address as 32 zero bytes, which satisfied the only check that used to exist here
+    (the ARC-4 len == 32 decode).
+    """
+    client, app_id, admin = deployed
+    pk, _ = falcon_keypair()
+    cell = mint_cell(algorand, admin, admin)
+    register(client, admin, cell, pk)
+    with pytest.raises(Exception):
+        client.send.update_owner(args=(cell, ZERO_ADDRESS),
+                                 params=CommonAppCallParams(sender=admin.address))
+    # The cell must still be usable by its real owner -- a rejected call must not consume it.
+    client.send.update_owner(args=(cell, admin.address),
+                             params=CommonAppCallParams(sender=admin.address))
+
+
+def test_register_rejects_the_zero_address_as_owner(algorand, deployed, accounts):
+    """The same guard at the OTHER point an owner enters state.
+
+    Minting straight to the zero address would brick the cell at registration, before any
+    owner ever holds it. Covering both writers makes the invariant "no cell is ever owned by
+    the zero address" rather than "one path happens to check".
+    """
+    client, app_id, admin = deployed
+    pk, _ = falcon_keypair()
+    cell = mint_cell(algorand, admin, admin)
+    with pytest.raises(Exception):
+        client.send.register_cell(args=(cell, ZERO_ADDRESS, pk),
+                                  params=CommonAppCallParams(sender=admin.address))
+    # register-once must NOT have been tripped by the rejected attempt: the real registration
+    # still succeeds. A failed call that half-registers would be a worse bug than the one fixed.
+    register(client, admin, cell, pk)
 
 
 def test_update_owner_after_inscribed_rejected(algorand, deployed, accounts):
