@@ -50,6 +50,70 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: .gitleaks.toml
 
+  build-recipe-consistency:
+    name: Every published build recipe is pinned and hardened
+    # The repo had FIVE user-facing recipes cloning the algorand/falcon DEFAULT BRANCH (no commit,
+    # no digest) and compiling with `cc -O3 -fPIC -shared`, omitting -DFALCON_UNALIGNED=0 and
+    # -fno-strict-aliasing - while EVERY automated path (this workflow, .env.example,
+    # Dockerfile.repro, scripts/verify_all.sh) carried commit ce15e75 plus both flags. The split
+    # was total: no user-facing recipe referenced PINNED_BUILD.md, and one sat under a heading
+    # reading "Reproduction (pinned)" while pinning nothing.
+    #
+    # Not cosmetic. This workflow's OWN sanitizer gate asserts the DEFAULT autodetected build MUST
+    # trap under -fsanitize=alignment (it fails with "gate vacuous" if it does not), so the
+    # published recipe was demonstrably UB-positive. `pip install trelyan-pq` makes sdk/README.md
+    # the PyPI long description, so this was the recipe users actually followed to build the signer
+    # that authorizes on-chain writes.
+    #
+    # Escalation to key recovery is NOT claimed: PINNED_BUILD.md records the pin and upstream main
+    # as byte-identical over 120 signatures plus the KAT, so on tested toolchains the flags change
+    # no output. The harm is latent UB plus loss of pin provenance.
+    #
+    # A docs-consistency grep is a weaker control than a test, and is labelled as one - but the
+    # thing being protected IS a set of documents, so a grep over the tree is the right shape.
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+
+      - name: No recipe may clone the default branch
+        # This file is EXCLUDED from the search, and that exclusion is load-bearing rather than
+        # lazy: the search strings appear literally in this job, so a tree-wide grep would match
+        # itself and the gate would fail permanently on its own text. Automated Falcon builds in
+        # this workflow already fetch the pinned tarball and are covered by the digest gate in
+        # signature-kat, so nothing is left unguarded by the exclusion.
+        run: |
+          if git grep -n "clone https://github.com/algorand/falcon" -- . ':!.github/workflows/ci.yml' ; then
+            echo "::error::a build recipe clones the DEFAULT BRANCH. Use the pinned tarball -"
+            echo "::error::  https://github.com/algorand/falcon/archive/<PIN>.tar.gz  (PINNED_BUILD.md)"
+            exit 1
+          fi
+          echo "no default-branch clones outside this workflow"
+
+      - name: Every cc recipe carries both hardening flags
+        run: |
+          # `cc -O3` is the anchor because the recipes are multi-line: the source list and even
+          # `-o libfalcondet1024.so` can sit on a continuation line, so anchoring on either misses
+          # most of them. Verified against the tree: this matches all 7 recipe sites.
+          bad=$(git grep -n "cc -O3" -- . ':!.github/workflows/ci.yml' | grep -v "FALCON_UNALIGNED=0" || true)
+          if [ -n "$bad" ]; then
+            echo "::error::build recipe(s) missing -DFALCON_UNALIGNED=0 / -fno-strict-aliasing:"
+            echo "$bad"
+            exit 1
+          fi
+          n=$(git grep -l "cc -O3" -- . ':!.github/workflows/ci.yml' | wc -l | tr -d ' ')
+          echo "recipe sites found: $n (all hardened)"
+          # NON-VACUITY. If the pattern ever stops matching - a rename, a reformat - this gate
+          # would pass by finding nothing at all, which is the exact defect class this repository's
+          # register is about. The floor is deliberately below today's 7 so ordinary edits do not
+          # trip it, while a collapse to zero or near-zero does.
+          if [ "$n" -lt 4 ]; then
+            echo "::error::only $n recipe site(s) matched (expected 7). This gate has probably gone"
+            echo "::error::vacuous - the pattern no longer finds the recipes. Repair the pattern;"
+            echo "::error::do not lower this floor."
+            exit 1
+          fi
+
   wire-format:
     name: Wire-format tests (no network, no native lib)
     runs-on: ubuntu-latest

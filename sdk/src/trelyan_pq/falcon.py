@@ -9,9 +9,17 @@ Algorand uses — exposing keygen / sign / verify.
 
 Build the shared library once and point FALCON_DET1024_LIB at it:
 
-    git clone https://github.com/algorand/falcon && cd falcon
-    cc -O3 -fPIC -shared -o libfalcondet1024.so \\
-        codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c
+    # PINNED tarball, not `git clone` of the default branch. The tarball is LF on every OS;
+    # a clone applies the local core.autocrlf and on Windows rewrites the C sources, changing
+    # deterministic.c's digest. See PINNED_BUILD.md.
+    curl -sfL https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz -o falcon-src.tar.gz
+    tar xzf falcon-src.tar.gz && cd falcon-ce15e75bceb372867daf6b8e81918ab6978686eb
+    # -DFALCON_UNALIGNED=0 -fno-strict-aliasing are MANDATORY, not tuning. Without the first,
+    # CI's own sanitizer gate proves the default autodetected build traps on a misaligned
+    # uint64 load; the second removes a TBAA-UB class. Omitting them builds a signer whose
+    # output is only accidentally byte-identical.
+    cc -O3 -fPIC -DFALCON_UNALIGNED=0 -fno-strict-aliasing -shared \\
+       -o libfalcondet1024.so codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c
     export FALCON_DET1024_LIB="$PWD/libfalcondet1024.so"   # .dylib on macOS, .dll on Windows
 
 (If the link errors on a missing symbol, add the .c that defines it; if it errors on a

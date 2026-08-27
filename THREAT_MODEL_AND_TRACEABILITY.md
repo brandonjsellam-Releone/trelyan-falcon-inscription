@@ -78,7 +78,11 @@ C library (`libfalcondet1024.so`, built with `cc`), AVM target **v12**.
 
 ```
 # 1. Build the deterministic Falcon lib (once, Linux/WSL) and self-test the off-chain signer (A8):
-cc -O3 -fPIC -shared -o libfalcondet1024.so codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c
+# PINNED tarball (PINNED_BUILD.md), and the two hardening flags are mandatory - CI's own
+# sanitizer gate proves the DEFAULT autodetected build traps on a misaligned uint64 load.
+curl -sfL https://github.com/algorand/falcon/archive/ce15e75bceb372867daf6b8e81918ab6978686eb.tar.gz -o falcon-src.tar.gz
+tar xzf falcon-src.tar.gz && cd falcon-ce15e75bceb372867daf6b8e81918ab6978686eb
+cc -O3 -fPIC -DFALCON_UNALIGNED=0 -fno-strict-aliasing -shared -o libfalcondet1024.so codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c
 export FALCON_DET1024_LIB="$PWD/libfalcondet1024.so"
 python contracts/falcon_det1024.py        # keygen -> sign -> verify round-trip
 
