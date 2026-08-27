@@ -118,13 +118,27 @@ def build_message(app_id: int, cell_id: int, artifact_hash: bytes, genesis_hash:
 
     Returns a 102-byte message.
     """
+    # `app_id` is validated exactly as `cell_id` is, and for the same reason: both are encoded
+    # into the message that gets SIGNED, so a value that differs from what the contract computes
+    # produces a signature the chain rejects.
+    #
+    # This was `int(app_id).to_bytes(...)`, which coerced instead of validating. Measured before
+    # the fix: `1001.9` encoded as **1001** — silent truncation inside a signed message — while
+    # `"1001"` and `True` were accepted as 1001 and 1. The contracts-side copy called
+    # `app_id.to_bytes()` directly and therefore RAISED on a float or str, so the two
+    # implementations that must agree byte-for-byte disagreed on the same input.
+    #
+    # `bool` is excluded explicitly because `isinstance(True, int)` is True in Python, so a bare
+    # isinstance check would let `True` through as app_id 1.
+    if isinstance(app_id, bool) or not isinstance(app_id, int) or not 0 <= app_id <= 0xFFFFFFFFFFFFFFFF:
+        raise ValueError("app_id must be a uint64 (0 .. 2**64-1)")
     if len(artifact_hash) != 32:
         raise ValueError("artifact_hash must be 32 bytes (a sha512_256 digest)")
     if len(genesis_hash) != 32:
         raise ValueError("genesis_hash must be 32 bytes (the network genesis hash)")
     msg = (
         DOMAIN_TAG
-        + int(app_id).to_bytes(8, "big")
+        + app_id.to_bytes(8, "big")
         + cell_key(cell_id)
         + bytes(artifact_hash)
         + bytes(genesis_hash)
