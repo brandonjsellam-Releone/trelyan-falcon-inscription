@@ -267,8 +267,18 @@ def _client_spec_matches(client: pathlib.Path, spec_path: pathlib.Path) -> str |
         return f"the spec embedded in {client.name} is not valid JSON: {exc}"
 
     committed = json.loads(spec_path.read_text(encoding="utf-8"))
-    if embedded == committed:
+    # The generator drops or rewrites build metadata (compilerInfo, sourceInfo) when
+    # embedding, so full-JSON equality here fails FOREVER on a freshly generated client --
+    # observed 2026-08-27, the day this comparison first ran against a same-day regen. The
+    # claim that matters is behavioral: same program, same ABI, same state schema. Metadata
+    # keys the generator does not preserve are excluded, deliberately and by name; everything
+    # else still participates. Mirrors verify_client_matches_arc56.py -- change together.
+    generator_dropped = {"compilerInfo", "sourceInfo"}
+    embedded_cmp = {k: v for k, v in embedded.items() if k not in generator_dropped}
+    committed_cmp = {k: v for k, v in committed.items() if k not in generator_dropped}
+    if embedded_cmp == committed_cmp:
         return None
+    embedded, committed = embedded_cmp, committed_cmp
 
     embedded_methods = [m.get("name") for m in embedded.get("methods", [])]
     committed_methods = [m.get("name") for m in committed.get("methods", [])]
