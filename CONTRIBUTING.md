@@ -21,9 +21,18 @@ algorand-python on Python 3.13, algokit localnet (Docker), AVM target v12.
 
 ```
 python contracts/falcon_det1024.py                         # signer self-test
-puyapy contracts/inscription.py --out-dir contracts/out --target-avm-version 12
+(cd contracts && puyapy inscription.py --out-dir out --target-avm-version 12)
 python -m pytest contracts/test_inscription.py -v          # 20 passed
 ```
+
+The compile step runs **from `contracts/` with the bare filename**, and that is not a style
+preference — the invocation is part of the artifact. puya writes the source path exactly as
+typed into the emitted TEAL comments, and records it relative to the out-dir in the
+`.puya.map`. Compiling from the repository root yields `// contracts/inscription.py:156`
+where the committed artifact carries `// inscription.py:156`: 124 differing lines, every one
+of them cosmetic. Use the pinned toolchain in `contracts/requirements-compile.txt`;
+`contracts/verify_teal_matches_source.py` checks the result in CI and will tell you which
+kind of difference you have produced.
 
 ## How to propose changes
 
