@@ -205,7 +205,32 @@ class FalconDet1024:
         return out
 
     def verify(self, sig: bytes, pubkey: bytes, message: bytes) -> bool:
-        """Local round-trip check mirroring the on-chain falcon_verify. True iff valid."""
+        """Local round-trip check mirroring the on-chain falcon_verify. True iff valid.
+
+        `pubkey` MUST be exactly `PUBKEY_SIZE` bytes. This is not defensive style — it is a
+        memory-safety requirement, and the C side cannot enforce it.
+
+        `falcon_det1024_verify_compressed` takes NO pubkey length parameter: `deterministic.c`
+        calls `falcon_verify(..., pubkey, FALCON_DET1024_PUBKEY_SIZE, ...)`, so it reads exactly
+        1793 bytes from that pointer whatever the caller allocated. `sig` and `message` are
+        length-delimited and therefore safe; `pubkey` alone is not. Passing a shorter buffer is an
+        out-of-bounds read — demonstrated with a guard page: a pubkey one byte short faults
+        deterministically at the first byte past the buffer, and it needs no valid signature to
+        get there.
+
+        This repo already wrote the invariant down. `tests/fuzz/fuzz_falcon_verify.cc` says the
+        function "reads exactly FALCON_DET1024_PUBKEY_SIZE bytes ... regardless of any length we
+        pass", and calls a smaller buffer "a caller-side over-read". This method WAS that caller.
+
+        Raises rather than returning False, matching `sign()`'s treatment of a wrong-length
+        private key: a mis-sized key is a caller error, not a failed verification, and silently
+        returning False would let a truncated key read as "signature invalid".
+
+        Raises:
+            ValueError: if `pubkey` is not exactly `PUBKEY_SIZE` bytes.
+        """
+        if len(pubkey) != PUBKEY_SIZE:
+            raise ValueError(f"pubkey must be {PUBKEY_SIZE} bytes, got {len(pubkey)}")
         lib = self._lib_ref()
         return lib.falcon_det1024_verify_compressed(sig, len(sig), pubkey, message, len(message)) == 0
 

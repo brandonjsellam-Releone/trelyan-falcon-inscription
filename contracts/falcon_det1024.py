@@ -131,7 +131,18 @@ def sign_compressed(privkey: bytes, data: bytes) -> bytes:
 
 
 def verify_compressed(sig: bytes, pubkey: bytes, data: bytes) -> bool:
-    """Local round-trip check (mirrors the on-chain falcon_verify). True iff valid."""
+    """Local round-trip check (mirrors the on-chain falcon_verify). True iff valid.
+
+    `pubkey` MUST be exactly PUBKEY_SIZE bytes: the C function takes no pubkey length and reads
+    1793 bytes unconditionally, so a shorter buffer is an out-of-bounds read. Same guard, same
+    reason, as `trelyan_pq.falcon.FalconDet1024.verify` — kept in step deliberately, because this
+    copy is the one `deploy_testnet.py` uses against real TestNet state.
+
+    Raises:
+        ValueError: if `pubkey` is not exactly PUBKEY_SIZE bytes.
+    """
+    if len(pubkey) != PUBKEY_SIZE:
+        raise ValueError(f"pubkey must be {PUBKEY_SIZE} bytes, got {len(pubkey)}")
     lib = _libref()
     return lib.falcon_det1024_verify_compressed(sig, len(sig), pubkey, data, len(data)) == 0
 
