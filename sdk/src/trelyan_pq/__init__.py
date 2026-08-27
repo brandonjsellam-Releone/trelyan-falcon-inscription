@@ -61,7 +61,22 @@ from .seal import (
     keygen_sign_seal_isolated,
 )
 
-__version__ = "0.1.0"
+# Derived from the INSTALLED package metadata, never hand-written.
+#
+# This was `"0.1.0"` while pyproject.toml declared `0.2.2`, so anyone who pip-installed 0.2.2 got a
+# package that reported itself as 0.1.0 — and `Dockerfile.verify`, the "hermetic checker" an auditor
+# is pointed at, pinned `trelyan-pq==0.1.0` on the strength of it. Three numbers, two of them wrong,
+# and nothing compared them.
+#
+# Reading the metadata makes the drift impossible rather than merely fixed: there is now one source
+# of truth, and `pyproject.toml` is it. The fallback covers a source checkout that was never
+# installed (running straight out of `src/`), where no distribution metadata exists to read.
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
+
+try:
+    __version__ = _pkg_version("trelyan-pq")
+except PackageNotFoundError:  # running from an uninstalled source tree
+    __version__ = "0.0.0+source"
 
 __all__ = [
     "__version__",

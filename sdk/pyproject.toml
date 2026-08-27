@@ -28,7 +28,9 @@ dependencies = []  # core (falcon signer + message/box helpers) is stdlib-only
 [project.optional-dependencies]
 # the high-level on-chain client (trelyan_pq.inscription) needs the Algorand stack:
 algorand = ["algokit-utils>=4,<5", "py-algorand-sdk>=2"]
-dev = ["pytest>=8"]
+# tomli: the `tomllib` backport. `tomllib` is stdlib only from 3.11, and requires-python
+#        admits 3.10 (which the CI matrix tests), so the version test needs it there.
+dev = ["pytest>=8", "tomli>=2 ; python_version < '3.11'"]
 
 [project.urls]
 Homepage = "https://github.com/brandonjsellam-Releone/trelyan-falcon-inscription"
