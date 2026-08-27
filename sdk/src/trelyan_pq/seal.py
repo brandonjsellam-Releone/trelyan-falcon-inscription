@@ -254,8 +254,28 @@ def keygen_sign_seal_isolated(
     # key). -P / PYTHONSAFEPATH drops the cwd entry; cwd= pins the child away from caller-controlled
     # directories. Both are set: belt and braces on the one path whose purpose is a STRONGER boundary.
     env["PYTHONSAFEPATH"] = "1"
+    # `-P` is CPython 3.11+, and this package declares requires-python = ">=3.10" with 3.10 in the
+    # CI matrix. On 3.10 the interpreter aborts during ARGV PARSING with "Unknown option: -P" and
+    # exit 2, before trelyan_pq._seal_worker is ever imported -- so the parent read empty stdout,
+    # fell into the failure branch below, and raised SealVerificationError, whose own docstring
+    # blames the Falcon build. The single API whose purpose is to keep the ephemeral private key
+    # out of the caller's address space was therefore unusable on a supported interpreter, and
+    # said so in a way that pointed at the wrong component.
+    #
+    # It was invisible because no test covered it: every spawning test in test_isolated_signer.py
+    # is @requires_lib, the only CI job that builds the library pins 3.12, and the one pure-Python
+    # isolated test pre-seals the cell so it raises before the spawn. DELETING `-P` ALTOGETHER
+    # WOULD NOT HAVE FAILED A SINGLE TEST.
+    #
+    # PYTHONSAFEPATH above is the same control by another route and IS honoured from 3.11 too, so
+    # 3.10 loses nothing by dropping the flag that 3.10 cannot parse. The cwd= pin below is what
+    # actually keeps the child away from caller-controlled directories on every version.
+    argv = [python_exe or sys.executable]
+    if sys.version_info >= (3, 11):
+        argv.append("-P")
+    argv += ["-m", "trelyan_pq._seal_worker"]
     proc = subprocess.run(
-        [python_exe or sys.executable, "-P", "-m", "trelyan_pq._seal_worker"],
+        argv,
         input=request, capture_output=True, timeout=timeout, env=env,
         cwd=os.path.dirname(os.path.abspath(__file__)),
     )
