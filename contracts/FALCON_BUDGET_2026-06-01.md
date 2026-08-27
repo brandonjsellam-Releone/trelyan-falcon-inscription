@@ -21,19 +21,41 @@ by a TestNet dry-run.
 | Component | ~opcode cost | Notes |
 |---|---|---|
 | `falcon_verify` | **1700** | the dominant, fixed term |
-| `sha512_256(pubkey)` (C5) | ~45–200 | hashing the 1793-B key |
+| ~~`sha512_256(pubkey)` (C5)~~ | ~~45–200~~ | **REMOVED — see the correction below.** `inscribe` no longer takes a pubkey argument. |
 | `_build_message` (itob ×2, concat, Global reads) | ~tens | cheap |
 | length/asset/owner asserts | ~tens | cheap |
-| **Total (estimate)** | **~1,850–2,050** | dominated by falcon_verify |
+| **Total (estimate)** | **~1,750–1,800** | dominated by `falcon_verify`; was quoted as ~1,850–2,050 while C5 was still counted |
 
 > Box access is metered by a **separate** box read/write budget (1024 B per box reference in the
 > group), **not** the opcode budget — don't conflate them. The ~2 KB `InscriptionRecord` write
 > needs enough box references in the txn to cover its size; that's orthogonal to the 1700 below.
 
-> **Contract update (1 Jun, self-review):** `inscribe` now runs **C5 (key-commitment hash) before
-> C4 (`falcon_verify`)**. A wrong-key attempt is therefore rejected for ~45–200 budget instead of
-> paying the full 1700 — this shrinks the budget-griefing surface (audit item A5). The **happy-path
-> total is unchanged (~2,050)**, so the OpUp math below still holds.
+> **~~Contract update (1 Jun, self-review): `inscribe` now runs C5 before C4…~~**
+>
+> **SUPERSEDED — corrected 2026-08-15.** That note described an architecture the contract no longer
+> has, and this memo billed opcodes for a step that does not execute.
+>
+> `contracts/inscription.py` (≈L71-73) records the change: *"the prior C5 'reveal pubkey and check
+> `sha512_256(pubkey)==committed_hash`' is removed — it was a storage optimization, not a security
+> property"*. The full public key now lives in box state, written once at `register_cell`, and
+> `inscribe` READS it rather than accepting it as an argument. The contract contains no
+> `sha512_256` call at all (`grep -c sha512_256 contracts/inscription.py` → 2, both in comments or
+> a constant's docstring).
+>
+> **What this changes, precisely:**
+> * The opcode total is **lower**, not higher — ~1,750–1,800 rather than ~1,850–2,050. The memo
+>   overstated the cost, which is the safe direction, but it is still a number an auditor re-derives.
+> * The **A5 claim no longer applies as written.** "A wrong-key attempt is rejected for ~45–200
+>   instead of paying the full 1700" described a cheap pre-check on a *supplied* key. There is no
+>   supplied key now, so a bad signature pays the full `falcon_verify`. Worth stating plainly rather
+>   than leaving a mitigation on the books that the code does not implement — though the exposure is
+>   narrow: the caller funds its own OpUp budget, so a failed `inscribe` wastes the caller's fees,
+>   not a third party's.
+> * The design change was deliberate and is a **stronger** binding, not a weaker one: with the key
+>   read from box state, no key argument can be substituted.
+>
+> **The OpUp conclusion below is unaffected.** 1,700 + overhead still exceeds the 1,400 that two
+> extra app calls provide, so three calls (3 × 700 = 2,100) remains the requirement.
 
 ## How to supply the budget — two options
 **Option A — OpUp budget pooling (keep the pure app-call model).**
