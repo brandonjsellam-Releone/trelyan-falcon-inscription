@@ -1,0 +1,57 @@
+[workspace]
+resolver = "3"
+members = ["crates/trelyan-pq-ffi", "crates/trelyan-pq-core", "crates/falcon-ct"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.90"          # MSRV, pinned per constitution §3
+license = "MIT"
+authors = ["Brandon Sellam"]
+repository = "https://github.com/brandonjsellam-Releone/trelyan-falcon-inscription"
+
+# ── dependency justifications (constitution §3: every new dependency needs one) ─────────────────
+[workspace.dependencies]
+# cc      : compiles the eleven vendored C11 sources of the pinned Falcon-1024 det1024 reference
+#           (third_party/falcon-det1024/src) into a static library at build time, with exactly the
+#           flags CI already proves byte-identical to the KAT goldens. The alternative — an
+#           out-of-band `make` and a hand-written link line — is what the ctypes SDK does today,
+#           and it is the reason `FALCON_DET1024_LIB` must be set by hand and can point anywhere.
+cc      = "1"
+# sha2    : RustCrypto SHA-2. Used ONLY in trelyan-pq-ffi's build script to recompute the pinned
+#           tree digest (sha512/256, same construction as sdk/ci/verify_pinned_digest.py) over the
+#           vendored sources BEFORE compiling them, so a drifted tree fails the build rather than
+#           producing a signer that disagrees with the goldens. Not a crypto dependency of the
+#           library itself; the primitive is the vendored C. RustCrypto is on the constitution's
+#           allow-list (§2.1).
+sha2    = "0.10"
+# zeroize : secret-key material is wiped on drop (constitution §2.3).
+zeroize = { version = "1", features = ["derive"] }
+# thiserror : library error types (constitution §3 — thiserror in libraries).
+thiserror = "2"
+# anyhow  : binary-only error handling (constitution §3 — anyhow only in binaries). Used by the
+#           falcon-ct harness binary; no library crate depends on it.
+anyhow = "1"
+# serde / serde_json : DEV-ONLY, to read sdk/tests/vectors/det1024_kat.json in the KAT tests.
+#           No production code path parses JSON.
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[workspace.lints.rust]
+# `unsafe_code` is NOT forbidden at the workspace level on purpose: `forbid` cannot be relaxed
+# per crate, and trelyan-pq-ffi must contain `unsafe` (the FFI calls). Every crate EXCEPT the
+# ffi crate carries `#![forbid(unsafe_code)]` at its root — see each lib.rs. The ffi crate
+# carries `#![deny(unsafe_op_in_unsafe_fn)]` and a `// SAFETY:` proof on every block.
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery  = { level = "warn", priority = -1 }
+# Denied per constitution §3: no panicking paths in library code.
+unwrap_used = "deny"
+expect_used = "deny"
+panic       = "deny"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

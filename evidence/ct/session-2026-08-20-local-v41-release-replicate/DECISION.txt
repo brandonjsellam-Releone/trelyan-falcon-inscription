@@ -1,0 +1,2 @@
+FOUNDER BRANCH DECISION: A (Smart App Control switched Off by Brandon, 2026-08-20, in chat, before any governed launch)
+commit: f03ea3efed009af19b2fbe5ce548fb559513cfd5

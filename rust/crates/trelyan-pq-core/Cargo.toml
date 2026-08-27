@@ -1,0 +1,24 @@
+[package]
+name = "trelyan-pq-core"
+version = "0.1.0"
+description = "Safe Rust API over the pinned deterministic Falcon-1024 (det1024) reference: keygen, sign, verify — the encoding Algorand's falcon_verify opcode accepts"
+# Internal to TRELYAN; not distributed via crates.io.
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+trelyan-pq-ffi = { path = "../trelyan-pq-ffi" }
+zeroize.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+
+[lints]
+workspace = true

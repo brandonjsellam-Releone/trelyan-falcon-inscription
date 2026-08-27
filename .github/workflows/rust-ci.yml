@@ -1,0 +1,243 @@
+name: rust-ci
+
+# Gates for the Rust workspace under rust/ (trelyan-pq-ffi, trelyan-pq-core) — constitution §3
+# and §6: cargo fmt, clippy (pedantic + nursery, -D warnings), the full test suite on three OSes,
+# a build on the declared MSRV, cargo audit + cargo deny. The KAT test in trelyan-pq-core is the
+# first thing that must be green (§2.5): it asserts the Rust signer reproduces the committed
+# det1024 goldens byte for byte, on every OS in the matrix, from the vendored pinned tree.
+#
+# Path filters include third_party/** because the ffi build script compiles that tree and refuses
+# to compile anything but the pinned digest — a change there must run this workflow.
+
+on:
+  # `push` is restricted to the default branch on purpose. A pull_request's path filter is
+  # evaluated against the PR's CUMULATIVE diff, not the newest commit, so on a long-lived branch
+  # that has already touched rust/** every later push re-triggers this workflow — and with an
+  # unrestricted `push` trigger it ran TWICE for the same SHA, once per event. Observed on PR #39:
+  # eight concurrent runs queued behind documentation-only commits.
+  push:
+    branches: [main]
+    paths: ["rust/**", "third_party/**", ".github/workflows/rust-ci.yml"]
+  pull_request:
+    paths: ["rust/**", "third_party/**", ".github/workflows/rust-ci.yml"]
+  schedule:
+    # Weekly: cargo audit reads a database that changes without this repo changing, and the
+    # falcon-ct evidence session below now runs on this cadence rather than per-push.
+    - cron: "41 5 * * 1"
+  workflow_dispatch: {}
+
+# One run per ref. A superseded run reports on code nobody has any more, and this workflow is
+# expensive — three OSes, plus (on demand) a 20-minute measurement session.
+concurrency:
+  group: rust-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # Fail on warnings from rustc itself, not only from clippy.
+  RUSTFLAGS: "-D warnings"
+
+defaults:
+  run:
+    working-directory: rust
+
+jobs:
+  lint:
+    name: rust fmt + clippy (pedantic, nursery, -D warnings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned toolchain (rust/rust-toolchain.toml)
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustc --version && cargo --version
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: rust
+      - name: cargo fmt --check
+        run: cargo fmt --all --check
+      - name: cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  test:
+    name: rust test + det1024 KAT (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned toolchain (rust/rust-toolchain.toml)
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustc --version && cargo --version
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: rust
+      # The ffi build script prints "vendored Falcon tree verified against pin …" as a cargo
+      # warning on success and FAILS the build on drift — so a green build here already implies
+      # the compiled bytes are the pinned bytes.
+      - name: cargo test --all (includes the byte-identity KAT)
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --all --all-features 2>&1 | tee test.log
+          grep -q "vendored Falcon tree verified against pin ce15e75b" test.log \
+            || { echo "::error::the ffi build script did not report the pin verification"; exit 1; }
+      # A green "0 tests ran" is indistinguishable from a green suite in the checks list. The
+      # workspace has 11 tests today; 8 is a floor that survives churn but not a harness that
+      # silently stopped collecting. The KAT file must be among them, by name.
+      - name: Assert the suite — and the KAT — actually ran
+        shell: bash
+        run: |
+          set -o pipefail
+          passed=$(grep -oE '^test result: ok\. [0-9]+ passed' test.log \
+                   | grep -oE '[0-9]+' | awk '{s+=$1} END {print s+0}')
+          echo "tests passed: ${passed:-0}"
+          if [ "${passed:-0}" -lt 8 ]; then
+            echo "::error::only ${passed:-0} tests ran; expected 8+. A collection failure reads as a pass."
+            exit 1
+          fi
+          grep -q "signatures_are_byte_identical_to_the_committed_goldens ... ok" test.log \
+            || { echo "::error::the det1024 byte-identity KAT did not run or did not pass"; exit 1; }
+
+  msrv:
+    name: rust build on the declared MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Read rust-version from Cargo.toml and install exactly that
+        id: msrv
+        run: |
+          set -euo pipefail
+          v=$(grep -m1 '^rust-version' Cargo.toml | cut -d'"' -f2)
+          if [ -z "$v" ]; then
+            echo "::error::no rust-version in rust/Cargo.toml — §3 requires the MSRV pinned"
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          rustup toolchain install "$v" --profile minimal
+          rustc "+$v" --version
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: rust
+      # Build only, on the floor: the claim is that a consumer on the declared MSRV can compile
+      # the library. rust-toolchain.toml pins the DEV channel; `+version` overrides it here.
+      - name: cargo build on ${{ steps.msrv.outputs.version }}
+        run: cargo "+${{ steps.msrv.outputs.version }}" build --all-features
+
+  falcon-ct:
+    name: falcon-ct evidence session (observation, never a gate)
+    # Runs the pre-registered constant-time session against the pinned signer on a shared runner
+    # and PUBLISHES the result to the job summary. It does not fail on FAIL or INCONCLUSIVE —
+    # that is what "observation, not a gate" means in the plan. It DOES fail if the harness
+    # itself cannot run, which also makes it the end-to-end smoke test of the harness.
+    #
+    # NO LONGER ON EVERY PUSH (2026-08-19). Two reasons, both measured:
+    #  1. It costs 20+ minutes, and on a PR branch every later commit — documentation included —
+    #     re-triggers it (see the `on:` block above).
+    #  2. Its verdict is currently INCONCLUSIVE *by construction* on this class of runner. The
+    #     null gate is a fixed |t| < 4.5 applied to a pool-vs-pool null whose spread grows as the
+    #     environment gets QUIETER: sd(t)^2 ~= 1 + (sigma_key/sigma_total)^2 * (n/32). This
+    #     runner's sigma_total is ~32 us against the laptop's 350-733 us, so 5 of 20 null sessions
+    #     tripped the gate and voided the session while BOTH synthetic controls behaved perfectly.
+    #     Written up in evidence/ct/OBSERVATION_ci-ubuntu-2026-08-18.md; the fix is drafted in
+    #     evidence/ct/METHODOLOGY-v4-DRAFT.md and is NOT yet in force.
+    # Until that lands, a per-push session burns runner time to re-derive a known INCONCLUSIVE.
+    # Weekly plus on-demand keeps the smoke test without the waste. Restore the per-push trigger
+    # when the v4 null makes a CI session capable of a verdict again.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned toolchain (rust/rust-toolchain.toml)
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustc --version && cargo --version
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: rust
+      - name: Build the harness (release)
+        run: FALCON_CT_RUSTC="$(rustc --version)" cargo build --release -p falcon-ct
+      # 4800 measurements → ≈2 352 per class after the 2 % warm-up: clears the 2 000 minimum
+      # with margin for the random class split (the harness refuses < 4600). 20 null sessions
+      # is the v3 minimum (METHODOLOGY-v3 §1); each is a real pool-vs-pool signing session, so
+      # this job runs ~20+ min on a shared runner — the honest cost of a real-operation null.
+      - name: Run the session (METHODOLOGY v3)
+        run: ./target/release/falcon-ct --samples 4800 --null-sessions 20 --out ../evidence/ct/ci-run
+      - name: Publish the result (job summary + annotations; never a failure)
+        working-directory: evidence/ct/ci-run
+        run: |
+          set -euo pipefail
+          verdict=$(python3 -c 'import json;print(json.load(open("report.json"))["session_verdict"])')
+          ok=$(python3 -c 'import json;print(json.load(open("report.json"))["controls"]["controls_ok"])')
+          nullok=$(python3 -c 'import json;print(json.load(open("report.json"))["controls"].get("null_ok"))')
+          {
+            echo "## falcon-ct — constant-time evidence session (ubuntu-latest, shared runner)"
+            echo
+            echo "**SESSION VERDICT: ${verdict}** — controls_ok=${ok}, null_ok=${nullok}. Observation per evidence/ct/METHODOLOGY-v2.md; not a gate. SHAPE = shape/scale difference only (never PASS, never FAIL)."
+            echo
+            echo '| experiment | n0 | n1 | Δmean (ns) | raw t | p(raw) | crop max abs t | crop p_emp | verdict | gated |'
+            echo '|---|---|---|---|---|---|---|---|---|---|'
+            python3 - <<'PY'
+          import json
+          r=json.load(open("report.json"))
+          def row(e, verdict, gated):
+              pe = e.get("crop_empirical_p")
+              pe = "-" if pe is None else f"{pe:.3f}"
+              print(f"| {e['id']} | {e['class0']['n']} | {e['class1']['n']} | {e.get('mean_diff_ns',0):+.0f} | {e.get('raw_t',0):.2f} | {e.get('p_raw',0):.2e} | {e.get('crop_max_abs_t',0):.2f} | {pe} | {verdict} | {gated} |")
+          for e in [r["controls"]["flat"], r["controls"]["leaky"]]:
+              row(e, e["isolated_verdict"], "control")
+          for e in r["experiments"]:
+              row(e, e["verdict"], "yes" if e["gated"] else "no")
+          PY
+            echo
+            echo '<details><summary>report.json</summary>'
+            echo
+            echo '```json'
+            cat report.json
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+          case "$verdict" in
+            PASS)  echo "::notice::falcon-ct: PASS on this runner (not a proof; see METHODOLOGY-v2.md)";;
+            SHAPE) echo "::notice::falcon-ct: SHAPE — timing distributions differ in shape/scale, not location; not a leak claim (see job summary)";;
+            FAIL)  echo "::warning::falcon-ct: FAIL — a LOCATION difference in signing time between key classes at this power (see job summary)";;
+            *)     echo "::warning::falcon-ct: INCONCLUSIVE — a control or the null misbehaved, or too few samples; no statement";;
+          esac
+
+  supply-chain:
+    name: rust cargo audit + cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: rust
+      - name: Install cargo-audit and cargo-deny
+        run: cargo install cargo-audit cargo-deny --locked
+      - name: cargo audit
+        run: cargo audit
+      # With NO config, cargo-deny's licence allowlist is EMPTY and it rejects even MIT — a
+      # failure that looks identical to a real licence violation. Assert the config is present.
+      - name: cargo deny check
+        run: |
+          set -euo pipefail
+          test -f deny.toml || { echo "::error::rust/deny.toml missing — an unconfigured cargo-deny rejects everything, which reads like a real finding"; exit 1; }
+          cargo deny check

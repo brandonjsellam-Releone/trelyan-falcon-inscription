@@ -1,0 +1,37 @@
+# cargo-deny policy (constitution §3: `cargo deny` must pass).
+#
+# With NO config, cargo-deny's licence allow-list is EMPTY and it rejects even MIT — which reads
+# identically to a real failure. This file is the policy; keep it small and explicit.
+
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = []
+
+[licenses]
+version = 2
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "Zlib",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# The workspace crates are `publish = false`; path deps between them are the intended layout.
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

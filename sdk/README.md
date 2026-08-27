@@ -101,8 +101,15 @@ PYTHONPATH=src pytest tests -v        # pure-Python wire-format tests (no lib/ne
 - **Unaudited, alpha.** Validated on localnet (20/20) and TestNet; **not externally audited**
   and **not for MainNet value**. An independent audit is planned before any MainNet use.
 - **Native C dependency.** The signer is a `ctypes` binding to the `algorand/falcon` C library
-  you build yourself — provenance and a reproducible build are your responsibility. No
-  constant-time / side-channel guarantees are claimed for the binding.
+  you build yourself — provenance and a reproducible build are your responsibility (the pinned
+  tree is now vendored at `third_party/falcon-det1024/src`, see its `PROVENANCE.md`). No
+  constant-time / side-channel guarantees are claimed for the binding; measured evidence lives
+  under `evidence/ct/` and, as of 2026-08-18, neither confirms nor refutes a timing dependence
+  at the pre-registered line.
+- **Only ever hand `sign()` key bytes from `keygen()` or an integrity-checked store.** The
+  reference checks only the key's header byte; a header-valid buffer with a garbage body makes
+  its retry loop spin without bound — `sign()` then **hangs** rather than raising (finding
+  2026-08-18). A corrupted key file is an availability hazard, not a clean error.
 - **Sign through `sign_inscription()`**, not raw `sign()`: the domain-separated message binds
   `app_id`, `cell_id`, artifact, and network genesis, which is what makes a signature
   non-replayable across apps/cells/networks.
