@@ -209,6 +209,14 @@ jobs:
         #          source) from STALE (identical instructions, stale '// inscription.py:NNN'
         #          references - bytecode unaffected, traceability broken).
         # Exit 2 = could not check (toolchain or artifact missing). Never reported as agreement.
+      - name: Generated client embeds the committed contract spec
+        # Closes the link found 2026-08-27: the LocalNet suite deploys through
+        # trelyan_client.py, whose embedded _APP_SPEC_JSON is frozen at generation time.
+        # It was last generated in June; the zero-address and TCE-76 guards landed after;
+        # the whole contract suite was exercising a stale program. Behavioral-keys
+        # comparison (byteCode, methods, state, ...) - see the script's header for why
+        # full-JSON equality is wrong here.
+        run: python contracts/verify_client_matches_arc56.py
 
   contract-drift:
     name: Deployed app matches the committed contract (non-circular)
