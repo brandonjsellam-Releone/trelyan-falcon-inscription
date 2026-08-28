@@ -8,13 +8,29 @@ post‑quantum authorization in their own contract.
 > **Live on Algorand TestNet** (2 June 2026): app **`763809096`**, asset `763809098` —
 > https://lora.algokit.io/testnet/application/763809096 . The on‑chain `i_` inscription box is written
 > only *after* the Falcon‑1024 signature verifies on‑chain and every authorization check passes, so the
-> deployment is a real, publicly verifiable post‑quantum inscription. Reproducible via
-> `contracts/deploy_testnet.py`.
+> deployment is a real, publicly verifiable post‑quantum inscription.
+>
+> **⚠ That live app does NOT run the contract in this repository, and never will.** The
+> contract changed after it was deployed. Run `python contracts/verify_deployment.py` and it
+> says so: the chain serves 660 B (`d24d9071…`) while this source builds to 709 B
+> (`6fa5cee1…`). The app cannot be updated to match, *by design* — control **I5
+> (non-upgradability)** makes `on_update` and `on_delete` reject unconditionally
+> (`contracts/inscription.py:404-412`), which is the property the contract exists to
+> demonstrate. Closing the gap therefore requires deploying a **new** application from the
+> committed artifact, not updating this one.
+>
+> **What this means for a reviewer:** reading this source is not reviewing app `763809096`.
+> The structural, on-chain facts about that app hold — the inscription box, the record layout,
+> the write-once behaviour — and `sdk/examples/verify_trelyan.py` checks them (currently
+> **17 passed, 1 failed**, the single failure being exactly this drift). CI is red for the
+> same reason, deliberately: the weekly job runs the drift check and is not permitted to pass
+> while the claim is untrue.
 
 **Status (honest):** last localnet validation was **20/20 on 2026-06-01**; the contract changed on
 2026-06-16 and the suite is now **22 tests with no recorded localnet run** (see
-[`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md)). **Deployed + verified on
-TestNet** — the weekly job checks the live app's bytecode fingerprint against the committed TEAL.
+[`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md)). **Deployed on TestNet,
+but the deployed app is NOT this source** — the weekly job checks the live app's bytecode
+fingerprint against the committed TEAL, and it currently fails, correctly (see the box above).
 **Not yet externally audited; not on MainNet.** Treat as a reference, not production‑ready. MIT licensed.
 
 ## Verify it yourself

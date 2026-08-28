@@ -10,8 +10,14 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Brandon J. Sellam" }]
+# NOTE: "fn-dsa" and "fips-206" were removed on 2026-08-28. This package implements
+# round-3 deterministic Falcon-1024 (`falcon_det1024`) — which AUDIT_READINESS.md states
+# is explicitly NOT FN-DSA / draft FIPS 206 — and FIPS 206 is unpublished, so advertising
+# either term on PyPI asserted conformance to a standard that does not exist and to a
+# scheme this code does not implement. Falcon is NIST-SELECTED, not standardised; keep the
+# keywords to what is true.
 keywords = [
-  "algorand", "post-quantum", "falcon", "falcon-1024", "fn-dsa", "fips-206",
+  "algorand", "post-quantum", "falcon", "falcon-1024", "falcon-det1024",
   "lattice", "cryptography", "pqc", "falcon_verify", "inscriptions", "avm",
 ]
 classifiers = [

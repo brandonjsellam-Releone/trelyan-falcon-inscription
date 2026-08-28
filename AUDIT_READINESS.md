@@ -175,7 +175,7 @@ auditor spends week one on the real surface, not rediscovery.
 | Signature KAT | `sdk/tests/test_signature_kat.py`, `sdk/tests/vectors/det1024_kat.json` | Byte-identity goldens (begin `ba00`); 3-OS reproduction in CI. |
 | Seeded fuzz / differential oracle | `sdk/tests/test_signature_fuzz.py` | Off-chain↔on-chain encoding differential (seed 1469, 300 iters). |
 | Pinned-build verifier | `sdk/ci/verify_pinned_digest.py` | Recomputes the 27-file tree + `deterministic.c` digests + FP-emulation pin. |
-| Read-only on-chain check | `sdk/examples/verify_trelyan.py` | 15/15 PASS against live app `763809096` (2026-06-17). |
+| Read-only on-chain check | `sdk/examples/verify_trelyan.py` | **17 passed, 1 failed** against live app `763809096` (re-run 2026-08-28). The one failure is `deployed bytecode matches the committed contract` — app `763809096` predates this source and, by control I5, can never be updated to match. Expect this failure until a new app is deployed from the committed artifact. |
 | Hermetic checker | `Dockerfile.verify` | Pins python 3.13 + `trelyan-pq` 0.1.0; read-only. |
 | CI | `.github/workflows/ci.yml` | wire-format / verify-live / signature-kat (3-OS) / testnet-e2e + a sanitizer (alignment/UBSan) gate. |
 | Encoding / budget / arg-order memos | `contracts/FALCON_ENCODING_2026-06-01.md`, `contracts/FALCON_BUDGET_2026-06-01.md`, `contracts/A1_RESOLUTION_2026-06-01.md` | How encoding, opcode cost, and argument order were pinned, with sources. |
@@ -207,7 +207,8 @@ The fast, no-trust path is **`REVIEWER.md`** (≈5 minutes, read-only, from publ
 
 ```
 pip install trelyan-pq
-python3 sdk/examples/verify_trelyan.py          # 15/15 PASS vs live app 763809096 (2026-06-17)
+python3 sdk/examples/verify_trelyan.py          # 17 passed, 1 failed vs live app 763809096 (2026-08-28)
+#   the 1 failure is the known bytecode drift described above — it is expected, not a regression
 ```
 
 Hermetic alternative (pins python 3.13 + `trelyan-pq` 0.1.0):
