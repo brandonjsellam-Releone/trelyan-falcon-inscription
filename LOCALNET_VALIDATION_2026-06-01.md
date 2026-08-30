@@ -5,8 +5,9 @@
 > On **2026-06-16** (`2ec798e`) `contracts/inscription.py` changed and the emitted TEAL was
 > regenerated, and the suite grew from **20 to 22 tests**. Those 22 tests have **no recorded
 > localnet run**; CI does not execute `contracts/test_inscription.py` (it has no localnet).
-> The weekly `verify-live` job checks the deployed app's **bytecode fingerprint**, which proves
-> the live app matches the committed TEAL — it does **not** re-run this functional suite.
+> The TestNet follow-up (`testnet-followup.yml`) compares the live app to the committed TEAL and
+> is **red** until app `763809096` is replaced (660 B on chain vs 709 B assembled — see
+> [`BLOCKERS.md`](BLOCKERS.md)). It does **not** re-run this functional suite.
 > Re-run on localnet and supersede this record before relying on it as current evidence.
 
 **Artifact under test:** `contracts/inscription.py` *(as of 1 June 2026 — since changed)*

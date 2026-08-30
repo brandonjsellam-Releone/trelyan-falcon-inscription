@@ -1,0 +1,85 @@
+name: TestNet follow-up
+
+# Not a merge gate. Local KAT / TEAL-recompile / gitleaks live in ci.yml
+# ("Required merge gates (local)") and rust-ci.yml ("Required merge gates (rust)").
+#
+# These jobs still RUN and still FAIL on bytecode drift. That red is the finding:
+# TestNet app 763809096 predates the committed contract. Do not add
+# continue-on-error, do not skip on mismatch, do not copy a hash from the chain
+# and call it agreement. After a keyed TestNet redeploy (BLOCKERS.md), this
+# workflow is what goes green — then it can be added as a required check.
+
+on:
+  push:
+    paths:
+      - "sdk/**"
+      - "contracts/**"
+      - "third_party/**"
+      - ".github/workflows/testnet-followup.yml"
+      - "BLOCKERS.md"
+  pull_request:
+    paths:
+      - "sdk/**"
+      - "contracts/**"
+      - "third_party/**"
+      - ".github/workflows/testnet-followup.yml"
+      - "BLOCKERS.md"
+  schedule:
+    - cron: "23 6 * * 1"   # same Monday slot as trelyan-pq CI
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live:
+    name: Live TestNet verification (follow-up; not a merge gate)
+    runs-on: ubuntu-latest
+    # Same scope as before the split: push / schedule / dispatch, not every PR.
+    # The PR-visible half of this follow-up is contract-drift below.
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - name: Install the published package from PyPI and verify the deployed app
+        run: |
+          python -m pip install --upgrade pip
+          pip install trelyan-pq
+          set +e
+          python sdk/examples/verify_trelyan.py
+          rc=$?
+          set -e
+          if [ "$rc" = "1" ]; then
+            echo "::error::AWAITING TESTNET REDEPLOY of app 763809096. Committed TEAL assembles to a different program than the live app. See BLOCKERS.md."
+          fi
+          exit "$rc"
+        # Read-only. No account, no mnemonic, no secrets.
+        # Exit 1 = a check failed (today: source↔chain bytecode drift).
+        # Exit 2 = a check did not run. Never treated as agreement.
+
+  contract-drift:
+    name: Committed TEAL vs deployed app (follow-up; not a merge gate)
+    # Derives expected bytecode from the committed artifact, so it CAN fail.
+    # Expected to fail until a new TestNet app is created from that artifact
+    # (app 763809096 cannot be updated — I1/I5). That red is the finding.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - name: Assemble the committed TEAL and compare it to the deployed program
+        run: |
+          set +e
+          python contracts/verify_deployment.py
+          rc=$?
+          set -e
+          if [ "$rc" = "1" ]; then
+            echo "::error::AWAITING TESTNET REDEPLOY of app 763809096. Committed TEAL assembles to a different program than the live app. See BLOCKERS.md."
+          fi
+          exit "$rc"
+        # Exit 1 = drift: the deployment is not what the committed source builds.
+        # Exit 2 = could not check (network, missing artifact). Distinct on purpose:
+        # an unreachable node must never be reported as agreement, nor as drift.
