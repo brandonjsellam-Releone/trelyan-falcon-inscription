@@ -67,8 +67,16 @@ files for one.
 | `ALGOD_*` | no | same |
 | any MainNet mnemonic / token | **must not be set** | This job is TestNet only. |
 
-Once `DEPLOYER_MNEMONIC` is set, run the keyed job — do not spend, do not
-MainNet:
+**Update 2026-08-30:** the secret *name* is now present (run
+[33329698067](https://github.com/brandonjsellam-Releone/trelyan-falcon-inscription/actions/runs/33329698067)
+got past the unset check). The *value* is not a valid Algorand 25-word
+mnemonic. `algosdk` raised `ValueError` with the word list, which appeared
+in that public log. Treat the value as exposed. Replace
+`DEPLOYER_MNEMONIC` with a real funded TestNet mnemonic (never paste it
+into chat, a PR, or an issue). Then re-run **TestNet redeploy**.
+
+Once `DEPLOYER_MNEMONIC` is a valid funded TestNet mnemonic, run the keyed
+job — do not spend, do not MainNet:
 
 1. Actions → **TestNet redeploy** (`.github/workflows/testnet-redeploy.yml`) →
    **Run workflow** → type `TESTNET`.

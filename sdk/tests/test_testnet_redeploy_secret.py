@@ -15,8 +15,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 REQUIRE = REPO / "contracts" / "require_testnet_deploy_secret.py"
 WORKFLOW = REPO / ".github" / "workflows" / "testnet-redeploy.yml"
-# Not a mnemonic — a stand-in value used only to prove the helper never echoes it.
+# Stand-ins used only to prove the helper never echoes them. Not a real mnemonic.
 FAKE_SECRET = "test-secret-value-must-never-appear-in-stdout-xyz"
+INVALID_25 = " ".join(f"xx{i:02d}" for i in range(25))
 
 
 def _load_require():
@@ -27,16 +28,23 @@ def _load_require():
     return mod
 
 
-def _run_require(env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def _run_require(env: dict[str, str], extra_args: list[str] | None = None) -> subprocess.CompletedProcess[str]:
     clean = {k: v for k, v in os.environ.items() if k != "DEPLOYER_MNEMONIC"}
     clean.update(env)
     return subprocess.run(
-        [sys.executable, str(REQUIRE)],
+        [sys.executable, str(REQUIRE), *(extra_args or [])],
         env=clean,
         capture_output=True,
         text=True,
         check=False,
     )
+
+
+def _assert_secret_not_printed(out: str, secret: str) -> None:
+    assert secret not in out
+    for token in secret.split():
+        if len(token) >= 4:
+            assert token not in out
 
 
 def test_missing_secret_lists_exact_name_and_hides_any_value():
@@ -55,13 +63,37 @@ def test_missing_secret_lists_exact_name_and_hides_any_value():
     result.stderr.encode("ascii")
 
 
-def test_present_secret_is_not_printed():
+def test_wrong_word_count_fails_without_printing_the_value():
     result = _run_require({"DEPLOYER_MNEMONIC": FAKE_SECRET})
+    assert result.returncode == 1
+    out = result.stdout + result.stderr
+    assert "25 words" in out
+    _assert_secret_not_printed(out, FAKE_SECRET)
+    out.encode("ascii")
+
+
+def test_present_25_word_secret_is_not_printed():
+    result = _run_require({"DEPLOYER_MNEMONIC": INVALID_25})
     assert result.returncode == 0
     out = result.stdout + result.stderr
     assert "present" in out
-    assert FAKE_SECRET not in out
-    assert "test-secret-value" not in out
+    _assert_secret_not_printed(out, INVALID_25)
+
+
+def test_parse_invalid_mnemonic_never_prints_the_word_list():
+    result = _run_require({"DEPLOYER_MNEMONIC": INVALID_25}, extra_args=["--parse"])
+    out = result.stdout + result.stderr
+    _assert_secret_not_printed(out, INVALID_25)
+    out.encode("ascii")
+    try:
+        import algosdk.mnemonic  # noqa: F401
+    except ImportError:
+        assert result.returncode == 2
+        assert "COULD NOT CHECK" in out
+    else:
+        assert result.returncode == 1
+        assert "not a valid Algorand mnemonic" in out
+        assert "ValueError" not in out
 
 
 def test_whitespace_only_secret_is_treated_as_missing():
@@ -90,6 +122,7 @@ def test_workflow_is_dispatch_only_and_never_echoes_the_mnemonic():
     assert "DEPLOYER_MNEMONIC" in text
     assert "secrets.DEPLOYER_MNEMONIC" in text
     assert "require_testnet_deploy_secret.py" in text
+    assert "--parse" in text
     assert "deploy_testnet.py" in text
     assert "verify_deployment.py" in text
     assert "Type TESTNET" in text or '!= "TESTNET"' in text
@@ -112,11 +145,14 @@ def test_deploy_script_refuses_mainnet_and_writes_only_numeric_ids():
     assert "TESTNET_GENESIS_B64" in text
     assert "Refusing to deploy: connected node is not Algorand TestNet." in text
     assert "AlgorandClient.testnet()" in text
+    assert "not a valid Algorand mnemonic" in text
+    assert "The value is not printed" in text
 
 
 def test_existing_e2e_job_also_fails_closed_on_the_same_secret():
     text = (REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "require_testnet_deploy_secret.py" in text
+    assert "--parse" in text
     assert "secrets.DEPLOYER_MNEMONIC" in text
 
 
