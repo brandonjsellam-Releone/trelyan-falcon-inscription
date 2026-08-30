@@ -155,10 +155,11 @@ jobs:
   # signature-kat job - which builds the PINNED Falcon source and re-signs the committed goldens
   # on Linux, macOS and Windows - succeed for THIS EXACT COMMIT?
   #
-  # Scoped to signature-kat on purpose, rather than "every check green". contract-drift is red
-  # by design until the committed contract is redeployed, and coupling releases to that is a
-  # policy decision for the maintainer, not something to smuggle in through a gate. If you DO
-  # want that coupling, widen the filter below deliberately.
+  # Scoped to signature-kat on purpose, rather than "every check green". The TestNet
+  # follow-up (testnet-followup.yml) is red by design until the committed contract is
+  # redeployed — see BLOCKERS.md — and coupling releases to that is a policy decision
+  # for the maintainer, not something to smuggle in through a gate. If you DO want
+  # that coupling, widen the filter below deliberately.
   # ---------------------------------------------------------------------------
   require-signature-kat:
     name: ci.yml signature-KAT must be green for this tag

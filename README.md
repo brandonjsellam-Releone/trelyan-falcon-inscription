@@ -7,15 +7,17 @@ post‑quantum authorization in their own contract.
 
 > **Live on Algorand TestNet** (2 June 2026): app **`763809096`**, asset `763809098` —
 > https://lora.algokit.io/testnet/application/763809096 . The on‑chain `i_` inscription box is written
-> only *after* the Falcon‑1024 signature verifies on‑chain and every authorization check passes, so the
-> deployment is a real, publicly verifiable post‑quantum inscription. Reproducible via
-> `contracts/deploy_testnet.py`.
+> only *after* the Falcon‑1024 signature verifies on‑chain and every authorization check passes, so that
+> deployment is a real, publicly verifiable post‑quantum inscription. It is **not** the program the
+> committed source builds today — see [BLOCKERS.md](BLOCKERS.md).
 
 **Status (honest):** last localnet validation was **20/20 on 2026-06-01**; the contract changed on
-2026-06-16 and the suite is now **22 tests with no recorded localnet run** (see
-[`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md)). **Deployed + verified on
-TestNet** — the weekly job checks the live app's bytecode fingerprint against the committed TEAL.
-**Not yet externally audited; not on MainNet.** Treat as a reference, not production‑ready. MIT licensed.
+2026-06-16 and the suite is now **22 tests** (CI LocalNet job). **TestNet app `763809096` predates
+the committed TEAL** (chain 660 B / `d24d9071…`; committed source assembles to 709 B /
+`6fa5cee1…`). Local merge gates (rust-ci, KAT, TEAL-recompile, gitleaks) stay blocking; live
+bytecode match is a **TestNet follow-up** that fails with
+`AWAITING TESTNET REDEPLOY of app 763809096` until a keyed redeploy. **Not yet externally
+audited; not on MainNet.** Treat as a reference, not production‑ready. MIT licensed.
 
 ## Verify it yourself
 
@@ -74,7 +76,10 @@ python contracts/falcon_det1024.py
 algokit generate client contracts/out/TrelyanInscription.arc56.json --output contracts/trelyan_client.py
 # run the suite (localnet) or deploy to TestNet:
 python -m pytest contracts/test_inscription.py -v          # 20 passed
-python contracts/deploy_testnet.py                          # needs DEPLOYER_MNEMONIC + a funded TestNet account
+# TestNet app 763809096 cannot be updated (I1/I5). Redeploy = NEW app, then retarget ids:
+# see BLOCKERS.md (needs DEPLOYER_MNEMONIC + a funded TestNet account; never commit the mnemonic).
+python contracts/deploy_testnet.py
+python contracts/verify_deployment.py --app-id <NEW_APP_ID>   # must print MATCH
 ```
 
 ## Scope of the claim

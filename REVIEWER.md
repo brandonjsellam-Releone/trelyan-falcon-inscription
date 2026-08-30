@@ -18,7 +18,7 @@ public inputs. Deeper analysis lives in `TRELYAN_PROTOCOL_SPEC_v0.2.md` and
 | Item | Value |
 |---|---|
 | TestNet application | `763809096` (asset `763809098`) |
-| Approval-program fingerprint | `sha512_256 = d24d9071209f526a2075542d9408295d78f83ca5ed4c8cc233000130dcc97d44` (660 B; `verify_trelyan.py` asserts this — Update is blocked, so it is fixed) |
+| Approval-program fingerprint | `sha512_256 = d24d9071209f526a2075542d9408295d78f83ca5ed4c8cc233000130dcc97d44` (660 B on app `763809096`; Update is blocked, so *this app* is fixed). **Not** the committed source: that assembles to **709 B** / `6fa5cee1…`. See [`BLOCKERS.md`](BLOCKERS.md). |
 | Pinned Falcon source | `algorand/falcon` commit `ce15e75bceb372867daf6b8e81918ab6978686eb` |
 | Source-tree digest | `sha512_256 = c6adf487…` (27 files); `deterministic.c = 601390dc…` |
 | FP backend (pinned) | `FALCON_FPEMU=1`, `FALCON_FPNATIVE=0` (integer-only emulated fixed point) |

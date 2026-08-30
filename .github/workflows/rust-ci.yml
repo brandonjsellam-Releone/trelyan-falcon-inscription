@@ -241,3 +241,35 @@ jobs:
           set -euo pipefail
           test -f deny.toml || { echo "::error::rust/deny.toml missing — an unconfigured cargo-deny rejects everything, which reads like a real finding"; exit 1; }
           cargo deny check
+
+  # Single required check for this workflow. Branch protection should require THIS
+  # job (and ci.yml's "Required merge gates (local)"). falcon-ct is observation-only
+  # and is deliberately omitted. Live TestNet match is testnet-followup.yml.
+  required-merge-gates:
+    name: Required merge gates (rust)
+    if: always() && !cancelled()
+    needs:
+      - lint
+      - test
+      - msrv
+      - supply-chain
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: All rust merge gates succeeded
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          needs = json.loads(os.environ["RESULTS"])
+          failed = [f"{name}={info.get('result')}" for name, info in needs.items()
+                    if info.get("result") not in ("success", "skipped")]
+          if failed:
+              print("Rust merge gates failed: " + ", ".join(failed))
+              sys.exit(1)
+          print("Rust merge gates passed (lint, test+KAT, MSRV, supply-chain).")
+          print("Live TestNet bytecode match is a separate follow-up — see BLOCKERS.md.")
+          PY
