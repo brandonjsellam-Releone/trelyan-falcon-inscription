@@ -49,6 +49,10 @@ def test_missing_secret_lists_exact_name_and_hides_any_value():
     assert "ALGOD_TOKEN" in out
     assert "not required" in out.lower() or "Not required" in out
     assert FAKE_SECRET not in out
+    # Windows CI is cp1252: a single non-ASCII glyph in this banner
+    # UnicodeEncodeError'd after the secret name and failed the KAT job.
+    out.encode("ascii")
+    result.stderr.encode("ascii")
 
 
 def test_present_secret_is_not_printed():

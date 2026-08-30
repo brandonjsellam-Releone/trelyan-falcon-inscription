@@ -46,7 +46,7 @@ def main() -> int:
         for name in missing:
             print(f"  - {name}")
         print()
-        print("Set them under Settings → Secrets and variables → Actions.")
+        print("Set them under Settings -> Secrets and variables -> Actions.")
         print("Use a dedicated, low-balance TestNet account only.")
         print("Faucet: https://bank.testnet.algorand.network/")
         print("Do not add MainNet keys. Do not add paid infra.")
