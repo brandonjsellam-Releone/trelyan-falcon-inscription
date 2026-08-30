@@ -35,6 +35,22 @@ from algokit_utils import (
 
 DOMAIN_TAG = b"TRELYAN-INSCRIPTION-v1"
 EXPLORER = "https://testnet.explorer.perawallet.app"
+# Public TestNet genesis (same constant as sdk/examples/verify_trelyan.py). Used only
+# as a MainNet refusal — never as a signing secret.
+TESTNET_GENESIS_B64 = "SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI="
+
+
+def _write_github_output(name: str, value: str) -> None:
+    """Emit a numeric id for Actions. Never writes secrets."""
+    path = os.environ.get("GITHUB_OUTPUT")
+    if not path:
+        return
+    if name not in {"app_id", "cell_id"}:
+        return
+    if not value.isdigit():
+        return
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(f"{name}={value}\n")
 
 
 def sha512_256(data: bytes) -> bytes:
@@ -60,6 +76,8 @@ def main() -> None:
     mn = os.environ.get("DEPLOYER_MNEMONIC")
     if not mn:
         sys.exit("Set DEPLOYER_MNEMONIC to a funded TestNet account (fund at https://bank.testnet.algorand.network/).")
+    if os.environ.get("ALGORAND_NETWORK", "").strip().lower() in {"mainnet", "main"}:
+        sys.exit("Refusing to run: ALGORAND_NETWORK looks like MainNet. TestNet only.")
 
     algorand = AlgorandClient.testnet()
     deployer = algorand.account.from_mnemonic(mnemonic=mn)
@@ -67,12 +85,15 @@ def main() -> None:
 
     gh = algorand.client.algod.suggested_params().gh
     genesis = bytes(gh) if isinstance(gh, (bytes, bytearray)) and len(gh) == 32 else base64.b64decode(gh)
+    if base64.b64encode(genesis).decode() != TESTNET_GENESIS_B64:
+        sys.exit("Refusing to deploy: connected node is not Algorand TestNet.")
 
     # 1. deploy (create() binds the native TestNet Global.genesis_hash — A2)
     factory = algorand.client.get_typed_app_factory(TrelyanInscriptionFactory, default_sender=deployer.address)
     client, _ = factory.send.create.create()
     app_id = client.app_id
     print(f"app deployed: {app_id}  ->  {EXPLORER}/application/{app_id}/")
+    _write_github_output("app_id", str(app_id))
 
     # 2. fund the app account for box min-balance. Real need: committed-key box (1793 B) ~0.72 ALGO +
     # owner box ~0.02 + small inscription record box ~0.05 + base app MBR 0.1 = ~0.9 ALGO. Fund 1.5 ALGO
@@ -90,6 +111,7 @@ def main() -> None:
     )
     cell = res.asset_id
     print(f"cell ASA: {cell}  ->  {EXPLORER}/asset/{cell}/")
+    _write_github_output("cell_id", str(cell))
 
     # 4. register: commit the FULL Falcon public key + the controlling owner (admin-only, once)
     client.send.register_cell(args=(cell, deployer.address, pk),

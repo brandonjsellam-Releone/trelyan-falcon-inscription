@@ -46,7 +46,39 @@ that source (contract changed `2ec798e` / 2026-06-16; app created 2026-06-02).
 Explorer (historical only):
 https://lora.algokit.io/testnet/application/763809096
 
-### One-shot redeploy checklist (Brandon, or a later keyed job)
+### BLOCKED — repository secret this agent cannot use
+
+An unattended agent **cannot** list Actions secrets (HTTP 403) and **cannot**
+dispatch `trelyan-pq CI` / `testnet-e2e` (HTTP 403). No `DEPLOYER_MNEMONIC` is
+present in the agent environment. Issue
+[#5](https://github.com/brandonjsellam-Releone/trelyan-falcon-inscription/issues/5)
+is still open asking for that secret. Do not invent a mnemonic. Do not scrape
+files for one.
+
+**Required repository secret** (Settings → Secrets and variables → Actions):
+
+| Secret | Required? | Why |
+|---|---|---|
+| `DEPLOYER_MNEMONIC` | **YES** | 25-word funded TestNet account. Signs `create()` / fund / register / inscribe. |
+| `ALGOD_URL` | no | `AlgorandClient.testnet()` uses the public TestNet algod. |
+| `ALGOD_TOKEN` | no | same |
+| `ALGOD_SERVER` | no | same |
+| `ALGOD_PORT` | no | same |
+| `ALGOD_*` | no | same |
+| any MainNet mnemonic / token | **must not be set** | This job is TestNet only. |
+
+Once `DEPLOYER_MNEMONIC` is set, run the keyed job — do not spend, do not
+MainNet:
+
+1. Actions → **TestNet redeploy** (`.github/workflows/testnet-redeploy.yml`) →
+   **Run workflow** → type `TESTNET`.
+2. Or Actions → **trelyan-pq CI** → **Run workflow** (`testnet-e2e`).
+
+Both fail closed with the table above if the secret is missing. Neither prints
+the mnemonic. Success is a **new** TestNet app id whose assembled bytecode
+**MATCH**es at **709 B**. Then continue at step 5 below.
+
+### One-shot redeploy checklist (Brandon, or the keyed job above)
 
 No signing keys in an unattended agent. Use a funded **TestNet** account and
 `DEPLOYER_MNEMONIC` in the environment or the repo secret of the same name.
@@ -94,9 +126,13 @@ Faucet: https://bank.testnet.algorand.network/ — a few ALGO is enough.
    python contracts/deploy_testnet.py
    ```
 
-   Or, if the repo secret is set, run the existing keyed job:
-   Actions → **trelyan-pq CI** → **Run workflow** (`testnet-e2e`). That path
-   uses `sdk/examples/quickstart.py` and also prints a new app id.
+   Or, if the repo secret is set, run a keyed job (same secret name):
+
+   - Actions → **TestNet redeploy** → type `TESTNET`. This path runs
+     `contracts/deploy_testnet.py` and then
+     `verify_deployment.py --app-id <NEW>` (must MATCH / 709 B).
+   - Actions → **trelyan-pq CI** → **Run workflow** (`testnet-e2e`). That path
+     uses `sdk/examples/quickstart.py` and also prints a new app id.
 
 5. **Record the new ids and the new program hash** from the script / explorer.
    Then:
