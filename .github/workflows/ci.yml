@@ -617,6 +617,10 @@ jobs:
           cc -O3 -fPIC -DFALCON_UNALIGNED=0 -fno-strict-aliasing -shared -o libfalcondet1024.so \
             codec.c common.c falcon.c fft.c fpr.c keygen.c rng.c shake.c sign.c vrfy.c deterministic.c
           echo "FALCON_DET1024_LIB=$PWD/libfalcondet1024.so" >> "$GITHUB_ENV"
+      - name: Fail closed if DEPLOYER_MNEMONIC is unset
+        env:
+          DEPLOYER_MNEMONIC: ${{ secrets.DEPLOYER_MNEMONIC }}
+        run: python contracts/require_testnet_deploy_secret.py
       - name: Install SDK with the Algorand extra
         working-directory: sdk
         run: |
