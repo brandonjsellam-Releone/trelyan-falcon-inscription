@@ -35,7 +35,12 @@ OUT = os.path.join(HERE, "det1024_kat.json")
 
 PINNED_COMMIT = "ce15e75bceb372867daf6b8e81918ab6978686eb"
 DETERMINISTIC_C_SHA512_256 = "601390dc53521fc1b00eb962ea63d64c2d65bfe774450cf4ec59a3478e0a54a4"
-APP_ID = 763809096  # TestNet app id (not load-bearing — just a fixed, realistic value)
+# LOAD-BEARING, despite what this comment used to say. `build_message` encodes APP_ID into
+# the message every golden signature signs, so changing it and re-running this script
+# replaces the entire byte-identity reference rather than adjusting a label. It is pinned by
+# test_app_id_references_are_coherent.py for that reason. A redeploy does NOT change it: the
+# vectors test the signer, which is independent of any deployment.
+APP_ID = 763809096
 
 # Fixed, network-agnostic messages: distinct (cell_id, artifact, genesis) so each sigma differs.
 # genesis_hash is fixed bytes here (not a live network value) — these are off-chain wire KATs.
