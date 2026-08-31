@@ -200,9 +200,14 @@ budget mode documented · §1.2 version/cost/byte-format pinned to live referenc
 - [ ] **Mint atomicity** of `committed_key_hash` (immutable storage; where exactly).
 - [ ] **Budget mode** chosen (app-call pooling vs. stateless logic-sig isolation).
 - [ ] **I5 mechanism** — exact non-upgradability control + how it's verified on-chain.
-- [x] **Lifecycle policy** drafted (`GOVERNANCE_AND_LIFECYCLE_POLICY.md`) — key-loss disclosure,
-      abandoned-Cell status, governance (mint-only authority; no-pause/no-upgrade by design),
-      wind-down (protocol outlives the Foundation). Pending Stiftung/counsel ratification.
+- [ ] **Lifecycle policy** — key-loss disclosure, abandoned-Cell status, governance (mint-only
+      authority; no-pause/no-upgrade by design), wind-down (protocol outlives the Foundation).
+      **NOT WRITTEN.** This line was checked `[x]` and said the policy was "drafted
+      (`GOVERNANCE_AND_LIFECYCLE_POLICY.md`)" until 2026-08-30. That file does not exist, in this
+      repository or anywhere on disk, and `AUDIT_READINESS.md` had already established as much
+      while this ledger went on claiming otherwise. §6.3 says key loss "MUST be disclosed to
+      record holders"; nothing discloses it. An honesty ledger is the last place a false entry
+      belongs, so it is unchecked and the gap is named.
 
 ---
 
