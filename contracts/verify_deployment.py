@@ -241,14 +241,42 @@ def main() -> int:
         print(f"MATCH - application {args.app_id} is running the committed source.")
         return 0
 
-    print(f"DRIFT - application {args.app_id} is NOT running the committed source.")
-    print(f"  committed source builds to : {expected_hash}  ({len(expected)} B)")
-    print(f"  chain is actually serving  : {deployed_hash}  ({len(deployed)} B)")
-    print()
-    print("  The deployed program predates the committed contract. Redeploy from the")
-    print("  committed artifact, or explain the divergence before treating any review")
-    print("  of this source as a review of the live application.")
+    print_awaiting_redeploy(
+        app_id=args.app_id,
+        expected_hash=expected_hash,
+        expected_len=len(expected),
+        deployed_hash=deployed_hash,
+        deployed_len=len(deployed),
+    )
     return 1
+
+
+def print_awaiting_redeploy(
+    *,
+    app_id: int,
+    expected_hash: str,
+    expected_len: int,
+    deployed_hash: str,
+    deployed_len: int,
+) -> None:
+    """Print the documented drift finding. Always a failure, never a skip.
+
+    App 763809096 cannot be patched in place (Update/Delete are blocked, I1/I5).
+    The one-shot checklist is BLOCKERS.md.
+    """
+    print(f"DRIFT - application {app_id} is NOT running the committed source.")
+    print(f"  committed source builds to : {expected_hash}  ({expected_len} B)")
+    print(f"  chain is actually serving  : {deployed_hash}  ({deployed_len} B)")
+    print()
+    print(f"AWAITING TESTNET REDEPLOY of app {app_id}.")
+    print("  This is not a silent skip. The live program predates the committed")
+    print("  contract. Update/Delete are blocked, so this app cannot be patched")
+    print("  in place. Deploy a NEW TestNet app from the committed TEAL, then")
+    print("  retarget APP_ID / PINNED_ON_CHAIN_SHA512_256. Checklist: BLOCKERS.md")
+    print("  Local source↔TEAL gates can stay green; chain match cannot until then.")
+    print()
+    print("  Do not treat any review of this source as a review of the live")
+    print("  application until the follow-up workflow is green.")
 
 
 if __name__ == "__main__":

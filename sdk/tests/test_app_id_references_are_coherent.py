@@ -61,6 +61,17 @@ FROZEN = {
     "sdk/tests/vectors/gen_det1024_kat.py",
     # This file: it names the historical id in order to talk about it.
     "sdk/tests/test_app_id_references_are_coherent.py",
+    # Synthetic fixture, not a live claim. It calls print_awaiting_redeploy() with hardcoded
+    # arguments to lock the drift banner's TEXT, so a later edit cannot turn a mismatch into a
+    # silent skip. Kept after the 2026-09-03 redeploy precisely as a regression guard: if drift
+    # ever recurs the banner must still name the app and both sizes.
+    "sdk/tests/test_testnet_drift_banner.py",
+    # The record of the drift that was closed on 2026-09-03. It must keep quoting the measured
+    # 660 B / d24d9071 and 709 B / 6fa5cee1 values -- test_testnet_drift_banner.py asserts they
+    # are still there -- so its app id is a historical observation, not a live claim.
+    "BLOCKERS.md",
+    # A dated validation record. It says what was true on 2026-06-01 and must not be rewritten.
+    "LOCALNET_VALIDATION_2026-06-01.md",
 }
 
 # Files whose app-id mentions are LIVE CLAIMS. These must agree with the deployment under test,
@@ -80,6 +91,9 @@ LIVE_CLAIM = {
     "sdk/docs/tutorials/04-end-to-end-inscribe-verify.md",
     ".github/workflows/ci.yml",
     "scripts/verify_all.sh",
+    "CONTRIBUTING.md",
+    ".github/workflows/testnet-followup.yml",
+    ".github/workflows/testnet-redeploy.yml",
 }
 
 # An Algorand TestNet application id: 9 digits in the 7xxxxxxxx range.

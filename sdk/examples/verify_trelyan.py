@@ -113,7 +113,11 @@ if COMMITTED_TEAL.exists():
     if _built_fp != fp:
         print(f"        committed source builds to : {_built_fp}  ({len(_built)} B)")
         print(f"        chain is actually serving  : {fp}  ({len(ap)} B)")
-        print("        -> the deployment predates the committed contract; see contracts/verify_deployment.py")
+        print(f"AWAITING TESTNET REDEPLOY of app {APP_ID}.")
+        print("        This is not a silent skip. The live program predates the committed")
+        print("        contract (Update/Delete blocked — cannot patch in place).")
+        print("        Deploy a NEW TestNet app from the committed TEAL, then retarget")
+        print("        APP_ID / PINNED_ON_CHAIN_SHA512_256. Checklist: BLOCKERS.md")
 else:
     not_checked("deployed bytecode matches the committed contract",
                 f"no committed artifact found at {COMMITTED_TEAL} "
