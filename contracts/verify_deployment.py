@@ -273,7 +273,7 @@ def print_awaiting_redeploy(
     print("  contract. Update/Delete are blocked, so this app cannot be patched")
     print("  in place. Deploy a NEW TestNet app from the committed TEAL, then")
     print("  retarget APP_ID / PINNED_ON_CHAIN_SHA512_256. Checklist: BLOCKERS.md")
-    print("  Local source↔TEAL gates can stay green; chain match cannot until then.")
+    print("  Local source-to-TEAL gates can stay green; chain match cannot until then.")
     print()
     print("  Do not treat any review of this source as a review of the live")
     print("  application until the follow-up workflow is green.")
