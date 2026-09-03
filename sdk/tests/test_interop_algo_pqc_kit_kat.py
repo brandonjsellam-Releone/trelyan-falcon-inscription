@@ -64,9 +64,12 @@ THE ALIGNMENT SPEC — what BOTH signers must emit, byte-for-byte (this is the r
               Gaussian sampler, rounding, or compressed encoding surfaces here as a byte mismatch.
               That divergence-detection is the entire point of this KAT.
 
-The committed goldens in `vectors/det1024_kat.json` ARE the ground truth — the exact bytes the live
-TestNet app (763809096) verifies on-chain. The primary direction below needs NO C library: it simply
-asks algo-pqc-kit to reproduce those goldens. If the C lib is also present, it cross-checks the two.
+The committed goldens in `vectors/det1024_kat.json` ARE the ground truth for byte-identity. Their
+signed messages name the HISTORICAL app **763809096**, not the current deployment (770964251):
+they are FROZEN evidence — a signature over a message that names that app — and must never be
+retargeted or regenerated. See `test_app_id_references_are_coherent.py`, which enforces exactly
+that split. The primary direction below needs NO C library: it simply asks algo-pqc-kit to
+reproduce those goldens. If the C lib is also present, it cross-checks the two.
 
 Wiring: `_ApkAdapter` is the SINGLE integration point. Until algo-pqc-kit's exact entry points are
 pinned (derive a pubkey from the committed private key; sign M to det1024-compressed bytes), the

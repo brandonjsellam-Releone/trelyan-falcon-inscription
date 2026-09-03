@@ -175,7 +175,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install trelyan-pq
           python sdk/examples/verify_trelyan.py
-        # 14 checks: package constants, pinned golden vectors, live app 763809096
+        # 14 checks: package constants, pinned golden vectors, live app 770964251
         # (bytecode fingerprint), on-chain Falcon key + inscription record, and a
         # byte-exact local rebuild of the domain-separated message. Exits non-zero
         # on any failure. No account, no mnemonic, no secrets.

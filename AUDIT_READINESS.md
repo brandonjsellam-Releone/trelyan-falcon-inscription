@@ -4,7 +4,7 @@
 **Repo:** `github.com/brandonjsellam-Releone/trelyan-falcon-inscription` · MIT (`LICENSE`).
 **Status:** Reference implementation. Last localnet validation 20/20 on 2026-06-01; contract changed
 2026-06-16 and the suite is now 22 tests with no recorded localnet run. Deployed to **Algorand TestNet**
-(app `763809096`). **UNAUDITED — not for MainNet value.** Falcon here provides a **signature**
+(app `770964251`). **UNAUDITED — not for MainNet value.** Falcon here provides a **signature**
 (integrity / authenticity), **not** encryption — no confidentiality is claimed.
 **Date:** 2026-06-17.
 
@@ -175,7 +175,7 @@ auditor spends week one on the real surface, not rediscovery.
 | Signature KAT | `sdk/tests/test_signature_kat.py`, `sdk/tests/vectors/det1024_kat.json` | Byte-identity goldens (begin `ba00`); 3-OS reproduction in CI. |
 | Seeded fuzz / differential oracle | `sdk/tests/test_signature_fuzz.py` | Off-chain↔on-chain encoding differential (seed 1469, 300 iters). |
 | Pinned-build verifier | `sdk/ci/verify_pinned_digest.py` | Recomputes the 27-file tree + `deterministic.c` digests + FP-emulation pin. |
-| Read-only on-chain check | `sdk/examples/verify_trelyan.py` | **17 passed, 1 failed** against live app `763809096` (re-run 2026-08-28). The one failure is `deployed bytecode matches the committed contract` — app `763809096` predates this source and, by control I5, can never be updated to match. Expect this failure until a new app is deployed from the committed artifact. |
+| Read-only on-chain check | `sdk/examples/verify_trelyan.py` | **18 passed, 0 failed** against live app `770964251` (run 2026-09-03), including `deployed bytecode matches the committed contract`. The superseded app `763809096` returned 17 passed / 1 failed for three months: its program predated this source and control I5 forbids updating a deployed app in place. That check was left failing in public rather than weakened, and was closed on 2026-09-03 by deploying a new app from the committed artifact. |
 | Hermetic checker | `Dockerfile.verify` | Pins python 3.13 + `trelyan-pq` 0.1.0; read-only. |
 | CI | `.github/workflows/ci.yml` | wire-format / verify-live / signature-kat (3-OS) / testnet-e2e + a sanitizer (alignment/UBSan) gate. |
 | Encoding / budget / arg-order memos | `contracts/FALCON_ENCODING_2026-06-01.md`, `contracts/FALCON_BUDGET_2026-06-01.md`, `contracts/A1_RESOLUTION_2026-06-01.md` | How encoding, opcode cost, and argument order were pinned, with sources. |
@@ -190,8 +190,8 @@ auditor spends week one on the real surface, not rediscovery.
 
 | Item | Value |
 |------|-------|
-| TestNet application | `763809096` (asset `763809098`) |
-| Approval-program fingerprint | `sha512_256 = d24d9071209f526a2075542d9408295d78f83ca5ed4c8cc233000130dcc97d44` (660 B; Update is blocked, so it is fixed) |
+| TestNet application | `770964251` (asset `770964264`) |
+| Approval-program fingerprint | `sha512_256 = 6fa5cee145762e4a0c2ba93738a0e6f51e93b02c71f23e4e663ac6d73b981c4b` (709 B; Update is blocked, so it is fixed) |
 | On-chain verifier | AVM native `falcon_verify` (`0x85`, AVM v12 / consensus v41 / go-algorand v4.3.0, cost `costly(1700)`) |
 | Pinned Falcon source | `algorand/falcon` commit `ce15e75bceb372867daf6b8e81918ab6978686eb` (GitHub source **tarball**, LF) |
 | Source-tree digest | `sha512_256 = c6adf487…` (27 files); `deterministic.c = 601390dc…` |
@@ -207,8 +207,7 @@ The fast, no-trust path is **`REVIEWER.md`** (≈5 minutes, read-only, from publ
 
 ```
 pip install trelyan-pq
-python3 sdk/examples/verify_trelyan.py          # 17 passed, 1 failed vs live app 763809096 (2026-08-28)
-#   the 1 failure is the known bytecode drift described above — it is expected, not a regression
+python3 sdk/examples/verify_trelyan.py          # 18 passed, 0 failed vs live app 770964251 (2026-09-03)
 ```
 
 Hermetic alternative (pins python 3.13 + `trelyan-pq` 0.1.0):

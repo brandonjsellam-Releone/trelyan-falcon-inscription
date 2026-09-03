@@ -50,7 +50,7 @@ DEFAULT_SOURCE = REPO_ROOT / "inscription.py"
 
 # TestNet deployment under review. Not a security constant - changing it only
 # changes which application is inspected, never what "correct" means.
-DEFAULT_APP_ID = 763809096
+DEFAULT_APP_ID = 770964251
 DEFAULT_ALGOD = "https://testnet-api.algonode.cloud"
 
 

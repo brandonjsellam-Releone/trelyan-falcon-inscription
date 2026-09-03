@@ -28,7 +28,7 @@ from trelyan_pq import falcon
 
 ART = sha512_256(b"trelyan isolated-signer artifact")
 GENESIS = bytes(32)
-APP_ID = 763809096
+APP_ID = 770964251
 
 
 def _lib_available() -> bool:

@@ -146,7 +146,7 @@ hr
 # ================================================================================================
 # Axis D — read-only on-chain verification of the deployed app (needs network)
 # ================================================================================================
-echo "== Axis D: read-only on-chain verify of deployed TestNet app 763809096 =="
+echo "== Axis D: read-only on-chain verify of deployed TestNet app 770964251 =="
 if [ "${SKIP_ONCHAIN:-0}" = "1" ]; then
   echo "  SKIP_ONCHAIN=1 set — skipping the on-chain axis (offline run)."
   RESULTS="${RESULTS}  [SKIP] Axis D — on-chain check skipped (SKIP_ONCHAIN=1)\n"
