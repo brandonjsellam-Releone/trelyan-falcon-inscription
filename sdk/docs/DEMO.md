@@ -2,7 +2,7 @@
 
 The reference contract is **deployed and verified on Algorand TestNet**:
 
-- **App ID `763809096`** — https://lora.algokit.io/testnet/application/763809096
+- **App ID `770964251`** — https://lora.algokit.io/testnet/application/770964251
 - A real post-quantum inscription was written **only after** an on-chain Falcon-1024 verification
   passed and every authorization check succeeded — the same validated path covered by the 20/20
   localnet suite.

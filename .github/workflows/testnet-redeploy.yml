@@ -1,7 +1,7 @@
 name: TestNet redeploy
 
 # Keyed job. Not a merge gate. Creates a NEW TestNet application from the
-# committed TEAL. App 763809096 cannot be patched — on_update / on_delete
+# committed TEAL. The live app cannot be patched — on_update / on_delete
 # reject every UpdateApplication / DeleteApplication (I1/I5).
 #
 # Required repository secret (Settings → Secrets and variables → Actions):
@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_testnet_only:
-        description: "Type TESTNET to create a new TestNet app from committed TEAL (763809096 cannot be patched in place)"
+        description: "Type TESTNET to create a new TestNet app from committed TEAL (the live app cannot be patched in place)"
         required: true
         type: string
 
@@ -122,7 +122,7 @@ jobs:
           if [ "${{ steps.deploy.outcome }}" != "success" ]; then
             echo "::warning::deploy_testnet.py did not finish (register/inscribe may have failed). Bytecode match is still what closes the drift."
           fi
-          echo "App 763809096 is unchanged (I1/I5). Retarget:"
+          echo "The previous app is unchanged (I1/I5). Retarget:"
           echo "  contracts/verify_deployment.py  DEFAULT_APP_ID"
           echo "  sdk/examples/verify_trelyan.py  APP_ID + PINNED_ON_CHAIN_SHA512_256"
           echo "  README.md, REVIEWER.md, sdk/docs/DEMO.md, ROADMAP.md, AUDIT_READINESS.md"

@@ -18,9 +18,11 @@ on:
 
 # Merge-gate split (2026-08-30). Local jobs in THIS workflow are the required
 # merge gates (plus rust-ci.yml). Live TestNet bytecode match is a separate
-# follow-up in testnet-followup.yml: it still runs, still fails on drift, and
-# must not be required until app 763809096 is replaced. Do not fold those jobs
-# back in here to "make CI green" — that would hide the mismatch. See BLOCKERS.md.
+# follow-up in testnet-followup.yml: it still runs and still fails on drift.
+# It went GREEN on 2026-09-03 when app 770964251 was deployed from the committed
+# artifact, closing the 763809096 drift. Kept out of the required gates because it
+# needs live algod; do not fold it back in to "make CI green", and never silence a
+# future mismatch. History in BLOCKERS.md.
 
 jobs:
   secret-scan:
@@ -323,8 +325,8 @@ jobs:
               sys.exit(1)
           print("Local merge gates passed (skipped = schedule-only exclusions).")
           print("Live TestNet bytecode match is NOT in this set. It lives in")
-          print("testnet-followup.yml and stays red until app 763809096 is replaced.")
-          print("See BLOCKERS.md.")
+          print("testnet-followup.yml, which went green on 2026-09-03 when app")
+          print("770964251 replaced the drifted 763809096. See BLOCKERS.md.")
           PY
 
   signature-kat:

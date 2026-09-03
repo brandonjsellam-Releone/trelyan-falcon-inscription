@@ -17,8 +17,8 @@ public inputs. Deeper analysis lives in `TRELYAN_PROTOCOL_SPEC_v0.2.md` and
 
 | Item | Value |
 |---|---|
-| TestNet application | `763809096` (asset `763809098`) |
-| Approval-program fingerprint | `sha512_256 = d24d9071209f526a2075542d9408295d78f83ca5ed4c8cc233000130dcc97d44` (660 B on app `763809096`; Update is blocked, so *this app* is fixed). **Not** the committed source: that assembles to **709 B** / `6fa5cee1…`. See [`BLOCKERS.md`](BLOCKERS.md). |
+| TestNet application | `770964251` (asset `770964264`) |
+| Approval-program fingerprint | `sha512_256 = 6fa5cee145762e4a0c2ba93738a0e6f51e93b02c71f23e4e663ac6d73b981c4b` (709 B; `verify_trelyan.py` asserts this — Update is blocked, so it is fixed) |
 | Pinned Falcon source | `algorand/falcon` commit `ce15e75bceb372867daf6b8e81918ab6978686eb` |
 | Source-tree digest | `sha512_256 = c6adf487…` (27 files); `deterministic.c = 601390dc…` |
 | FP backend (pinned) | `FALCON_FPEMU=1`, `FALCON_FPNATIVE=0` (integer-only emulated fixed point) |
@@ -37,9 +37,9 @@ python3 sdk/examples/verify_trelyan.py
 *Hermetic alternative* (pins python 3.13 + `trelyan-pq` 0.1.0, read-only): `docker build -f Dockerfile.verify -t trelyan-verify . && docker run --rm trelyan-verify`. For the **full** offline rebuild — compile the pinned Falcon lib + byte-identity KAT + digest gate, all in one container, then the on-chain check: `docker build -f Dockerfile.repro -t trelyan-repro . && docker run --rm trelyan-repro sh scripts/verify_all.sh` runs Axes A–D and prints one PASS/FAIL (both containers verified green on 2026-06-17: `verify` 15/15, `repro` 4/4).
 Read-only. Confirms: the package constants (domain tag, 102-byte message, `0xBA` det-header, sig ≤1423 /
 pubkey 1793); offline golden vectors (`sha512_256`, `build_message`, box names `k_`/`o_`/`i_`); the **live**
-TestNet app `763809096` (prints its bytecode `sha512_256` fingerprint — diff it against your compile of
+TestNet app `770964251` (prints its bytecode `sha512_256` fingerprint — diff it against your compile of
 `contracts/inscription.py`); the registered 1793-byte Falcon public keys in box storage; and a byte-exact
-local reconstruction of the domain-separated message `M` a live inscription must have signed. On 2026-06-17 this returned **15/15 PASS** against the live app — 1 registered cell (`763809098`) and 1 on-chain inscription — and asserted the pinned bytecode fingerprint above.
+local reconstruction of the domain-separated message `M` a live inscription must have signed. On 2026-09-03, against the newly deployed app, this returned **18/18 PASS** — 1 registered cell (`770964264`) and 1 on-chain inscription — including `deployed bytecode matches the committed contract`. (The same script returned 17 passed / 1 failed against the superseded app `763809096`, whose program predated this source; that failure is what the 2026-09-03 redeploy closed.)
 
 ### 2. Signer byte-identity KAT (offline — proves determinism)
 Build the pinned Falcon library, then:

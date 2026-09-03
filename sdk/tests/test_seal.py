@@ -47,7 +47,7 @@ requires_lib = pytest.mark.skipif(
 # Fixed, network-agnostic seal inputs reused across tests.
 ART = sha512_256(b"trelyan T1 seal artifact")
 GENESIS = bytes(32)
-APP_ID = 763809096  # the TestNet app id (not load-bearing for these off-chain tests)
+APP_ID = 770964251  # the TestNet app id (not load-bearing for these off-chain tests)
 
 
 # --- spies that wrap a real signer (let tests observe the wiped buffer / force a bad build) -----

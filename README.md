@@ -5,19 +5,36 @@ that verifies a **Falcon‑1024** signature *on‑chain* using Algorand's native
 then writes a **write‑once** record. Built so any Algorand developer can fork the pattern for
 post‑quantum authorization in their own contract.
 
-> **Live on Algorand TestNet** (2 June 2026): app **`763809096`**, asset `763809098` —
-> https://lora.algokit.io/testnet/application/763809096 . The on‑chain `i_` inscription box is written
-> only *after* the Falcon‑1024 signature verifies on‑chain and every authorization check passes, so that
-> deployment is a real, publicly verifiable post‑quantum inscription. It is **not** the program the
-> committed source builds today — see [BLOCKERS.md](BLOCKERS.md).
+> **Live on Algorand TestNet** (3 September 2026): app **`770964251`**, asset `770964264` —
+> https://lora.algokit.io/testnet/application/770964251 . The on‑chain `i_` inscription box is written
+> only *after* the Falcon‑1024 signature verifies on‑chain and every authorization check passes, so the
+> deployment is a real, publicly verifiable post‑quantum inscription.
+>
+> **The deployed program is byte-for-byte the contract in this repository.** Run
+> `python contracts/verify_deployment.py` and it prints `MATCH`: the chain serves 709 B
+> (`6fa5cee1…`) and this source assembles to the same 709 B and the same digest. It cannot
+> drift away from that silently, *by design* — control **I5 (non-upgradability)** makes
+> `on_update` and `on_delete` reject unconditionally (`contracts/inscription.py:404-412`),
+> which is the property the contract exists to demonstrate.
+>
+> **The history is kept on purpose.** The previous app **`763809096`** (deployed 2 June 2026)
+> served 660 B (`d24d9071…`) and did **not** match this source: the contract changed on
+> 2026-06-16, and I5 forbids patching a deployed app in place. Rather than fold that check
+> into the green gates or copy the chain's hash into the repo and call it agreement, the job
+> was left running and **failing in public for three months**. It was closed on 2026-09-03 by
+> deploying a new application from the committed artifact. `763809096` remains on chain,
+> unmodified, as the historical record.
+>
+> **What this means for a reviewer:** reading this source *is* reviewing app `770964251`.
+> `sdk/examples/verify_trelyan.py` reports **18 passed, 0 failed**.
 
 **Status (honest):** last localnet validation was **20/20 on 2026-06-01**; the contract changed on
-2026-06-16 and the suite is now **22 tests** (CI LocalNet job). **TestNet app `763809096` predates
-the committed TEAL** (chain 660 B / `d24d9071…`; committed source assembles to 709 B /
-`6fa5cee1…`). Local merge gates (rust-ci, KAT, TEAL-recompile, gitleaks) stay blocking; live
-bytecode match is a **TestNet follow-up** that fails with
-`AWAITING TESTNET REDEPLOY of app 763809096` until a keyed redeploy. **Not yet externally
-audited; not on MainNet.** Treat as a reference, not production‑ready. MIT licensed.
+2026-06-16 and the suite is now **22 tests with no recorded localnet run** (see
+[`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md)). **Deployed on TestNet,
+and the deployed app IS this source** — the follow-up job checks the live app's bytecode
+fingerprint against the committed TEAL and has passed since the 2026-09-03 redeploy; it is kept
+out of the required merge gates only because it needs live algod, and it is never silenced.
+**Not yet externally audited; not on MainNet.** Treat as a reference, not production‑ready. MIT licensed.
 
 ## Verify it yourself
 
@@ -76,10 +93,7 @@ python contracts/falcon_det1024.py
 algokit generate client contracts/out/TrelyanInscription.arc56.json --output contracts/trelyan_client.py
 # run the suite (localnet) or deploy to TestNet:
 python -m pytest contracts/test_inscription.py -v          # 20 passed
-# TestNet app 763809096 cannot be updated (I1/I5). Redeploy = NEW app, then retarget ids:
-# see BLOCKERS.md (needs DEPLOYER_MNEMONIC + a funded TestNet account; never commit the mnemonic).
-python contracts/deploy_testnet.py
-python contracts/verify_deployment.py --app-id <NEW_APP_ID>   # must print MATCH
+python contracts/deploy_testnet.py                          # needs DEPLOYER_MNEMONIC + a funded TestNet account
 ```
 
 ## Scope of the claim

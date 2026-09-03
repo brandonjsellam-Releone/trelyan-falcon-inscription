@@ -14,7 +14,7 @@ STATUS — READ BEFORE CITING THIS FILE AS EVIDENCE (TCE-28)
 **This KAT has produced ZERO comparisons to date.** Everything below describes what it will check
 once it can run; none of it has run. Do not read the alignment spec as a verified property.
 
-Two independent reasons, and the first is the one people assume is the only one:
+Three independent reasons, and the first is the one people assume is the only one:
 
   1. Nothing installs `algo-pqc-kit`. `sdk/pyproject.toml:28-31` declares only `algorand` and
      `dev = ["pytest>=8"]`; both CI test jobs run `pip install -e ".[dev]"`. All three differential
@@ -23,6 +23,22 @@ Two independent reasons, and the first is the one people assume is the only one:
      wired to a *guessed* upstream API shape (`algo_pqc_kit.account.FalconAccount.from_private_key`
      / `.public_key` / `.sign`) and raise `NotImplementedError` -> skip if that shape differs. The
      upstream API still has to be confirmed with the maintainer (issue #1).
+  3. **MEASURED 2026-09-03 — the real blocker is upstream, and it is not wiring.** Installed
+     `algo-pqc-kit==0.3.1` and probed it directly:
+       * `FalconAccount.from_private_key(priv)` EXISTS — so the guessed shape in reason 2 was
+         right — but is an unimplemented stub: `NotImplementedError: falcon-python does not
+         support deriving pk from sk after generation.` The primary direction therefore cannot
+         load the committed fixture key, no matter how `_ApkAdapter` is written.
+       * Decisive: `generate()` then `sign()` emits header byte0 **0x3A** (standard Falcon), NOT
+         **0xBA** (det1024's deterministic marker), and signing one message twice yields
+         DIFFERENT bytes. Upstream implements STANDARD RANDOMIZED Falcon-1024, not derandomized
+         det1024. Key sizes DO match (privkey 2305, pubkey 1793) — which is exactly why it looks
+         compatible at a glance. Observed sig length 1272 B; their FALCON_SIG_SIZE is a fixed 1280.
+     Byte-identity between a randomized signer and a derandomized one is unachievable by
+     construction. Unblocking needs UPSTREAM to implement det1024 (0xBA, salt-version byte 0x00,
+     nonce = SHAKE256(logn || privkey || data)) AND a real `from_private_key`. Until then the
+     "drop the ctypes/C dependency" bonus in the Purpose block above is NOT available, and the
+     honest answer to "has an independent implementation reproduced these bytes?" is NO.
 
 The golden fixture IS populated (1793-byte pubkey, 2305-byte privkey, 3 vectors), so this is a
 working test wired to a dependency no environment provides — which is exactly why it reads green.
@@ -48,14 +64,20 @@ THE ALIGNMENT SPEC — what BOTH signers must emit, byte-for-byte (this is the r
               Gaussian sampler, rounding, or compressed encoding surfaces here as a byte mismatch.
               That divergence-detection is the entire point of this KAT.
 
-The committed goldens in `vectors/det1024_kat.json` ARE the ground truth — the exact bytes the live
-TestNet app (763809096) verifies on-chain. The primary direction below needs NO C library: it simply
-asks algo-pqc-kit to reproduce those goldens. If the C lib is also present, it cross-checks the two.
+The committed goldens in `vectors/det1024_kat.json` ARE the ground truth for byte-identity. Their
+signed messages name the HISTORICAL app **763809096**, not the current deployment (770964251):
+they are FROZEN evidence — a signature over a message that names that app — and must never be
+retargeted or regenerated. See `test_app_id_references_are_coherent.py`, which enforces exactly
+that split. The primary direction below needs NO C library: it simply asks algo-pqc-kit to
+reproduce those goldens. If the C lib is also present, it cross-checks the two.
 
 Wiring: `_ApkAdapter` is the SINGLE integration point. Until algo-pqc-kit's exact entry points are
 pinned (derive a pubkey from the committed private key; sign M to det1024-compressed bytes), the
 methods raise NotImplementedError and these tests SKIP with an actionable message rather than
-silently passing. Edit ONLY `_ApkAdapter` to wire the real API, and the suite runs.
+silently passing. `_ApkAdapter` remains the single integration point for the day upstream ships a
+det1024 signer — but see STATUS reason 3: as of algo-pqc-kit 0.3.1, editing it CANNOT make this
+suite run, because upstream signs a different (randomized, 0x3A) scheme. Do not describe this KAT
+as "one adapter edit away".
 """
 
 import json

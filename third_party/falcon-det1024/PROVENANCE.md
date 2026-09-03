@@ -16,14 +16,23 @@ update this file, `SHA256SUMS`, and the KAT goldens together in one reviewed dif
 | Tarball size | 1,391,487 bytes |
 | Tarball SHA-256 | `dfac3e6f211b1d30589e75eeeaa8b64e13694076b2d0221106857ae1afb5ff30` |
 | Vendored on | 2026-08-18 |
-| Cross-check | Every file's SHA-256 matched the independent pin evidence tree kept locally since 2026-08-11 for `FALCON_PIN_BUMP_EVIDENCE_2026-08-11.md` (27 files, identical) |
+| Cross-check | `cd third_party/falcon-det1024 && sha256sum -c SHA256SUMS` &mdash; **27 of 27 OK**, re-verified 2026-08-30. This replaces a citation of a locally-kept evidence tree that is no longer on disk; see the note below. A command an auditor can run beats a document only one machine ever had |
 | Upstream version string | `README.txt`: "DETERMINISTIC FALCON IMPLEMENTATION — Version: 2021-12-03" |
 
 **Why this commit and not HEAD:** `ce15e75b` is the commit `go-algorand`'s release vendors — it is
 what the AVM `falcon_verify` opcode actually runs, and it is the commit the SDK's KAT goldens
 (`sdk/tests/vectors/det1024_kat.json`, `pinned_commit`) were produced from. Upstream resumed
-activity in 2026 and its default branch has moved; `FALCON_PIN_BUMP_EVIDENCE_2026-08-11.md`
-records why the pin is **not** bumped. Do not bump it here without that decision being revisited.
+activity in 2026 and its default branch has moved. **Do not bump the pin.** The reason is the
+two sentences above and needs no separate document: this commit is what the AVM `falcon_verify`
+opcode runs, and it is what the KAT goldens were produced from. Bumping it would break byte
+identity against the chain and against `sdk/tests/vectors/det1024_kat.json` in the same move.
+
+> **A citation removed on 2026-08-30.** This paragraph pointed at
+> `FALCON_PIN_BUMP_EVIDENCE_2026-08-11.md` for that reasoning. **That file does not exist** &mdash;
+> not in this repository and not anywhere on the machine that was supposed to hold it. It was
+> found by resolving every document citation in the repository against the filesystem. The
+> reasoning it was said to contain is stated inline above instead, because a reason an auditor can
+> read is worth more than a reference to a document nobody can produce.
 
 ## Layout, and what is vendored
 
@@ -83,10 +92,13 @@ header byte `0xBA` (= `0x3A | 0x80`), `FALCON_DET1024_CURRENT_SALT_VERSION = 0`.
   Algorand-authored deterministic layer. (The four Go files were not assessed; TRELYAN does not
   compile or distribute them separately.)
 - **The upstream repository has no `LICENSE` file.** This is a known, open item
-  (`FINDING_falcon-licensing_2026-08-11.md`; upstream issues #4 and #11 unanswered since 2022;
+  (upstream issues #4 and #11 unanswered since 2022;
   a comment on #4 is drafted and not yet sent). Until upstream states terms, TRELYAN's position
   is *risk accepted, documented, ask outstanding* — recorded here so an auditor finds it in the
   vendored tree, not only in a workspace note.
+  (A citation to `FINDING_falcon-licensing_2026-08-11.md` was removed here on 2026-08-30 for the
+  same reason as above: the file does not exist. Nothing was lost by removing it &mdash; the
+  finding's whole substance is the sentence it was attached to.)
 
 ## How to verify this tree
 

@@ -14,7 +14,12 @@ __pycache__/
 *.pyc
 .venv/
 .venv-contracts/
+# Any .venv-* an operator creates: the existing rules named two specific ones by hand,
+# so a third (.venv-compile) was staged in full by `git add -A` -- thousands of files
+# into a public MIT repo. Match the family, not the instances.
+.venv-*/
 venv/
+.pytest_cache/
 
 # Build artifacts are NEVER committed. A checked-in wheel/sdist silently goes stale against the
 # source next to it while keeping the same version number, so `pip install sdk/dist/*.whl` and
@@ -47,3 +52,9 @@ rust/target/
 # falcon-ct CI runs write here; CI publishes them to the job summary, the repo keeps only named sessions
 evidence/ct/ci-run/
 evidence/ct/out/
+
+# scripts/verify_all.sh unpacks the pinned Falcon tarball and builds it in the repo root.
+# README tells reviewers to run that script, so these must not show up as untracked noise.
+falcon-src/
+codec.lib
+libfalcondet1024.pdb

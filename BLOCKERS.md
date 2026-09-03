@@ -5,10 +5,37 @@ check or by copying a hash off the chain and calling it agreement.
 
 ---
 
-## OPEN — awaiting TestNet redeploy of app 763809096
+## CLOSED 2026-09-03 — was: awaiting TestNet redeploy of app 763809096
 
-**Status:** OPEN. Local merge gates are green. The live chain does not match
-the committed contract. That mismatch is the finding.
+**Status: CLOSED.** Resolved the only way it could be, by deploying a NEW
+application from the committed artifact — not by skipping the check, and not by
+copying a hash off the chain and calling it agreement.
+
+    contracts/verify_deployment.py --app-id 770964251  ->  MATCH  (exit 0)
+      expected (committed TEAL) : 709 B  sha512_256 6fa5cee1...b981c4b
+      deployed app 770964251    : 709 B  sha512_256 6fa5cee1...b981c4b
+
+    sdk/examples/verify_trelyan.py  ->  18 passed, 0 failed   (was 17 / 1)
+
+New app **770964251**, cell ASA **770964264**, deployed 2026-09-03. Signature
+header 0xba (det1024 deterministic marker). App **763809096** remains on chain,
+unmodified, as the historical record — it was never patched, because I1/I5
+forbid it.
+
+The measured drift is preserved verbatim below. It is quoted by
+`sdk/tests/test_testnet_drift_banner.py`, which is kept as a regression guard:
+if drift ever recurs, the banner must still name the app and both sizes rather
+than degrade into a silent skip.
+
+**How long it stayed open, deliberately:** three months. The check ran and
+failed publicly that entire time rather than being folded into the green gates.
+
+---
+
+### Historical record — the drift as measured while this was OPEN
+
+**Status at the time:** OPEN. Local merge gates were green. The live chain did
+not match the committed contract. That mismatch was the finding.
 
 **Why CI is split.** `Required merge gates (local)` (trelyan-pq CI) and
 `Required merge gates (rust)` (rust-ci) stay blocking. Live TestNet bytecode

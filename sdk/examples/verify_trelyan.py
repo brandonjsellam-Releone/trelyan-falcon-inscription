@@ -3,15 +3,15 @@
 TRELYAN reviewer verification — one command, no trust required.
   pip install trelyan-pq && python3 verify_trelyan.py
 Checks: [1] package constants  [2] pinned golden vectors (offline)
-        [3] live TestNet app 763809096 (bytecode fingerprint + source correspondence)
+        [3] live TestNet app 770964251 (bytecode fingerprint + source correspondence)
         [4] on-chain boxes (registered Falcon keys / inscription records)
         [5] message reconstruction for a live cell (byte-exact, recomputed locally)
 Read-only. Only dependency: trelyan-pq (stdlib otherwise).
 """
 import json, os, sys, base64, pathlib, urllib.request
 
-APP_ID = 763809096
-# The fingerprint of the program deployed on 2026-06-02, recorded here on 2026-06-17 (660 B).
+APP_ID = 770964251
+# The fingerprint of the program deployed on 2026-09-03, recorded here the same day (709 B).
 #
 # Read what this constant can and cannot tell you. Because the contract blocks Update and
 # Delete (invariants I1/I5) the deployed bytecode is immutable, so comparing it to this value
@@ -19,7 +19,7 @@ APP_ID = 763809096
 # evidence that the deployment matches contracts/inscription.py, and it was previously
 # presented as though it were. Those are separate claims and only the second one matters to a
 # reviewer. The second is checked below, and needs the committed artifact to answer.
-PINNED_ON_CHAIN_SHA512_256 = "d24d9071209f526a2075542d9408295d78f83ca5ed4c8cc233000130dcc97d44"
+PINNED_ON_CHAIN_SHA512_256 = "6fa5cee145762e4a0c2ba93738a0e6f51e93b02c71f23e4e663ac6d73b981c4b"
 # Committed build artifact, when this script is run from a repo clone rather than downloaded
 # on its own. sdk/examples/ -> repo root -> contracts/out/.
 # Resolved DEFENSIVELY, and it must never raise. `parents[2]` assumed this file sits at
@@ -95,7 +95,7 @@ check(f"app {APP_ID} exists", app.get("id") == APP_ID)
 ap = base64.b64decode(app["params"]["approval-program"])
 check("approval program fetched", len(ap) > 0, f"{len(ap)} bytes")
 fp = t.sha512_256(ap).hex()
-check("deployed app not replaced since 2026-06-17 pin", fp == PINNED_ON_CHAIN_SHA512_256, fp[:16] + "...")
+check("deployed app not replaced since the 2026-09-03 pin", fp == PINNED_ON_CHAIN_SHA512_256, fp[:16] + "...")
 print(f"        bytecode sha512_256: {fp}")
 
 # The claim that actually matters: is the deployed program what the committed contract builds?

@@ -33,7 +33,7 @@ from trelyan_pq import FalconDet1024, sha512_256
 falcon = FalconDet1024()
 pubkey, privkey = falcon.keygen()                 # 1793-byte pubkey, 2305-byte privkey
 
-app_id, cell_id = 763809096, 1
+app_id, cell_id = 770964251, 1
 artifact_hash = sha512_256(b"my artifact")
 genesis_hash  = bytes(32)                          # use the real network genesis on-chain
 
