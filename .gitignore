@@ -52,3 +52,9 @@ rust/target/
 # falcon-ct CI runs write here; CI publishes them to the job summary, the repo keeps only named sessions
 evidence/ct/ci-run/
 evidence/ct/out/
+
+# scripts/verify_all.sh unpacks the pinned Falcon tarball and builds it in the repo root.
+# README tells reviewers to run that script, so these must not show up as untracked noise.
+falcon-src/
+codec.lib
+libfalcondet1024.pdb
