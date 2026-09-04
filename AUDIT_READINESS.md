@@ -199,6 +199,18 @@ auditor spends week one on the real surface, not rediscovery.
 | Build flags | `-DFALCON_UNALIGNED=0 -fno-strict-aliasing` (proven byte-identical; -D/-f flags, source unchanged) |
 | Toolchain | python **3.13** · `trelyan-pq` **0.1.0** · PuyaPy **5.8.1** · algokit-utils **v4** · AVM target **v12** |
 
+> **Independence caveat — read the two rows above together.** The on-chain verifier is
+> `go-algorand`'s `falcon_verify`, which vendors `github.com/algorand/falcon` **v0.1.0**; that tag
+> dereferences to `ce15e75b`. That is the **same commit** this repository pins for its off-chain
+> signer. So the signer and the verifier are the *same C source at the same commit*, and on-chain
+> acceptance of a signature is a **sign/verify round-trip within one implementation** — not
+> cross-implementation evidence. Nothing currently checks these signatures against a genuinely
+> independent Falcon: no other signer reproduces the bytes (see the interop note in
+> `sdk/tests/test_interop_algo_pqc_kit_kat.py` — det1024 `0xBA` vs randomized `0x3A` makes
+> byte-identity impossible by construction), and no other verifier has been asked to accept them.
+> The pin is deliberate and should NOT be bumped — matching what the chain runs is the point — but
+> it means "the AVM accepted it" must never be cited as independent verification.
+
 ---
 
 ## 7. Reproduction entry (start here — read-only)
