@@ -6,9 +6,13 @@ already run and correctly found the mismatch — so the process died in its own 
 exited **2 ("could not complete the check")** instead of **1 ("DRIFT")**.
 
 That is the worst possible place for a crash. A real finding was downgraded to an inconclusive
-one, by a decoration, and only on the platform where the maintainer actually works. It stayed
-invisible because the offending line only executes when something is wrong: the happy path never
-touches it, so no green run could ever reveal it.
+one, by a decoration, and only on the platform where the maintainer actually works.
+
+It stayed invisible because it needs TWO conditions at once, and CI supplies only one of them.
+The drift branch did run -- it ran on every push while the live app diverged -- but it ran on
+Linux CI, where the stream is UTF-8 and U+2194 encodes fine. A green run cannot reach the line
+at all. So the uncovered case was never "the failure path"; it was "the failure path on a
+cp1252 stream", which is precisely the maintainer's console and nobody else's.
 
 The exit codes are a contract (see verify_deployment.py's docstring): 0 match, 1 drift, 2 could
 not check. A reviewer who sees 2 concludes "the tooling failed", not "the deployment diverged".

@@ -27,8 +27,13 @@ The measured drift is preserved verbatim below. It is quoted by
 if drift ever recurs, the banner must still name the app and both sizes rather
 than degrade into a silent skip.
 
-**How long it stayed open, deliberately:** three months. The check ran and
-failed publicly that entire time rather than being folded into the green gates.
+**How long it stayed open, and how much of that was blind:** 79 days of divergence,
+and for the first 58 nothing detected it -- the verifier of the day hashed the deployed
+program and compared it to the chain, so it could not fail. The rebuilt, able-to-fail
+check landed 2026-08-13 (#12); the drift it exposed was split out of the merge gates
+and ran red in public from 2026-08-30 until closure on 2026-09-03. It was never folded
+into the green gates and never silenced -- but it did not catch this early either, and
+the reason it did not is the same defect class this repo keeps finding.
 
 ---
 
