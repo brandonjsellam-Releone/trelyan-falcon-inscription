@@ -22,9 +22,11 @@ not commitments.
 - **FN-DSA / FIPS 206 tracking:** version the reference when FIPS 206 finalizes.
 
 ## Before MainNet (gated)
-- **Independent third-party security audit** (intend to pursue NLnet's Radically
-  Open Security path if supported). **No MainNet deployment until the audit
-  closes.**
+- **Independent third-party security audit.** The NLnet NGI Zero → Radically Open
+  Security route was **declined on 2026-06-29** (NLnet: the NGI Zero programmes have
+  ended and no audit funding is available). The audit is therefore a **paid
+  engagement, not yet funded**, or an alternative grant not yet identified. **No
+  MainNet deployment until the audit closes.**
 
 ## Known limitations (see `LOCALNET_VALIDATION_2026-06-01.md`)
 - Not externally audited; not on MainNet.
