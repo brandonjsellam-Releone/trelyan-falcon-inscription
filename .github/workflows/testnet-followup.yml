@@ -63,9 +63,11 @@ jobs:
   contract-drift:
     name: Committed TEAL vs deployed app (follow-up; not a merge gate)
     # Derives expected bytecode from the committed artifact, so it CAN fail.
-    # It failed for three months until a new app was created from that artifact
-    # (app 763809096 could not be updated — I1/I5). Green since 2026-09-03 on app
-    # 770964251. If it ever goes red again, that red is the finding.
+    # The drift it exposed had already run 58 days undetected, because the previous
+    # verifier compared the chain to itself. This job ran red from 2026-08-30 until a
+    # new app was created from the committed artifact (app 763809096 could not be
+    # updated — I1/I5). Green since 2026-09-03 on app 770964251. If it ever goes red
+    # again, that red is the finding.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1

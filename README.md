@@ -15,15 +15,19 @@ post‑quantum authorization in their own contract.
 > (`6fa5cee1…`) and this source assembles to the same 709 B and the same digest. It cannot
 > drift away from that silently, *by design* — control **I5 (non-upgradability)** makes
 > `on_update` and `on_delete` reject unconditionally (`contracts/inscription.py:404-412`),
-> which is the property the contract exists to demonstrate.
+> which is enforced by the contract itself, not by deployment convention.
 >
-> **The history is kept on purpose.** The previous app **`763809096`** (deployed 2 June 2026)
-> served 660 B (`d24d9071…`) and did **not** match this source: the contract changed on
-> 2026-06-16, and I5 forbids patching a deployed app in place. Rather than fold that check
-> into the green gates or copy the chain's hash into the repo and call it agreement, the job
-> was left running and **failing in public for three months**. It was closed on 2026-09-03 by
-> deploying a new application from the committed artifact. `763809096` remains on chain,
-> unmodified, as the historical record.
+> **The history is kept on purpose, including the part that reflects badly on us.** The previous
+> app **`763809096`** (deployed 2 June 2026) served 660 B (`d24d9071…`) and did **not** match this
+> source: the contract changed after deployment, and I5 forbids patching a deployed app in place.
+> The divergence lasted **79 days** — and for the first **58 of them nothing detected it**, because
+> the verifier of the day hashed the deployed program and compared it to the chain. That check
+> could not fail. `contracts/verify_deployment.py` was rebuilt to be *able* to fail on 2026-08-13
+> (#12); the drift it then exposed was split out of the merge gates and left **red in public** on
+> 2026-08-30, and closed on 2026-09-03 by deploying a new application from the committed artifact.
+> So: 58 days undetected, 21 days from detectable to closed, 4 of those publicly red. Nothing was
+> ever silenced, but nothing caught it early either. `763809096` remains on chain, unmodified, as
+> the historical record.
 >
 > **What this means for a reviewer:** reading this source *is* reviewing app `770964251`.
 > `sdk/examples/verify_trelyan.py` reports **18 passed, 0 failed**.

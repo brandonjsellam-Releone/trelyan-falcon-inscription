@@ -175,7 +175,7 @@ auditor spends week one on the real surface, not rediscovery.
 | Signature KAT | `sdk/tests/test_signature_kat.py`, `sdk/tests/vectors/det1024_kat.json` | Byte-identity goldens (begin `ba00`); 3-OS reproduction in CI. |
 | Seeded fuzz / differential oracle | `sdk/tests/test_signature_fuzz.py` | Off-chain↔on-chain encoding differential (seed 1469, 300 iters). |
 | Pinned-build verifier | `sdk/ci/verify_pinned_digest.py` | Recomputes the 27-file tree + `deterministic.c` digests + FP-emulation pin. |
-| Read-only on-chain check | `sdk/examples/verify_trelyan.py` | **18 passed, 0 failed** against live app `770964251` (run 2026-09-03), including `deployed bytecode matches the committed contract`. The superseded app `763809096` returned 17 passed / 1 failed for three months: its program predated this source and control I5 forbids updating a deployed app in place. That check was left failing in public rather than weakened, and was closed on 2026-09-03 by deploying a new app from the committed artifact. |
+| Read-only on-chain check | `sdk/examples/verify_trelyan.py` | **18 passed, 0 failed** against live app `770964251` (run 2026-09-03), including `deployed bytecode matches the committed contract`. The superseded app `763809096` returned 17 passed / 1 failed: its program predated this source and control I5 forbids updating a deployed app in place. The divergence lasted 79 days, of which **58 went undetected** because the then-current verifier compared the chain to itself; once the check could fail (2026-08-13, #12) it was left failing in public rather than weakened, and was closed on 2026-09-03 by deploying a new app from the committed artifact. |
 | Hermetic checker | `Dockerfile.verify` | Pins python 3.13 + `trelyan-pq` 0.1.0; read-only. |
 | CI | `.github/workflows/ci.yml` | wire-format / verify-live / signature-kat (3-OS) / testnet-e2e + a sanitizer (alignment/UBSan) gate. |
 | Encoding / budget / arg-order memos | `contracts/FALCON_ENCODING_2026-06-01.md`, `contracts/FALCON_BUDGET_2026-06-01.md`, `contracts/A1_RESOLUTION_2026-06-01.md` | How encoding, opcode cost, and argument order were pinned, with sources. |
@@ -198,6 +198,18 @@ auditor spends week one on the real surface, not rediscovery.
 | FP backend (pinned) | `FALCON_FPEMU=1`, `FALCON_FPNATIVE=0` (integer-only emulated fixed point) |
 | Build flags | `-DFALCON_UNALIGNED=0 -fno-strict-aliasing` (proven byte-identical; -D/-f flags, source unchanged) |
 | Toolchain | python **3.13** · `trelyan-pq` **0.1.0** · PuyaPy **5.8.1** · algokit-utils **v4** · AVM target **v12** |
+
+> **Independence caveat — read the two rows above together.** The on-chain verifier is
+> `go-algorand`'s `falcon_verify`, which vendors `github.com/algorand/falcon` **v0.1.0**; that tag
+> dereferences to `ce15e75b`. That is the **same commit** this repository pins for its off-chain
+> signer. So the signer and the verifier are the *same C source at the same commit*, and on-chain
+> acceptance of a signature is a **sign/verify round-trip within one implementation** — not
+> cross-implementation evidence. Nothing currently checks these signatures against a genuinely
+> independent Falcon: no other signer reproduces the bytes (see the interop note in
+> `sdk/tests/test_interop_algo_pqc_kit_kat.py` — det1024 `0xBA` vs randomized `0x3A` makes
+> byte-identity impossible by construction), and no other verifier has been asked to accept them.
+> The pin is deliberate and should NOT be bumped — matching what the chain runs is the point — but
+> it means "the AVM accepted it" must never be cited as independent verification.
 
 ---
 
