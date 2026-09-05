@@ -9,8 +9,10 @@
 **Date:** 2026-06-17.
 
 This document is the **scope sheet for an independent security audit of the on-chain (TEAL) contract
-and the Falcon signing/verification path.** Primary audit path: **NLnet NGI0 → Radically Open Security
-(ROS)**; a paid engagement is the fallback. It is written to be auditor-agnostic and to let a reviewer
+and the Falcon signing/verification path.** Audit path: **a paid engagement, not yet funded.** The NLnet
+NGI0 → Radically Open Security route named in earlier revisions was **declined on 2026-06-29**
+(NLnet: NGI Zero has ended, no audit funding available); this line was not updated for 67 days
+and is corrected as of 2026-09-04. It is written to be auditor-agnostic and to let a reviewer
 start on day one without reconstructing the trust surface.
 
 > **Relationship to existing docs.** This file is the *security-audit* scope sheet (what an external
