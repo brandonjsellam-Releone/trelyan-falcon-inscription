@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that the deployed application is what the committed source builds.
+"""Verify that the deployed application is what the committed TEAL artifact assembles to.
 
 This check is deliberately capable of FAILING. Its predecessor was not: the
 reviewer example pinned a constant that had been copied from the deployed
@@ -26,8 +26,8 @@ lie consistently across both. Pass --compile-url pointing at an independent
 node (or a local `goal clerk compile`) to split that trust. The comparison is
 only as strong as the weaker of the two sources.
 
-Exit codes:  0 deployment matches committed source
-             1 DRIFT - deployment differs from committed source
+Exit codes:  0 deployment matches the committed TEAL artifact
+             1 DRIFT - deployment differs from the committed TEAL artifact
              2 could not complete the check (network, missing artifact, ...)
 """
 
@@ -238,7 +238,7 @@ def main() -> int:
 
     print()
     if expected == deployed:
-        print(f"MATCH - application {args.app_id} is running the committed source.")
+        print(f"MATCH - application {args.app_id} is running the committed compiled TEAL.")
         return 0
 
     print_awaiting_redeploy(
@@ -264,8 +264,8 @@ def print_awaiting_redeploy(
     App 763809096 cannot be patched in place (Update/Delete are blocked, I1/I5).
     The one-shot checklist is BLOCKERS.md.
     """
-    print(f"DRIFT - application {app_id} is NOT running the committed source.")
-    print(f"  committed source builds to : {expected_hash}  ({expected_len} B)")
+    print(f"DRIFT - application {app_id} is NOT running the committed compiled TEAL.")
+    print(f"  committed TEAL assembles to: {expected_hash}  ({expected_len} B)")
     print(f"  chain is actually serving  : {deployed_hash}  ({deployed_len} B)")
     print()
     print(f"AWAITING TESTNET REDEPLOY of app {app_id}.")

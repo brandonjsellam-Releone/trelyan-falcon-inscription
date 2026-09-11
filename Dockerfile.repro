@@ -50,7 +50,7 @@ COPY scripts/ scripts/
 # COMMITTED_TEAL to <root>/contracts/out/TrelyanInscription.approval.teal; without it the
 # source-correspondence check silently did not run, and because a skipped check counted as
 # neither pass nor fail the PASS COUNT WAS IDENTICAL either way. From a clone the same script
-# reported 17 passed / 1 failed (with "deployed bytecode matches the committed contract"
+# reported 17 passed / 1 failed (with the check now labelled "deployed bytecode matches the committed TEAL artifact"
 # FAILING); from this container, 17 passed / 0 failed. The advertised hermetic path returned
 # clean green on precisely the divergence the contract-drift CI job exists to catch.
 COPY contracts/ contracts/

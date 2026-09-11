@@ -46,7 +46,7 @@ Read-only. Confirms: the package constants (domain tag, 102-byte message, `0xBA`
 pubkey 1793); offline golden vectors (`sha512_256`, `build_message`, box names `k_`/`o_`/`i_`); the **live**
 TestNet app `770964251` (prints its bytecode `sha512_256` fingerprint — diff it against your compile of
 `contracts/inscription.py`); the registered 1793-byte Falcon public keys in box storage; and a byte-exact
-local reconstruction of the domain-separated message `M` a live inscription must have signed. On 2026-09-03, against the newly deployed app, this returned **18/18 PASS** — 1 registered cell (`770964264`) and 1 on-chain inscription — including `deployed bytecode matches the committed contract`. (The same script returned 17 passed / 1 failed against the superseded app `763809096`, whose program predated this source; that failure is what the 2026-09-03 redeploy closed.)
+local reconstruction of the domain-separated message `M` a live inscription must have signed. On 2026-09-03, against the newly deployed app, this returned **18/18 PASS** — 1 registered cell (`770964264`) and 1 on-chain inscription — including the check now labelled `deployed bytecode matches the committed TEAL artifact`. (The same script returned 17 passed / 1 failed against the superseded app `763809096`, whose program predated this source; that failure is what the 2026-09-03 redeploy closed.)
 
 ### 2. Signer byte-identity KAT (offline — proves determinism)
 Build the pinned Falcon library, then:

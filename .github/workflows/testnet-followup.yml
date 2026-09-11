@@ -84,6 +84,6 @@ jobs:
             echo "::error::AWAITING TESTNET REDEPLOY of app 770964251. Committed TEAL assembles to a different program than the live app. See BLOCKERS.md."
           fi
           exit "$rc"
-        # Exit 1 = drift: the deployment is not what the committed source builds.
+        # Exit 1 = drift: the deployment is not what the committed TEAL assembles to.
         # Exit 2 = could not check (network, missing artifact). Distinct on purpose:
         # an unreachable node must never be reported as agreement, nor as drift.
