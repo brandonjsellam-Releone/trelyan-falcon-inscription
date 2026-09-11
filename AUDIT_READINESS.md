@@ -36,7 +36,7 @@ A Cell holder binds an off-chain artifact to the Algorand ledger by having a sma
 consensus v41 / go-algorand v4.3.0, published cost `costly(1700)`) — over a domain-separated message,
 then writing a **write-once** record into box storage. The Falcon public key is committed once per Cell
 at mint and read from chain state at inscribe, so it never rides in the call arguments. The value is a
-durable, write-once record whose Falcon-1024 authorization anyone can re-check — today only with the same `algorand/falcon@ce15e75b` implementation (see the independence caveat in §6) — and it is post-quantum *authorization at the inscription layer*, not total quantum resistance: the ledger storing the record is still secured by Algorand's own account and consensus cryptography. It is a **reference** on TestNet,
+durable, write-once record whose Falcon-1024 authorization anyone can re-check — so far only with the same `algorand/falcon@ce15e75b` implementation; no independent verifier has been run (see the independence caveat in §6) — and it is post-quantum *authorization at the inscription layer*, not total quantum resistance: the ledger storing the record is still secured by Algorand's own account and consensus cryptography. It is a **reference** on TestNet,
 not a production system.
 
 ---
