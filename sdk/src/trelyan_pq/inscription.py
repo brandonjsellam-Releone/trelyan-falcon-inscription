@@ -7,7 +7,7 @@ Turns the validated end-to-end flow into a few method calls:
     inscribe (sign M off-chain, submit only the signature) -> read back
 
 and encapsulates the opcode-budget / box-reference / fee handling the `falcon_verify`
-inscribe path needs (the two-strategy submit proven on localnet — 20/20 on 2026-06-01, against
+inscribe path needs (the two-strategy submit exercised on localnet — 20/20 on 2026-06-01, against
 the pre-2026-06-16 contract — and on TestNet).
 
 Requires the `algorand` extra:
@@ -127,7 +127,7 @@ class TrelyanInscriptionClient:
         """Sign M off-chain and submit ONLY the signature; the contract verifies on-chain.
 
         `artifact_hash` must be a 32-byte sha512_256 digest (use inscribe_bytes() to hash for you).
-        Uses the proven two-strategy submit: a fat static fee + manual box/asset references first,
+        Uses the two-strategy submit (exercised on localnet and TestNet): a fat static fee + manual box/asset references first,
         then auto resource population + inner-fee coverage as a fallback.
         """
         if len(artifact_hash) != 32:

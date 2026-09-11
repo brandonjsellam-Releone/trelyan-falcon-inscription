@@ -18,7 +18,7 @@ assert c.read_back_matches(cell, b"my artifact")
 
 `inscribe_bytes` does the right thing end-to-end: it hashes the artifact (`sha512_256`), builds
 the domain-separated message, signs it deterministically (header `0xBA`), and submits — handling
-the opcode budget, the box references, and a fee-fallback strategy proven on localnet (20/20 on
+the opcode budget, the box references, and a fee-fallback strategy exercised on localnet (20/20 on
 2026-06-01, against the pre-2026-06-16 contract) and on TestNet.
 
 Reads:
