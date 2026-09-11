@@ -106,8 +106,12 @@ python contracts/deploy_testnet.py                          # needs DEPLOYER_MNE
 ## Scope of the claim
 Post‑quantum **authorization at the inscription layer** — not total quantum resistance (Algorand's own
 consensus‑crypto upgrades are separate). Falcon‑1024 is NIST‑selected and the basis of the forthcoming
-**FIPS 206 (FN‑DSA)** standard, **not yet finalized**; this reference tracks the current Falcon spec and
-Algorand's opcode and will version when FIPS 206 finalizes.
+**FIPS 206 (FN‑DSA)**, which is **not yet published**. This reference signs with Algorand's **deterministic**
+Falcon‑1024 variant (det1024, header `0xBA`) pinned at `algorand/falcon@ce15e75b` — the variant the AVM
+`falcon_verify` opcode accepts — and makes **no FIPS 206 / FN‑DSA conformance claim**: NIST's provisional plan
+for FIPS 206 permits randomized signing only, so det1024 would not conform unless that changes, and any migration
+depends on Algorand changing its opcode (see `THREAT_MODEL_AND_TRACEABILITY.md`, "Standards trajectory"). When
+FIPS 206 is published we will document how it relates to this reference.
 
 ## Scope & relationship to TRELYAN
 

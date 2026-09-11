@@ -78,7 +78,7 @@ histories — that gap is exactly the engagement.
 
 ### 2.3 Deterministic-Falcon encoding & salt handling (off-chain signer ↔ on-chain rebuild)
 
-- Scheme: **round-3 deterministic Falcon-1024** (`falcon_det1024`), **not** FN-DSA / draft FIPS 206.
+- Scheme: **round-3 deterministic Falcon-1024** (`falcon_det1024`), **not** FN-DSA / FIPS 206 (unpublished).
 - Compressed encoding header byte **`0xBA`** (`0x3A | 0x80`, deterministic variant) + a 1-byte salt
   version (`CURRENT_SALT_VERSION = 0`); deterministic signing is RFC-6979 / Ed25519-style
   (`SHAKE256(logn‖privkey‖data)`), **not** a zeroed nonce.

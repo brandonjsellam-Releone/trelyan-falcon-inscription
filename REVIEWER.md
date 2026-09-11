@@ -16,7 +16,7 @@ public inputs. Deeper analysis lives in `TRELYAN_PROTOCOL_SPEC_v0.2.md` and
 > **Scope.** Reference implementation on Algorand **TestNet**, **unaudited**, not for value. Falcon here
 > provides a **signature** (integrity/authenticity), **not** encryption — no confidentiality is claimed.
 > The deployed scheme is **round-3 deterministic Falcon-1024** (`falcon_det1024`), **not** FN-DSA /
-> draft FIPS 206 (which remains unpublished as of mid-2026).
+> FIPS 206 (which remains unpublished as of mid-2026).
 
 ---
 

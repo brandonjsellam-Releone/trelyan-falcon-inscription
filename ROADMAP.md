@@ -20,7 +20,10 @@ not commitments.
   TOTAL_RECORDS` cap (currently reasoned, not unit-tested).
 - **Signature-suite agility:** document and prototype an **ML-DSA (FIPS 204)**
   path alongside Falcon-1024, so the primitive is algorithm-agile.
-- **FN-DSA / FIPS 206 tracking:** version the reference when FIPS 206 finalizes.
+- **FN-DSA / FIPS 206 tracking:** when FIPS 206 is published, document how it relates to this
+  reference and track Algorand's opcode roadmap. The on-chain det1024 (`0xBA`) path cannot
+  become FIPS 206 conformant unilaterally: NIST's provisional plan for FN-DSA permits randomized
+  signing only, and the AVM opcode accepts deterministic signatures only.
 
 ## Before MainNet (gated)
 - **Independent third-party security audit.** The NLnet NGI Zero → Radically Open

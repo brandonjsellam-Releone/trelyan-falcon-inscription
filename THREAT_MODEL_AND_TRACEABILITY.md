@@ -216,8 +216,8 @@ existing `test_kat_private_key_does_not_leak_into_source` guardrail means the ve
 data, not embedded in source; (3) carry both natively into the recommended `trelyan-pq` Rust port
 (self-KAT at library init, `zeroize` + `subtle`, `#![forbid(unsafe_code)]` outside the FFI module).
 
-**Standards trajectory (a claims-accuracy consequence, not a bug).** Because FN-DSA will only permit
-randomized signing, **`det1024` can never be FIPS 206 conformant as specified.** Algorand owns the
+**Standards trajectory (a claims-accuracy consequence, not a bug).** FIPS 206 (FN-DSA) is unpublished; NIST's provisional
+plan permits randomized signing only, so **`det1024` would not be FIPS 206 conformant unless that changes.** Algorand owns the
 identical problem for its opcode, so any migration is coupled to Algorand's protocol roadmap and is not
 TRELYAN's to solve unilaterally. Public materials must therefore **not** claim FIPS 206 / FN-DSA
 conformance for the deterministic on-chain path (this repo's `PUBLIC_CLAIMS_HARDENING_2026-06-01.md`

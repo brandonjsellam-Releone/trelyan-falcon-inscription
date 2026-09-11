@@ -34,7 +34,7 @@ fixes adopted from the Council review are tagged **[FIX]** with attribution.
 
 ## 1. Primitives and provenance
 
-### 1.1 Falcon-1024 (FN-DSA)
+### 1.1 Falcon-1024 (Algorand deterministic variant, det1024 — not FN-DSA)
 - GPV hash-and-sign over NTRU lattices, FFT trapdoor sampler. Falcon-1024 targets **NIST
   security level V**. **NIST-selected (2022); FN-DSA in the forthcoming FIPS 206 (draft, NOT
   published as of June 2026).** Published PQC FIPS: 203 ML-KEM, 204 ML-DSA, 205 SLH-DSA
