@@ -2,7 +2,7 @@
 
 **Version:** 0.2 (post-Council-review draft for external audit preparation)
 **Date:** 1 June 2026
-**Status:** DRAFT — not yet audited. Prepared for Runtime Verification review.
+**Status:** DRAFT — not yet audited. Written to be handed to an external auditor (originally prepared with Runtime Verification in mind); no audit is engaged or funded — see `AUDIT_READINESS.md`.
 **Authors:** TRELYAN Foundation (in formation, Zug, CH), with the TRELYAN AI Council
 (Claude Opus, Gemini 3.1 Pro technical-verification seat, Hermes, IBM watsonx, Mistral).
 
@@ -212,4 +212,4 @@ budget mode documented · §1.2 version/cost/byte-format pinned to live referenc
 ---
 
 *Council-reviewed (Gemini verification seat + Hermes + watsonx, three independent lineages).
-For Runtime Verification audit. Not a security guarantee prior to that audit.*
+For an external audit (none engaged or funded as of 2026-09). Not a security guarantee prior to that audit.*

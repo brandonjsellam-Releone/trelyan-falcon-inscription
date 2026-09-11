@@ -5,7 +5,7 @@ does not spend week one reconstructing the trust surface, the invariant→test m
 reproduction steps. **Scope honesty up front:** the 20-test suite *exercises* the listed execution
 paths and *rejects the exercised attack vectors* on a live localnet AVM. It does **not** constitute a
 proof of the invariants over all histories, encodings, or upgrade paths — that inductive/exhaustive
-argument is exactly what we are engaging Runtime Verification to provide.
+argument is what we will ask an external auditor to provide; no auditor is engaged or funded yet (see `AUDIT_READINESS.md`).
 
 ---
 

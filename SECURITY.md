@@ -56,7 +56,9 @@ not published test vectors.
 
 ## Planned hardening
 
-An **independent third-party security audit** is planned before any MainNet
-deployment. If supported, we intend to pursue NLnet's audit path via Radically
-Open Security. Until that audit completes, every public claim in this repo is
-deliberately scoped to "reference / TestNet / unaudited."
+An **independent third-party security audit** is required before any MainNet
+deployment. The NLnet NGI Zero → Radically Open Security route named in earlier
+revisions was **declined on 2026-06-29** (NLnet: the NGI Zero programmes have ended
+and no audit funding is available), so the audit is a **paid engagement, not yet
+funded**. No MainNet deployment until an audit closes. Until then, every public
+claim in this repo is deliberately scoped to "reference / TestNet / unaudited."

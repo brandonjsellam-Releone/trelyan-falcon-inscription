@@ -17,7 +17,8 @@ puts it in THIS process's environment only, and hands that environment to the de
 child. When the process exits the mnemonic is gone. Nothing writes it down.
 
 It is deliberately thin. It prompts, it sanity-checks the shape, it execs the real script. Any
-logic beyond that belongs in `contracts/deploy_testnet.py`, which is the audited path.
+logic beyond that belongs in `contracts/deploy_testnet.py`, the single deploy path (not externally
+audited).
 
 USAGE
 -----

@@ -11,7 +11,7 @@ Why generate in-process rather than `python -c "...print(mnemonic)"` then paste:
   * pasting it into a prompt puts it on the clipboard, which other processes can read;
   * writing it to a file to "keep it safe" is the durable copy we are trying to avoid.
 
-Here the seed exists only as a local in one Python process, is handed to the audited deploy path
+Here the seed exists only as a local in one Python process, is handed to the deploy script
 as a child-process environment variable, and is gone when the process exits. Only the ADDRESS is
 ever displayed — that is public and is what the faucet needs.
 
@@ -26,7 +26,8 @@ deploy, fund and then die at keygen never gets started.
   python scripts/deploy_testnet_fresh.py
 
 Deliberately thin: generate, show the address, wait for funds to actually arrive, exec the real
-script. Any logic beyond that belongs in contracts/deploy_testnet.py, which is the audited path.
+script. Any logic beyond that belongs in contracts/deploy_testnet.py, the single deploy path
+(not externally audited).
 """
 
 from __future__ import annotations

@@ -99,7 +99,8 @@ PYTHONPATH=src pytest tests -v        # pure-Python wire-format tests (no lib/ne
   Falcon-1024 signature and writes a write-once record. It is **not** a replacement for
   Algorand account/transaction authentication or consensus security.
 - **Unaudited, alpha.** Validated on localnet (20/20) and TestNet; **not externally audited**
-  and **not for MainNet value**. An independent audit is planned before any MainNet use.
+  and **not for MainNet value**. An independent audit is a precondition for any MainNet use; it is a paid engagement
+  that is not yet funded (the NLnet route was declined on 2026-06-29).
 - **Native C dependency.** The signer is a `ctypes` binding to the `algorand/falcon` C library
   you build yourself — provenance and a reproducible build are your responsibility (the pinned
   tree is now vendored at `third_party/falcon-det1024/src`, see its `PROVENANCE.md`). No

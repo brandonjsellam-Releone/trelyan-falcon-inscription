@@ -3,7 +3,7 @@
 //! This is the crate the rest of TRELYAN uses. It is `#![forbid(unsafe_code)]`; every FFI call
 //! lives in `trelyan-pq-ffi`, whose build script refuses to compile anything but the pinned
 //! `algorand/falcon@ce15e75b` tree. What this crate adds on top of the raw calls is exactly the
-//! policy the audited Python SDK (`trelyan_pq.falcon`) enforces, ported line for line in intent:
+//! policy the Python SDK (`trelyan_pq.falcon`) enforces, ported line for line in intent:
 //!
 //! * **Key material is a type, not a byte slice.** [`SecretKey`] is zeroized on drop, has no
 //!   `Debug`/`Display`/`Serialize`, and exposes its bytes through one greppable accessor.
