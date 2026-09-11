@@ -142,7 +142,8 @@ def test_seal_signature_verifies_and_has_0xBA_header():
     result = keygen_sign_seal(APP_ID, 12, ART, GENESIS, store=store)
     assert len(result.pubkey) == 1793 and result.pubkey[0] == 0x0A   # logn=10 public-key header
     assert result.signature[0] == 0xBA                                # deterministic compressed header
-    # an INDEPENDENT verifier accepts the returned (sig, pubkey) for these exact inscription params
+    # a fresh verifier instance (same pinned library, not an independent implementation) accepts the
+    # returned (sig, pubkey) for these exact inscription params
     verifier = falcon.FalconDet1024()
     assert verifier.verify_inscription(result.signature, result.pubkey, APP_ID, 12, ART, GENESIS)
 
