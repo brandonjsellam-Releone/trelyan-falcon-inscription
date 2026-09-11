@@ -26,8 +26,9 @@ deploy, fund and then die at keygen never gets started.
   python scripts/deploy_testnet_fresh.py
 
 Deliberately thin: generate, show the address, wait for funds to actually arrive, exec the real
-script. Any logic beyond that belongs in contracts/deploy_testnet.py, the single deploy path
-(not externally audited).
+script. Any logic beyond that belongs in contracts/deploy_testnet.py, the deploy script these
+wrappers exec and the one testnet-redeploy.yml invokes (the SDK's
+TrelyanInscriptionClient.deploy_testnet is a separate, SDK-level deploy path). Not externally audited.
 """
 
 from __future__ import annotations
