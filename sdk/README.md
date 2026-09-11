@@ -107,8 +107,8 @@ PYTHONPATH=src pytest tests -v        # pure-Python wire-format tests (no lib/ne
   Algorand TestNet. TestNet acceptance runs the same pinned
   `algorand/falcon` code (`ce15e75b`) this package's build recipe uses, so it is a consistency
   check, not independent verification. **Not externally audited** and **not for MainNet value**.
-  An independent audit is a precondition for any MainNet use; it is a paid engagement
-  that is not yet funded (the NLnet route was declined on 2026-06-29).
+  An independent audit is a precondition for any MainNet use; it would have to be a paid
+  engagement, and none is engaged or funded yet (the NLnet route was declined on 2026-06-29).
 - **Native C dependency.** The signer is a `ctypes` binding to the `algorand/falcon` C library
   you build yourself — provenance and a reproducible build are your responsibility (the pinned
   tree is now vendored at `third_party/falcon-det1024/src`, see its `PROVENANCE.md`). No

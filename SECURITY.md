@@ -60,6 +60,6 @@ not published test vectors.
 An **independent third-party security audit** is required before any MainNet
 deployment. The NLnet NGI Zero → Radically Open Security route named in earlier
 revisions was **declined on 2026-06-29** (NLnet: the NGI Zero programmes have ended
-and no audit funding is available), so the audit is a **paid engagement, not yet
-funded**. No MainNet deployment until an audit closes. Until then, every public
+and no audit funding is available), so the audit would have to be a **paid engagement; none is
+engaged or funded yet**. No MainNet deployment until an audit closes. Until then, every public
 claim in this repo is deliberately scoped to "reference / TestNet / unaudited."

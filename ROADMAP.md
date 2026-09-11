@@ -28,8 +28,8 @@ not commitments.
 ## Before MainNet (gated)
 - **Independent third-party security audit.** The NLnet NGI Zero → Radically Open
   Security route was **declined on 2026-06-29** (NLnet: the NGI Zero programmes have
-  ended and no audit funding is available). The audit is therefore a **paid
-  engagement, not yet funded**, or an alternative grant not yet identified. **No
+  ended and no audit funding is available). The audit would therefore have to be a **paid
+  engagement** or an alternative grant not yet identified; **none is engaged or funded yet**. **No
   MainNet deployment until the audit closes.**
 
 ## Known limitations (see `LOCALNET_VALIDATION_2026-06-01.md`)
