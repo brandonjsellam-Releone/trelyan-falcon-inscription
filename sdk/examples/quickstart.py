@@ -41,7 +41,7 @@ def main() -> None:
     print(f"inscribed cell {cell}; artifact hash {h.hex()}")
 
     assert c.read_back_matches(cell, artifact), "on-chain record did not match!"
-    print("verified on-chain: the post-quantum inscription is written and re-verifies.")
+    print("Inscription written on TestNet (accepted by the AVM falcon_verify) and its artifact_hash reads back.")
 
 
 if __name__ == "__main__":
