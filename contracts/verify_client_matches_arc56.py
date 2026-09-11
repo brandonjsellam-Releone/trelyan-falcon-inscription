@@ -3,7 +3,7 @@
 
 Found 2026-08-27, the hard way: the coverage map had a hole exactly one file wide.
 `verify_teal_matches_source.py` proves source -> TEAL; the TestNet follow-up
-(`testnet-followup.yml`) proves committed TEAL -> deployed TestNet app; but the
+(`testnet-followup.yml`) proves committed approval TEAL -> the deployed app's approval program; but the
 LocalNet test suite deploys through
 `trelyan_client.py`, whose `_APP_SPEC_JSON` is frozen at GENERATION time — and nothing
 compared it to `contracts/out/TrelyanInscription.arc56.json`. The client was last generated

@@ -101,7 +101,7 @@ jobs:
           fi
           echo "new TestNet app id: $app_id"
 
-      - name: Assembled committed TEAL must MATCH the new app
+      - name: Assembled committed approval TEAL must MATCH the approval program of the new app
         if: always() && !cancelled() && steps.deploy.conclusion != 'skipped' && steps.deploy.outputs.app_id != ''
         run: |
           app_id="${{ steps.deploy.outputs.app_id }}"

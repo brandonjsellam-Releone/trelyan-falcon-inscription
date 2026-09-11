@@ -57,11 +57,11 @@ jobs:
           fi
           exit "$rc"
         # Read-only. No account, no mnemonic, no secrets.
-        # Exit 1 = a check failed (today: source↔chain bytecode drift).
+        # Exit 1 = a check failed (today: committed-approval-TEAL vs deployed-approval-program drift).
         # Exit 2 = a check did not run. Never treated as agreement.
 
   contract-drift:
-    name: Committed TEAL vs deployed app (follow-up; not a merge gate)
+    name: Committed approval TEAL vs deployed approval program (follow-up; not a merge gate)
     # Derives expected bytecode from the committed artifact, so it CAN fail.
     # The drift it exposed had already run 58 days undetected, because the previous
     # verifier compared the chain to itself. This job ran red from 2026-08-30 until a
