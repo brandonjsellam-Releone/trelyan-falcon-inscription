@@ -99,6 +99,10 @@ PYTHONPATH=src pytest tests -v        # pure-Python wire-format tests (no lib/ne
 - **Scope:** this is **app-level post-quantum inscription signing** — a contract verifies a
   Falcon-1024 signature and writes a write-once record. It is **not** a replacement for
   Algorand account/transaction authentication or consensus security.
+- **Which Falcon:** the signer is Algorand's deterministic variant of round-3 Falcon-1024
+  (`falcon_det1024`, header `0xBA`). It is **not** FN-DSA: FIPS 206 is unpublished, and NIST's
+  provisional plan for it permits randomized signing only. The 0.1.0 PyPI metadata listed
+  `fn-dsa` / `fips-206` keywords in error; they were removed from the source on 2026-08-28.
 - **Unaudited, alpha.** Contract suite 28/28 on LocalNet in the reference repo's CI (2026-09-04); deployed on
   Algorand TestNet. TestNet acceptance runs the same pinned
   `algorand/falcon` code (`ce15e75b`) this package's build recipe uses, so it is a consistency
