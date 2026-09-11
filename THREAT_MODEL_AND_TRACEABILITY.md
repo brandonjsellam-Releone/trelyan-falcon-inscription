@@ -2,7 +2,7 @@
 
 Companion to `LOCALNET_VALIDATION_2026-06-01.md`. Built at the council's request so a formal auditor
 does not spend week one reconstructing the trust surface, the invariant→test mapping, or the
-reproduction steps. **Scope honesty up front:** the 20-test suite *exercises* the listed execution
+reproduction steps. **Scope honesty up front:** the contract suite (20 tests on 2026-06-01; 28 today, run on LocalNet by the CI job `contract-tests`) *exercises* the listed execution
 paths and *rejects the exercised attack vectors* on a live localnet AVM. It does **not** constitute a
 proof of the invariants over all histories, encodings, or upgrade paths — that inductive/exhaustive
 argument is what we will ask an external auditor to provide; no auditor is engaged or funded yet (see `AUDIT_READINESS.md`).
