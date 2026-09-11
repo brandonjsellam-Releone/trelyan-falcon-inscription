@@ -35,8 +35,8 @@ A Cell holder binds an off-chain artifact to the Algorand ledger by having a sma
 **deterministic Falcon-1024** signature — via the AVM native `falcon_verify` opcode (`0x85`, AVM v12 /
 consensus v41 / go-algorand v4.3.0, published cost `costly(1700)`) — over a domain-separated message,
 then writing a **write-once** record into box storage. The Falcon public key is committed once per Cell
-at mint and read from chain state at inscribe, so it never rides in the call arguments. The value is
-durable, third-party re-verifiable, quantum-resistant attestation. It is a **reference** on TestNet,
+at mint and read from chain state at inscribe, so it never rides in the call arguments. The value is a
+durable, write-once record whose Falcon-1024 authorization anyone can re-check — today only with the same `algorand/falcon@ce15e75b` implementation (see the independence caveat in §6) — and it is post-quantum *authorization at the inscription layer*, not total quantum resistance: the ledger storing the record is still secured by Algorand's own account and consensus cryptography. It is a **reference** on TestNet,
 not a production system.
 
 ---
@@ -217,7 +217,7 @@ auditor spends week one on the real surface, not rediscovery.
 
 ## 7. Reproduction entry (start here — read-only)
 
-The fast, no-trust path is **`REVIEWER.md`** (≈5 minutes, read-only, from public inputs):
+The fast, run-it-yourself path is **`REVIEWER.md`** (≈5 minutes, read-only, from public inputs):
 
 ```
 pip install trelyan-pq

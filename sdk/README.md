@@ -98,8 +98,10 @@ PYTHONPATH=src pytest tests -v        # pure-Python wire-format tests (no lib/ne
 - **Scope:** this is **app-level post-quantum inscription signing** — a contract verifies a
   Falcon-1024 signature and writes a write-once record. It is **not** a replacement for
   Algorand account/transaction authentication or consensus security.
-- **Unaudited, alpha.** Validated on localnet (20/20) and TestNet; **not externally audited**
-  and **not for MainNet value**. An independent audit is a precondition for any MainNet use; it is a paid engagement
+- **Unaudited, alpha.** Validated on localnet (20/20) and TestNet; TestNet acceptance runs the same pinned
+  `algorand/falcon` code (`ce15e75b`) this package's build recipe uses, so it is a consistency
+  check, not independent verification. **Not externally audited** and **not for MainNet value**.
+  An independent audit is a precondition for any MainNet use; it is a paid engagement
   that is not yet funded (the NLnet route was declined on 2026-06-29).
 - **Native C dependency.** The signer is a `ctypes` binding to the `algorand/falcon` C library
   you build yourself — provenance and a reproducible build are your responsibility (the pinned

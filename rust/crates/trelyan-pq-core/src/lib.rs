@@ -13,8 +13,8 @@
 //!   `[2, 1423]`. Verification then runs the reference verifier on top of that.
 //! * **Determinism is a property, not a hope.** [`sign`] over the same key and message yields
 //!   identical bytes — asserted by tests against the committed goldens in
-//!   `sdk/tests/vectors/det1024_kat.json` (byte identity with the Python SDK and, transitively,
-//!   with what the chain verifies).
+//!   `sdk/tests/vectors/det1024_kat.json` (byte identity with the Python SDK; the fixture's
+//!   throwaway key was never used on-chain).
 //!
 //! What this crate does **not** do, on purpose: it does not build TRELYAN inscription messages
 //! (that layout is `trelyan_pq.message` today and will be ported separately), and it does not

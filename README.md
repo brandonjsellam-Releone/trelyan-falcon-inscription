@@ -42,8 +42,9 @@ out of the required merge gates only because it needs live algod, and it is neve
 
 ## Verify it yourself
 
-You don't have to trust us — **[`REVIEWER.md`](REVIEWER.md)** is a 5-minute, read-only independent
-verification guide. The short version:
+**[`REVIEWER.md`](REVIEWER.md)** is a 5-minute, read-only guide to checking these claims yourself — and it
+names what you still have to trust (our package and scripts, the algod endpoint, and the pinned Falcon C
+source, which the AVM verifier also runs). The short version:
 
 ```
 pip install trelyan-pq && python3 sdk/examples/verify_trelyan.py        # live TestNet + pinned-bytecode assert

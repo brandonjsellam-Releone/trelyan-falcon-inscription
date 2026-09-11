@@ -1,6 +1,13 @@
-# Independent Verification Guide
+# Reviewer Verification Guide (run it yourself)
 
-**Verify TRELYAN's core claims yourself in ~5 minutes — no trust in us required.**
+**Check TRELYAN's core claims yourself in ~5 minutes.** Running the checks yourself replaces trust in
+*our reports*; it is not an independent-implementation check. What you still trust: the `trelyan-pq`
+package and the scripts in this repository (they are short — read them first); the algod endpoint
+(`verify_trelyan.py` reads everything through one provider, while
+`contracts/verify_deployment.py --compile-url` can split assembly from the deployed-program read); and
+the pinned `algorand/falcon@ce15e75b` C source, which is also what the AVM `falcon_verify` opcode runs —
+so on-chain acceptance is a sign/verify round-trip within one implementation, not independent
+verification (`AUDIT_READINESS.md` §6).
 
 This is the fast path for a reviewer or auditor. Everything below is read-only and reproducible from
 public inputs. Deeper analysis lives in `TRELYAN_PROTOCOL_SPEC_v0.2.md` and
