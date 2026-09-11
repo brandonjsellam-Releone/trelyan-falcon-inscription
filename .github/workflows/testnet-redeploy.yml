@@ -110,7 +110,7 @@ jobs:
           rc=$?
           set -e
           if [ "$rc" != "0" ]; then
-            echo "::error::new app $app_id approval program does not match the committed approval TEAL (exit $rc). See BLOCKERS.md."
+            echo "::error::new app $app_id approval program is not what the committed approval TEAL assembles to (exit $rc). See BLOCKERS.md."
             exit "$rc"
           fi
 

@@ -1,6 +1,6 @@
 # Live demo (Algorand TestNet)
 
-The reference contract is **deployed and verified on Algorand TestNet**:
+The reference contract is **deployed on Algorand TestNet**; its approval program is what the committed approval TEAL assembles to (`contracts/verify_deployment.py`; the clear-state program is not compared), and the inscription below was accepted by the AVM's `falcon_verify` (the same `algorand/falcon@ce15e75b` code this repo pins, so not an independent verification):
 
 - **App ID `770964251`** — https://lora.algokit.io/testnet/application/770964251
 - A real post-quantum inscription was written **only after** an on-chain Falcon-1024 verification

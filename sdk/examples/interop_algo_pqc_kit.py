@@ -99,7 +99,7 @@ def main() -> None:
     # --- inscribe + verify --------------------------------------------------------------------
     c.inscribe(cell, artifact_hash, priv, b"ipfs://demo")
     assert c.read_back_matches(cell, artifact), "on-chain record did not match!"
-    print("VERIFIED on TestNet: the write-once post-quantum inscription is written and re-verifies.")
+    print("Inscription written on TestNet (accepted by the AVM falcon_verify) and its artifact_hash reads back.")
     print("  (The full PQ-account-authorizes-PQ-inscription flow needs inscribe_presigned(); see STATUS.)")
 
 

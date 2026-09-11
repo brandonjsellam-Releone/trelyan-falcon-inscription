@@ -226,7 +226,7 @@ jobs:
     #
     # It asserts the containers BUILD, RUN, and report "0 not checked" - i.e. every check they
     # claim to perform actually executed. It does NOT assert a particular verdict: whether the
-    # deployed approval program matches the committed approval TEAL is testnet-followup.yml's job, and encoding
+    # deployed approval program is what the committed approval TEAL assembles to is testnet-followup.yml's job, and encoding
     # today's known drift here would make this job wrong the moment the redeploy lands.
     #
     # So this job stays valid across the redeploy, and it CAN fail: it goes red if a container
