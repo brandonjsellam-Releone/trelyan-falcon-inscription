@@ -10,7 +10,7 @@ post‑quantum authorization in their own contract.
 > only *after* the Falcon‑1024 signature verifies on‑chain and every authorization check passes, so the
 > deployment is a real, publicly verifiable post‑quantum inscription.
 >
-> **The deployed approval program is byte-for-byte the committed compiled build of the contract in this repository.**
+> **The deployed approval program is byte-for-byte what this repository's committed approval TEAL assembles to.**
 > Run `python contracts/verify_deployment.py` and it prints `MATCH`: the chain serves 709 B (`6fa5cee1…`) and the
 > committed TEAL (`contracts/out/TrelyanInscription.approval.teal`) assembles to the same 709 B and digest. A separate
 > CI job (`teal-matches-source`) recompiles `inscription.py` with the pinned puya and checks the committed TEAL is what
@@ -29,14 +29,14 @@ post‑quantum authorization in their own contract.
 > ever silenced, but nothing caught it early either. `763809096` remains on chain, unmodified, as
 > the historical record.
 >
-> **What this means for a reviewer:** reading this source is reviewing app `770964251` through two checked links: the chain's program matches the committed TEAL (`verify_deployment.py`, run by the TestNet follow-up), and the committed TEAL is what this source compiles to (CI job `teal-matches-source`). Both passed on `1b349f7` on 2026-09-07 (runs 34123818653 and 34123725705).
+> **What this means for a reviewer:** reading this source is reviewing app `770964251` through two checked links: the chain's approval program matches the committed approval TEAL (`verify_deployment.py`, run by the TestNet follow-up; the clear-state program is not compared), and the committed TEAL is what this source compiles to (CI job `teal-matches-source`). Both passed on `1b349f7` on 2026-09-07 (runs 34123818653 and 34123725705).
 > `sdk/examples/verify_trelyan.py` reports **18 passed, 0 failed**.
 
 **Status (honest):** the contract suite (`contracts/test_inscription.py`, **28 tests**) runs on LocalNet in CI on pushes and
 PRs (not on the weekly schedule) and last passed **28/28 on 2026-09-04** (run 33836856910, `f8ae52c`; `contracts/inscription.py`,
 `contracts/out/` and `contracts/test_inscription.py` unchanged since); [`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md) is the dated 20/20 record of the earlier contract. **Deployed on TestNet,
-and the deployed app IS this source's committed compiled TEAL** — the follow-up job checks the live app's bytecode
-fingerprint against the committed TEAL and has passed since the 2026-09-03 redeploy; it is kept
+and the deployed approval program IS this source's committed compiled approval TEAL** — the follow-up job checks its bytecode
+fingerprint against `contracts/out/TrelyanInscription.approval.teal` and has passed since the 2026-09-03 redeploy; it is kept
 out of the required merge gates only because it needs live algod, and it is never silenced.
 **Not yet externally audited; not on MainNet.** Treat as a reference, not production‑ready. MIT licensed.
 

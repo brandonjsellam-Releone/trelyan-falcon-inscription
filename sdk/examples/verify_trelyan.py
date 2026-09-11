@@ -98,7 +98,7 @@ fp = t.sha512_256(ap).hex()
 check("deployed app not replaced since the 2026-09-03 pin", fp == PINNED_ON_CHAIN_SHA512_256, fp[:16] + "...")
 print(f"        bytecode sha512_256: {fp}")
 
-# The claim that actually matters: is the deployed program what the committed TEAL assembles to?
+# The claim that actually matters: is the deployed approval program what the committed approval TEAL assembles to?
 # Answering it requires assembling the committed TEAL, so it is only possible from a repo
 # clone. When it cannot be answered it is reported as NOT CHECKED and counted as neither a
 # pass nor a failure - silently omitting it is how the weaker check above came to stand in for
@@ -109,7 +109,7 @@ if COMMITTED_TEAL.exists():
     with urllib.request.urlopen(_req, timeout=20) as _r:
         _built = base64.b64decode(json.load(_r)["result"])
     _built_fp = t.sha512_256(_built).hex()
-    check("deployed bytecode matches the committed TEAL artifact", _built_fp == fp, f"committed TEAL assembles to {_built_fp[:16]}...")
+    check("deployed approval program matches the committed approval TEAL artifact", _built_fp == fp, f"committed approval TEAL assembles to {_built_fp[:16]}...")
     if _built_fp != fp:
         print(f"        committed TEAL assembles to: {_built_fp}  ({len(_built)} B)")
         print(f"        chain is actually serving  : {fp}  ({len(ap)} B)")
@@ -119,7 +119,7 @@ if COMMITTED_TEAL.exists():
         print("        Deploy a NEW TestNet app from the committed TEAL, then retarget")
         print("        APP_ID / PINNED_ON_CHAIN_SHA512_256. Checklist: BLOCKERS.md")
 else:
-    not_checked("deployed bytecode matches the committed TEAL artifact",
+    not_checked("deployed approval program matches the committed approval TEAL artifact",
                 f"no committed artifact found at {COMMITTED_TEAL} "
                 f"(set TRELYAN_COMMITTED_TEAL to override)")
     print("        Run contracts/verify_deployment.py from a repo clone to compare the deployed")

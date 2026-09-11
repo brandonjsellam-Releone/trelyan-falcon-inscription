@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that the deployed application is what the committed TEAL artifact assembles to.
+"""Verify the deployed approval program against the committed approval TEAL (clear-state is not compared).
 
 This check is deliberately capable of FAILING. Its predecessor was not: the
 reviewer example pinned a constant that had been copied from the deployed
@@ -26,8 +26,8 @@ lie consistently across both. Pass --compile-url pointing at an independent
 node (or a local `goal clerk compile`) to split that trust. The comparison is
 only as strong as the weaker of the two sources.
 
-Exit codes:  0 deployment matches the committed TEAL artifact
-             1 DRIFT - deployment differs from the committed TEAL artifact
+Exit codes:  0 deployed approval program matches the committed approval TEAL
+             1 DRIFT - deployed approval program differs from the committed approval TEAL
              2 could not complete the check (network, missing artifact, ...)
 """
 
@@ -238,7 +238,7 @@ def main() -> int:
 
     print()
     if expected == deployed:
-        print(f"MATCH - application {args.app_id} is running the committed compiled TEAL.")
+        print(f"MATCH - the approval program of application {args.app_id} is the committed compiled approval TEAL.")
         return 0
 
     print_awaiting_redeploy(
@@ -264,7 +264,7 @@ def print_awaiting_redeploy(
     App 763809096 cannot be patched in place (Update/Delete are blocked, I1/I5).
     The one-shot checklist is BLOCKERS.md.
     """
-    print(f"DRIFT - application {app_id} is NOT running the committed compiled TEAL.")
+    print(f"DRIFT - the approval program of application {app_id} is NOT the committed compiled approval TEAL.")
     print(f"  committed TEAL assembles to: {expected_hash}  ({expected_len} B)")
     print(f"  chain is actually serving  : {deployed_hash}  ({deployed_len} B)")
     print()
