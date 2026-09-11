@@ -156,7 +156,7 @@ jobs:
   # on Linux, macOS and Windows - succeed for THIS EXACT COMMIT?
   #
   # Scoped to signature-kat on purpose, rather than "every check green". The TestNet
-  # follow-up (testnet-followup.yml) needs live algod and was red for the 763809096 drift
+  # follow-up (testnet-followup.yml) needs live algod and was red for the pre-redeploy app's drift
   # until the 2026-09-03 redeploy (see BLOCKERS.md); coupling releases to it is a policy decision
   # for the maintainer, not something to smuggle in through a gate. If you DO want
   # that coupling, widen the filter below deliberately.
