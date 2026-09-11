@@ -13,7 +13,7 @@ argument is what we will ask an external auditor to provide; no auditor is engag
 
 | Actor | Power | Trust assumption |
 | --- | --- | --- |
-| **Admin / Foundation** | `register_cell` only (mint a cell, set its controlling_owner + committed Falcon key). NO power over existing inscriptions. | Trusted at mint; custody is Stiftung multisig (see GOVERNANCE doc). Compromise blast radius = mis-minting *unregistered* cells only. |
+| **Admin / Foundation** | `register_cell` only (mint a cell, set its controlling_owner + committed Falcon key). NO power over existing inscriptions. | Trusted at mint. On TestNet app 770964251 the admin is the single-key deployer account (`create` sets `admin = Txn.sender`); Stiftung multisig custody is planned for any MainNet deployment and not yet implemented, and no governance document exists yet. Compromise blast radius = mis-minting *unregistered* cells only. |
 | **Controlling owner** (per cell) | The sole address allowed to `inscribe` that cell, and to `update_owner` it (pre-inscription). Recorded immutably at mint, moved only by the prior owner. | A normal Algorand account; authenticates via the transaction signature. |
 | **Falcon-1024 key holder** | Produces the signature over the domain-separated message M. The key is committed in full at mint. | The post-quantum authority for the cell. Key loss ⇒ cell permanently un-inscribable (by design). |
 | **Inscriber** (txn sender) | Submits `inscribe`. C1 forces `sender == controlling_owner`, so the recorded inscriber is necessarily the authorized owner. | Same key as the controlling owner. |
@@ -127,7 +127,7 @@ is the one packaging item still to add.
 
 App-account MBR funding policy (~737 ALGO if fully minted; user-paid-at-register is an option worth
 evaluating); lost-key cells irrecoverable by design (disclose to holders); admin mis-mint limited to
-*unregistered* cells (Stiftung multisig custody); committed pubkey + inscriber permanent on-chain
+*unregistered* cells (admin is a single-key deployer on TestNet; Stiftung multisig custody is planned for MainNet, not implemented); committed pubkey + inscriber permanent on-chain
 (GDPR DPIA at the Foundation layer — the inscriber address is inherent to any Algorand transaction);
 1,024 cap left to static verification; OpUp fees drawn from the caller's own surplus.
 
