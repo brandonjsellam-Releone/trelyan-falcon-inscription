@@ -50,11 +50,11 @@ as of 2026-06-17; the invariant/check IDs are stable and match `THREAT_MODEL_AND
 
 | ID | Property | Control in `contracts/inscription.py` | Evidence |
 |----|----------|----------------------------------------|----------|
-| **I1** | Inscriptions are write-once & tamper-evident | `inscribe` C2 `assert cid not in self.inscriptions` (≈L272); `on_delete` = `assert False` (≈L353–356) | `test_double_inscribe_*`, `test_rejects_delete` |
+| **I1** | Inscriptions are write-once & tamper-evident | `inscribe` C2 `assert cid not in self.inscriptions` (≈L272); `on_delete` = `assert False` (L409–412) | `test_double_inscribe_*`, `test_rejects_delete` |
 | **I2** | Message integrity — M binds app, cell, artifact, network | `_build_message` (≈L302–311) | `test_cross_cell_replay_rejected`, `test_inscribe_rejects_tampered_sig` |
 | **I3** | Public re-verifiability of the record | `get_inscription` (≈L335–342) + boxes `k_`/`i_` | `test_inscribe_accepts_valid` (read-back), `test_get_inscription_missing_raises` |
 | **I4** | Key committed at mint, fixed (no rotation) | `register_cell` writes `committed_pubkey[cid]` once (≈L222–225); register-once asserts (≈L219–220) | `test_register_rejects_bad_pubkey_length`, `test_reregister_rejected`, `test_inscribe_rejects_wrong_key` |
-| **I5** | Non-upgradable & non-deletable | `on_update` / `on_delete` = `assert False` (≈L348–356) | `test_rejects_update`, `test_rejects_delete` |
+| **I5** | Non-upgradable & non-deletable | `on_update` / `on_delete` = `assert False` (L404–412) | `test_rejects_update`, `test_rejects_delete` |
 | **C1** | Ownership: holds the ASA ∧ is the recorded controlling owner | `inscribe` C1 (≈L266–269): `AssetHoldingGet` balance==1 **and** `controlling_owner[cid] == Txn.sender` | `test_flash_custody_rejected`, `test_update_owner_then_inscribe` |
 | **C2** | Single-use / write-once | `inscribe` C2 (≈L272) | `test_double_inscribe_*` |
 | **C3** | M reconstructed on-chain (never caller-supplied) | `_build_message` (≈L302–311), read from `Global.current_application_id` + `Global.genesis_hash` | `test_inscribe_accepts_valid`, `test_cross_cell_replay_rejected` |
