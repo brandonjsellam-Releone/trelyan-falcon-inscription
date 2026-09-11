@@ -10,7 +10,7 @@ post‑quantum authorization in their own contract.
 > only *after* the Falcon‑1024 signature verifies on‑chain and every authorization check passes, so the
 > deployment is a real, publicly verifiable post‑quantum inscription.
 >
-> **The deployed program is byte-for-byte the committed compiled build of the contract in this repository.**
+> **The deployed approval program is byte-for-byte the committed compiled build of the contract in this repository.**
 > Run `python contracts/verify_deployment.py` and it prints `MATCH`: the chain serves 709 B (`6fa5cee1…`) and the
 > committed TEAL (`contracts/out/TrelyanInscription.approval.teal`) assembles to the same 709 B and digest. A separate
 > CI job (`teal-matches-source`) recompiles `inscription.py` with the pinned puya and checks the committed TEAL is what
