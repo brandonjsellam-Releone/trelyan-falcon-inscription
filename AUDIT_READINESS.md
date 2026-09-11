@@ -44,22 +44,22 @@ not a production system.
 ## 2. In scope (what we are asking the auditor to attack and confirm)
 
 Every item maps to a file and the exact control. Line numbers are against `contracts/inscription.py`
-as of 2026-06-17; the invariant/check IDs are stable and match `THREAT_MODEL_AND_TRACEABILITY.md` §3.
+at `205d874` (its last change, 2026-08-27); the invariant/check IDs are stable and match `THREAT_MODEL_AND_TRACEABILITY.md` §3.
 
 ### 2.1 Inscription-contract invariants & checks (I1–I5, C1–C5)
 
 | ID | Property | Control in `contracts/inscription.py` | Evidence |
 |----|----------|----------------------------------------|----------|
-| **I1** | Inscriptions are write-once & tamper-evident | `inscribe` C2 `assert cid not in self.inscriptions` (≈L272); `on_delete` = `assert False` (L409–412) | `test_double_inscribe_*`, `test_rejects_delete` |
-| **I2** | Message integrity — M binds app, cell, artifact, network | `_build_message` (≈L302–311) | `test_cross_cell_replay_rejected`, `test_inscribe_rejects_tampered_sig` |
-| **I3** | Public re-verifiability of the record | `get_inscription` (≈L335–342) + boxes `k_`/`i_` | `test_inscribe_accepts_valid` (read-back), `test_get_inscription_missing_raises` |
-| **I4** | Key committed at mint, fixed (no rotation) | `register_cell` writes `committed_pubkey[cid]` once (≈L222–225); register-once asserts (≈L219–220) | `test_register_rejects_bad_pubkey_length`, `test_reregister_rejected`, `test_inscribe_rejects_wrong_key` |
+| **I1** | Inscriptions are write-once & tamper-evident | `inscribe` C2 `assert cid not in self.inscriptions` (L288); `on_delete` = `assert False` (L409–412) | `test_double_inscribe_*`, `test_rejects_delete` |
+| **I2** | Message integrity — M binds app, cell, artifact, network | `_build_message` (L318–327) | `test_cross_cell_replay_rejected`, `test_inscribe_rejects_tampered_sig` |
+| **I3** | Public re-verifiability of the record | `get_inscription` (L391–398) + boxes `k_`/`i_` | `test_inscribe_accepts_valid` (read-back), `test_get_inscription_missing_raises` |
+| **I4** | Key committed at mint, fixed (no rotation) | `register_cell` writes `committed_pubkey[cid]` once (L239); register-once asserts (L235–236) | `test_register_rejects_bad_pubkey_length`, `test_reregister_rejected`, `test_inscribe_rejects_wrong_key` |
 | **I5** | Non-upgradable & non-deletable | `on_update` / `on_delete` = `assert False` (L404–412) | `test_rejects_update`, `test_rejects_delete` |
-| **C1** | Ownership: holds the ASA ∧ is the recorded controlling owner | `inscribe` C1 (≈L266–269): `AssetHoldingGet` balance==1 **and** `controlling_owner[cid] == Txn.sender` | `test_flash_custody_rejected`, `test_update_owner_then_inscribe` |
-| **C2** | Single-use / write-once | `inscribe` C2 (≈L272) | `test_double_inscribe_*` |
-| **C3** | M reconstructed on-chain (never caller-supplied) | `_build_message` (≈L302–311), read from `Global.current_application_id` + `Global.genesis_hash` | `test_inscribe_accepts_valid`, `test_cross_cell_replay_rejected` |
-| **C4** | Falcon-1024 signature valid (opcode) | `inscribe` (≈L288): `op.falcon_verify(m, falcon_sig.native, pubkey)` | `test_inscribe_accepts_valid`, `_rejects_tampered_sig`, `_rejects_wrong_key` |
-| **C5** | Key is the one committed at mint (no substitution) | `inscribe` reads `committed_pubkey[cid]` (≈L278); `inscribe` takes **no** pubkey argument | `test_inscribe_rejects_wrong_key`, `test_inscribe_accepts_valid` |
+| **C1** | Ownership: holds the ASA ∧ is the recorded controlling owner | `inscribe` C1 (L282–285): `AssetHoldingGet` balance==1 **and** `controlling_owner[cid] == Txn.sender` | `test_flash_custody_rejected`, `test_update_owner_then_inscribe` |
+| **C2** | Single-use / write-once | `inscribe` C2 (L288) | `test_double_inscribe_*` |
+| **C3** | M reconstructed on-chain (never caller-supplied) | `_build_message` (L318–327), read from `Global.current_application_id` + `Global.genesis_hash` | `test_inscribe_accepts_valid`, `test_cross_cell_replay_rejected` |
+| **C4** | Falcon-1024 signature valid (opcode) | `inscribe` (L304): `op.falcon_verify(m, falcon_sig.native, pubkey)` | `test_inscribe_accepts_valid`, `_rejects_tampered_sig`, `_rejects_wrong_key` |
+| **C5** | Key is the one committed at mint (no substitution) | `inscribe` reads `committed_pubkey[cid]` (L294); `inscribe` takes **no** pubkey argument | `test_inscribe_rejects_wrong_key`, `test_inscribe_accepts_valid` |
 
 **Primary audit ask for this block:** confirm that **no reachable path writes an `inscriptions[cid]`
 box without passing C1–C5**, and that I1/I4/I5 hold across arbitrary prior histories (not just the 28
@@ -73,7 +73,7 @@ histories — that gap is exactly the engagement.
 - **In scope:** that the contract *calls it correctly* — argument order, that `data` is the on-chain
   rebuilt `M` (not a caller arg), that `signature` is the raw compressed bytes (`.native`, no ARC4
   length prefix), that `public_key` is the committed key read from box state, and that the result is
-  asserted (not ignored). Evidence: `contracts/inscription.py` (≈L288), `contracts/A1_RESOLUTION_2026-06-01.md`.
+  asserted (not ignored). Evidence: `contracts/inscription.py` (L304), `contracts/A1_RESOLUTION_2026-06-01.md`.
 - **Out of scope:** the opcode's internal correctness (see §3).
 
 ### 2.3 Deterministic-Falcon encoding & salt handling (off-chain signer ↔ on-chain rebuild)
@@ -94,7 +94,7 @@ histories — that gap is exactly the engagement.
 
 - **Commit-at-mint, fixed:** the full 1793-byte Falcon public key is written once at
   `register_cell` and never rewritten; length (`PUBKEY_LEN = 1793`) and header byte (`0x0A`, logn=10)
-  are validated at the **only** point a key enters state (≈L210–215). Evidence:
+  are validated at the **only** point a key enters state (L221, L226). Evidence:
   `contracts/inscription.py` and its tests. (`CELL_MINT_SPEC.md` was cited here and **does not
   exist**; the mint semantics are specified in `TRELYAN_PROTOCOL_SPEC_v0.2.md` §4–§5.)
 - **No rotation / loss is irrecoverable by design** (intentional per I4/I5).
@@ -112,20 +112,20 @@ histories — that gap is exactly the engagement.
 ### 2.5 Opcode budget
 
 - `inscribe` self-budgets with `ensure_budget(UInt64(2100), fee_source=OpUpFeeSource.GroupCredit)`
-  (≈L286), placed **after** the cheap structural/ownership checks so unauthorized attempts reject
+  (L302), placed **after** the cheap structural/ownership checks so unauthorized attempts reject
   cheaply (fail-fast), funded from the caller's own fee surplus.
 - **In scope:** budget sufficiency for `falcon_verify` (cost 1700), fee-source correctness, and that
   the OpUp inner-txn fees are drawn from the caller (not the app). Evidence:
-  `contracts/inscription.py` (≈L283–288), `contracts/FALCON_BUDGET_2026-06-01.md`.
+  `contracts/inscription.py` (L299–304), `contracts/FALCON_BUDGET_2026-06-01.md`.
 
 ### 2.6 Box-storage authorization
 
 - Three BoxMaps, each keyed by `uint64_be(cell_id)`: `committed_pubkey` (`k_`), `controlling_owner`
   (`o_`), `inscriptions` (`i_`). Layout mirrored off-chain in `sdk/src/trelyan_pq/message.py`.
-- **In scope:** register-once (`cid not in committed_pubkey / controlling_owner`, ≈L219–220),
-  write-once (≈L272), admin-only `register_cell` (≈L197), the pure-NFT / no-clawback / no-freeze /
-  no-manager binding (≈L199–207), `update_owner` authorization (current owner only, pre-inscription,
-  ≈L317–329), and BoxMap miss-read semantics (a missing read **raises**, per `AUDIT-NOTE A3`).
+- **In scope:** register-once (`cid not in committed_pubkey / controlling_owner`, L235–236),
+  write-once (L288), admin-only `register_cell` (L208), the pure-NFT / no-clawback / no-freeze /
+  no-manager binding (L210–218), `update_owner` authorization (current owner only, pre-inscription,
+  L333–385), and BoxMap miss-read semantics (a missing read **raises**, per `AUDIT-NOTE A3`).
 - Evidence: `contracts/inscription.py`, `sdk/src/trelyan_pq/message.py`.
 
 ---

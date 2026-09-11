@@ -23,7 +23,7 @@ STATUS (honest)
 
   2. **trelyan-pq has no entry point that submits an externally produced signature.**
      `TrelyanInscriptionClient.inscribe(cell_id, artifact_hash, privkey, ...)` takes a PRIVATE KEY
-     and re-derives M and re-signs internally (inscription.py:135-136). So the full cross-library
+     and re-derives M and re-signs internally (inscription.py:136-137). So the full cross-library
      flow — where the algo-pqc-kit account signs and TRELYAN submits those bytes — cannot be
      expressed against today's SDK at all, regardless of how issue #1 lands. It needs a new
      `inscribe_presigned(cell_id, artifact_hash, signature, ...)`, which is a design decision, not
