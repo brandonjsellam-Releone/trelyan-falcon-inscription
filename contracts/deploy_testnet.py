@@ -3,7 +3,7 @@ deploy_testnet.py — TRELYAN inscription, end-to-end on Algorand TestNet.
 
 Runs the §5 TestNet checklist as one command: deploy → fund → mint a clean pure-NFT Cell →
 register (commit the full Falcon key) → inscribe with the off-chain deterministic signer against the
-LIVE falcon_verify opcode → read the record back and re-verify. Mirrors the localnet contract suite (28 tests in CI; 20/20 on 2026-06-01), so
+LIVE falcon_verify opcode → read the record back (artifact_hash) and run the off-chain det1024 check (same pinned code, not independent). Mirrors the localnet contract suite (28 tests in CI; 20/20 on 2026-06-01), so
 it is the validated code path pointed at TestNet rather than localnet.
 
 PREREQS
@@ -153,7 +153,7 @@ def main() -> None:
             raise
     print(f"inscribed cell {cell}")
 
-    # 6. read back + re-verify (I3): on-chain record matches, and the signature re-verifies off-chain.
+    # 6. read back (I3): the on-chain artifact_hash matches, and the signature passes the off-chain det1024 check (same pinned code, not independent).
     # The inscription box is already written by step 5; this readonly read-back is a convenience, so a
     # transient timing failure here must NOT mask the success.
     try:

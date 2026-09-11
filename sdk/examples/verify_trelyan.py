@@ -56,7 +56,7 @@ def not_checked(name, why):
     Added 2026-08-16. Skipped checks were previously printed as prose and counted as NOTHING,
     so the pass count was IDENTICAL whether or not they ran: from a repo clone this script
     reported 17 passed / 1 failed, and from the advertised hermetic container 17 passed /
-    0 failed - green, on the exact divergence the contract-drift CI job is red on, with no
+    0 failed - green, on the exact divergence the contract-drift CI job was red on until 2026-09-03, with no
     signal that a check had been dropped. Counting them and exiting 2 mirrors
     contracts/verify_deployment.py, which already separates "could not check" from "agreed".
     """
