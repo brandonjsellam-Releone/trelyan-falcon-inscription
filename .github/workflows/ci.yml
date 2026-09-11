@@ -7,11 +7,11 @@ on:
   # precisely what happened in 2ec798e (2026-06-16), and it went unseen for two months.
   # third_party/** was added 2026-08-18 with the vendored Falcon tree: every job that builds the
   # library now builds it from there, so a change to those bytes must run the KAT and the
-  # sanitizer gate exactly like a change to the SDK would.
+  # sanitizer gate exactly like a change to the SDK would. scripts/**, Dockerfile.repro and Dockerfile.verify were added 2026-09-11: the reviewer-containers job builds and checks them, and a change to them alone previously ran no CI.
   push:
-    paths: ["sdk/**", "contracts/**", "third_party/**", ".github/workflows/ci.yml", "BLOCKERS.md"]
+    paths: ["sdk/**", "contracts/**", "third_party/**", "scripts/**", "Dockerfile.repro", "Dockerfile.verify", ".github/workflows/ci.yml", "BLOCKERS.md"]
   pull_request:
-    paths: ["sdk/**", "contracts/**", "third_party/**", ".github/workflows/ci.yml", "BLOCKERS.md"]
+    paths: ["sdk/**", "contracts/**", "third_party/**", "scripts/**", "Dockerfile.repro", "Dockerfile.verify", ".github/workflows/ci.yml", "BLOCKERS.md"]
   schedule:
     - cron: "23 6 * * 1"   # Mondays 06:23 UTC — local gates + (via testnet-followup.yml) live drift
   workflow_dispatch: {}
