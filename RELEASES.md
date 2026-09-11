@@ -1,9 +1,9 @@
 # Verifying a `trelyan-pq` release
 
-Tagged releases (`v*`) of the `trelyan-pq` SDK cut after 2026-06-18 are published by
+Tagged releases (`v*`) of the `trelyan-pq` SDK cut after 2026-06-18 will be published by
 [`.github/workflows/release.yml`](.github/workflows/release.yml) with a signed SLSA
 provenance attestation and a cosign keyless blob signature (separate tools, both rooted in this repo's GitHub Actions
-OIDC identity and Sigstore) that together let you check the artifact you downloaded was built (SLSA) and signed (cosign)
+OIDC identity and Sigstore) that together will let you check the artifact you downloaded was built (SLSA) and signed (cosign)
 by this repository's release workflow at **that exact tag**. **No release has been cut through it yet:**
 `v0.2.0` and `v0.2.1` predate the workflow and carry no assets or attestations, and
 PyPI `trelyan-pq` 0.1.0 (uploaded 2026-06-12) was published outside it. What it will
