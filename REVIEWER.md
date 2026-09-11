@@ -29,7 +29,7 @@ public inputs. Deeper analysis lives in `TRELYAN_PROTOCOL_SPEC_v0.2.md` and
 | Pinned Falcon source | `algorand/falcon` commit `ce15e75bceb372867daf6b8e81918ab6978686eb` |
 | Source-tree digest | `sha512_256 = c6adf487…` (27 files); `deterministic.c = 601390dc…` |
 | FP backend (pinned) | `FALCON_FPEMU=1`, `FALCON_FPNATIVE=0` (integer-only emulated fixed point) |
-| Pinned toolchain | python **3.13** · `trelyan-pq` **0.1.0** (PyPI) · PuyaPy **5.8.1** · algokit-utils **v4** · AVM target **v12** |
+| Toolchain | python **3.13** · `trelyan-pq` **0.1.0** from PyPI for step 1 and `Dockerfile.verify` (the only published release; it predates this tree and still carries the `fn-dsa` / `fips-206` keywords removed from source on 2026-08-28) · in-tree SDK **0.2.2** (unreleased; what `Dockerfile.repro` installs) · PuyaPy **5.8.1** · algokit-utils **v4** · AVM target **v12** |
 | On-chain verifier | AVM native `falcon_verify` opcode (`0x85`, **AVM v12** / consensus v41 / go-algorand v4.3.0), published cost `costly(1700)` |
 
 ---
@@ -41,7 +41,7 @@ public inputs. Deeper analysis lives in `TRELYAN_PROTOCOL_SPEC_v0.2.md` and
 pip install trelyan-pq
 python3 sdk/examples/verify_trelyan.py
 ```
-*Hermetic alternative* (pins python 3.13 + `trelyan-pq` 0.1.0, read-only): `docker build -f Dockerfile.verify -t trelyan-verify . && docker run --rm trelyan-verify`. For the **full** offline rebuild — compile the pinned Falcon lib + byte-identity KAT + digest gate, all in one container, then the on-chain check: `docker build -f Dockerfile.repro -t trelyan-repro . && docker run --rm trelyan-repro sh scripts/verify_all.sh` runs Axes A–D and prints one PASS/FAIL (the CI job `reviewer-containers` builds both images — the `repro` build runs the byte-identity KAT — and runs `Dockerfile.verify`: 18 passed, 0 failed, 0 not checked in run 33836856910 on `f8ae52c`, 2026-09-04; it syntax-checks `scripts/verify_all.sh` but does not execute it, so the last full `repro` run on record is the 4/4 of 2026-06-17).
+*Hermetic alternative* (pins python 3.13 + `trelyan-pq` 0.1.0 from PyPI — the only published release, which predates this tree's 0.2.2 SDK; read-only): `docker build -f Dockerfile.verify -t trelyan-verify . && docker run --rm trelyan-verify`. For the **full** offline rebuild — compile the pinned Falcon lib + byte-identity KAT + digest gate, all in one container, then the on-chain check: `docker build -f Dockerfile.repro -t trelyan-repro . && docker run --rm trelyan-repro sh scripts/verify_all.sh` runs Axes A–D and prints one PASS/FAIL (the CI job `reviewer-containers` builds both images — the `repro` build runs the byte-identity KAT — and runs `Dockerfile.verify`: 18 passed, 0 failed, 0 not checked in run 33836856910 on `f8ae52c`, 2026-09-04; it syntax-checks `scripts/verify_all.sh` but does not execute it, so the last full `repro` run on record is the 4/4 of 2026-06-17).
 Read-only. Confirms: the package constants (domain tag, 102-byte message, `0xBA` det-header, sig ≤1423 /
 pubkey 1793); offline golden vectors (`sha512_256`, `build_message`, box names `k_`/`o_`/`i_`); the **live**
 TestNet app `770964251` (prints its bytecode `sha512_256` fingerprint — diff it against your compile of

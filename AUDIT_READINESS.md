@@ -173,12 +173,12 @@ auditor spends week one on the real surface, not rediscovery.
 | Compiled output | `contracts/out/` | Approval/clear TEAL + ARC-56 app spec (diff against your own compile). |
 | Off-chain signer | `contracts/falcon_det1024.py` | Deterministic Falcon-1024 ctypes signer/verifier; the byte-exact `M` builder. |
 | Localnet suite | `contracts/test_inscription.py` | 28 tests: register→inscribe→read-back + attack-rejection vectors. Run on LocalNet in CI (job `contract-tests`, since 2026-08-13); last run on `main` 28/28 on `f8ae52c`, 2026-09-04 (run 33836856910). The 20-test run of 2026-06-01 is the dated record of the earlier contract. |
-| Published SDK | `sdk/src/trelyan_pq/` | `trelyan-pq` 0.1.0 (PyPI): `message.py`, `falcon.py`, `seal.py`. |
+| SDK source | `sdk/src/trelyan_pq/` | `trelyan-pq` 0.2.2 in this tree (unreleased): `message.py`, `falcon.py`, `seal.py`. The only PyPI release is 0.1.0, which predates this source and still carries the `fn-dsa` / `fips-206` keywords removed from `sdk/pyproject.toml` on 2026-08-28. |
 | Signature KAT | `sdk/tests/test_signature_kat.py`, `sdk/tests/vectors/det1024_kat.json` | Byte-identity goldens (begin `ba00`); 3-OS reproduction in CI. |
 | Seeded fuzz / differential oracle | `sdk/tests/test_signature_fuzz.py` | Off-chain↔on-chain encoding differential (seed 1469, 300 iters). |
 | Pinned-build verifier | `sdk/ci/verify_pinned_digest.py` | Recomputes the 27-file tree + `deterministic.c` digests + FP-emulation pin. |
 | Read-only on-chain check | `sdk/examples/verify_trelyan.py` | **18 passed, 0 failed** against live app `770964251` (run 2026-09-03), including the check now labelled `deployed bytecode matches the committed TEAL artifact`. The superseded app `763809096` returned 17 passed / 1 failed: its program predated this source and control I5 forbids updating a deployed app in place. The divergence lasted 79 days, of which **58 went undetected** because the then-current verifier compared the chain to itself; once the check could fail (2026-08-13, #12) it was left failing in public rather than weakened, and was closed on 2026-09-03 by deploying a new app from the committed artifact. |
-| Hermetic checker | `Dockerfile.verify` | Pins python 3.13 + `trelyan-pq` 0.1.0; read-only. |
+| Hermetic checker | `Dockerfile.verify` | Pins python 3.13 + `trelyan-pq` 0.1.0 from PyPI (the only published release; it predates the in-tree 0.2.2 SDK); read-only. |
 | CI | `.github/workflows/ci.yml`, `rust-ci.yml`, `testnet-followup.yml` | ci.yml (local gates, aggregated by the `Required merge gates (local)` job): gitleaks, build-recipe consistency, vendored-Falcon integrity, wire-format, committed-TEAL-matches-source, reviewer containers, signature-kat (3-OS) + sanitizer (alignment/UBSan) gate, contract suite on LocalNet; testnet-e2e is manual only. testnet-followup.yml (not a merge gate): live TestNet verify + committed-TEAL-vs-deployed drift. rust-ci.yml: Rust fmt/clippy, tests incl. the det1024 KAT, MSRV build. |
 | Encoding / budget / arg-order memos | `contracts/FALCON_ENCODING_2026-06-01.md`, `contracts/FALCON_BUDGET_2026-06-01.md`, `contracts/A1_RESOLUTION_2026-06-01.md` | How encoding, opcode cost, and argument order were pinned, with sources. |
 | Threat model & traceability | `THREAT_MODEL_AND_TRACEABILITY.md` | Actors, boundaries, invariant→test→code matrix, reproduction, TestNet checklist. |
@@ -199,7 +199,7 @@ auditor spends week one on the real surface, not rediscovery.
 | Source-tree digest | `sha512_256 = c6adf487…` (27 files); `deterministic.c = 601390dc…` |
 | FP backend (pinned) | `FALCON_FPEMU=1`, `FALCON_FPNATIVE=0` (integer-only emulated fixed point) |
 | Build flags | `-DFALCON_UNALIGNED=0 -fno-strict-aliasing` (proven byte-identical; -D/-f flags, source unchanged) |
-| Toolchain | python **3.13** · `trelyan-pq` **0.1.0** · PuyaPy **5.8.1** · algokit-utils **v4** · AVM target **v12** |
+| Toolchain | python **3.13** · `trelyan-pq` **0.2.2** in-tree (`Dockerfile.verify` pins PyPI **0.1.0**, the only published release; `Dockerfile.repro` installs the in-tree source) · PuyaPy **5.8.1** · algokit-utils **v4** · AVM target **v12** |
 
 > **Independence caveat — read the two rows above together.** The on-chain verifier is
 > `go-algorand`'s `falcon_verify`, which vendors `github.com/algorand/falcon` **v0.1.0**; that tag
@@ -224,7 +224,7 @@ pip install trelyan-pq
 python3 sdk/examples/verify_trelyan.py          # 18 passed, 0 failed vs live app 770964251 (2026-09-03)
 ```
 
-Hermetic alternative (pins python 3.13 + `trelyan-pq` 0.1.0):
+Hermetic alternative (pins python 3.13 + `trelyan-pq` 0.1.0 from PyPI, the only published release; the in-tree SDK is 0.2.2):
 
 ```
 docker build -f Dockerfile.verify -t trelyan-verify . && docker run --rm trelyan-verify

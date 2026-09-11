@@ -89,8 +89,8 @@ ENV FALCON_DET1024_LIB=/trelyan/libfalcondet1024.so
 
 # --- 4. Install the SDK (dev extra) -------------------------------------------------------------
 # Editable install from the in-tree source so the byte-identity KAT runs against THIS checkout.
-# (Dockerfile.verify pins trelyan-pq==0.1.0 from PyPI for the on-chain check; the version in-tree
-# is the same 0.1.0 — kept here as a label for parity.)
+# (Dockerfile.verify pins trelyan-pq==0.1.0, the only PyPI release, for the on-chain check. The in-tree
+# SDK installed below is 0.2.2 and unreleased; the LABEL records that PyPI pin, not this image's SDK.)
 LABEL trelyan.trelyan_pq_version="${TRELYAN_PQ_VERSION}"
 RUN python -m pip install --no-cache-dir -e "sdk[dev]"
 
