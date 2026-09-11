@@ -33,8 +33,8 @@ post‑quantum authorization in their own contract.
 > `sdk/examples/verify_trelyan.py` reports **18 passed, 0 failed**.
 
 **Status (honest):** the contract suite (`contracts/test_inscription.py`, **28 tests**) runs on LocalNet in CI on pushes and
-PRs (not on the weekly schedule) and last passed **28/28 on 2026-09-04** (run 33836856910, `f8ae52c`; `contracts/` unchanged
-since); [`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md) is the dated 20/20 record of the earlier contract. **Deployed on TestNet,
+PRs (not on the weekly schedule) and last passed **28/28 on 2026-09-04** (run 33836856910, `f8ae52c`; `contracts/inscription.py`,
+`contracts/out/` and `contracts/test_inscription.py` unchanged since); [`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md) is the dated 20/20 record of the earlier contract. **Deployed on TestNet,
 and the deployed app IS this source's committed compiled TEAL** — the follow-up job checks the live app's bytecode
 fingerprint against the committed TEAL and has passed since the 2026-09-03 redeploy; it is kept
 out of the required merge gates only because it needs live algod, and it is never silenced.

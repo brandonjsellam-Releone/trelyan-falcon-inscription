@@ -3,7 +3,7 @@
 **Project:** TRELYAN — Falcon-1024 Inscription (open reference implementation).
 **Repo:** `github.com/brandonjsellam-Releone/trelyan-falcon-inscription` · MIT (`LICENSE`).
 **Status:** Reference implementation. Contract suite (28 tests) 28/28 on LocalNet in CI (job `contract-tests`, run 33836856910,
-`f8ae52c`, 2026-09-04; `contracts/` unchanged since); the 20/20 of 2026-06-01 predates the 2026-06-16 contract change. Deployed to **Algorand TestNet**
+`f8ae52c`, 2026-09-04; `contracts/inscription.py`, `contracts/out/` and `contracts/test_inscription.py` unchanged since); the 20/20 of 2026-06-01 predates the 2026-06-16 contract change. Deployed to **Algorand TestNet**
 (app `770964251`). **UNAUDITED — not for MainNet value.** Falcon here provides a **signature**
 (integrity / authenticity), **not** encryption — no confidentiality is claimed.
 **Date:** 2026-06-17.
