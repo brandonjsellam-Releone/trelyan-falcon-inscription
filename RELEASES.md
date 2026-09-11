@@ -1,10 +1,10 @@
 # Verifying a `trelyan-pq` release
 
 Tagged releases (`v*`) of the `trelyan-pq` SDK cut after 2026-06-18 are published by
-[`.github/workflows/release.yml`](.github/workflows/release.yml) with two signed
-supply-chain attestations (SLSA provenance and a cosign signature; separate tools, both rooted in this repo's GitHub Actions
-OIDC identity and Sigstore) that the artifact you downloaded was built from
-**this repository at that exact tag**. **No release has been cut through it yet:**
+[`.github/workflows/release.yml`](.github/workflows/release.yml) with a signed SLSA
+provenance attestation and a cosign keyless blob signature (separate tools, both rooted in this repo's GitHub Actions
+OIDC identity and Sigstore) that together let you check the artifact you downloaded was built (SLSA) and signed (cosign)
+by this repository's release workflow at **that exact tag**. **No release has been cut through it yet:**
 `v0.2.0` and `v0.2.1` predate the workflow and carry no assets or attestations, and
 PyPI `trelyan-pq` 0.1.0 (uploaded 2026-06-12) was published outside it. What it will
 produce:
@@ -21,7 +21,7 @@ Once a release runs through `release.yml`, both are attached to the GitHub Relea
 alongside the `.whl` and `.tar.gz`.
 
 > **Status / honesty note.** TRELYAN is an UNAUDITED reference implementation.
-> These steps check signed attestations of *build provenance and artifact integrity* (the bytes came
+> These steps check a signed provenance attestation and an artifact signature (*build provenance and artifact integrity*: the bytes came
 > from this repo+tag and were not altered) — they do **not** constitute a
 > security audit of the code itself. The commands below have not yet been run
 > against a real published tag; the first actual `v*` release run is required to
