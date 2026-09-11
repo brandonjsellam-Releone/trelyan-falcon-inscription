@@ -36,7 +36,7 @@ post‑quantum authorization in their own contract.
 PRs (not on the weekly schedule) and last passed **28/28 on 2026-09-04** (run 33836856910, `f8ae52c`; `contracts/inscription.py`,
 `contracts/out/` and `contracts/test_inscription.py` unchanged since); [`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md) is the dated 20/20 record of the earlier contract. **Deployed on TestNet,
 and the deployed approval program IS what this source's committed approval TEAL assembles to** — the follow-up job assembles
-`contracts/out/TrelyanInscription.approval.teal` and compares the result with the deployed bytecode; it has passed since the 2026-09-03 redeploy; it is kept
+`contracts/out/TrelyanInscription.approval.teal` and compares the result with the deployed bytecode; it has passed since the 2026-09-03 redeploy (latest: run 34123818653, 2026-09-07); it is kept
 out of the required merge gates only because it needs live algod, and it is never silenced.
 **Not yet externally audited; not on MainNet.** Treat as a reference, not production‑ready. MIT licensed.
 

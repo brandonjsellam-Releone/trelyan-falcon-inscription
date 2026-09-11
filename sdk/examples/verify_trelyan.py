@@ -96,7 +96,7 @@ ap = base64.b64decode(app["params"]["approval-program"])
 check("approval program fetched", len(ap) > 0, f"{len(ap)} bytes")
 fp = t.sha512_256(ap).hex()
 check("deployed app not replaced since the 2026-09-03 pin", fp == PINNED_ON_CHAIN_SHA512_256, fp[:16] + "...")
-print(f"        bytecode sha512_256: {fp}")
+print(f"        approval program sha512_256: {fp}")
 
 # The claim that actually matters: is the deployed approval program what the committed approval TEAL assembles to?
 # Answering it requires assembling the committed TEAL, so it is only possible from a repo
@@ -109,17 +109,17 @@ if COMMITTED_TEAL.exists():
     with urllib.request.urlopen(_req, timeout=20) as _r:
         _built = base64.b64decode(json.load(_r)["result"])
     _built_fp = t.sha512_256(_built).hex()
-    check("deployed approval program matches the committed approval TEAL artifact", _built_fp == fp, f"committed approval TEAL assembles to {_built_fp[:16]}...")
+    check("deployed approval program is what the committed approval TEAL assembles to", _built_fp == fp, f"committed approval TEAL assembles to {_built_fp[:16]}...")
     if _built_fp != fp:
         print(f"        committed TEAL assembles to: {_built_fp}  ({len(_built)} B)")
         print(f"        chain is actually serving  : {fp}  ({len(ap)} B)")
         print(f"AWAITING TESTNET REDEPLOY of app {APP_ID}.")
-        print("        This is not a silent skip. The live program predates the committed")
+        print("        This is not a silent skip. The live approval program predates the committed")
         print("        contract (Update/Delete blocked — cannot patch in place).")
         print("        Deploy a NEW TestNet app from the committed TEAL, then retarget")
         print("        APP_ID / PINNED_ON_CHAIN_SHA512_256. Checklist: BLOCKERS.md")
 else:
-    not_checked("deployed approval program matches the committed approval TEAL artifact",
+    not_checked("deployed approval program is what the committed approval TEAL assembles to",
                 f"no committed artifact found at {COMMITTED_TEAL} "
                 f"(set TRELYAN_COMMITTED_TEAL to override)")
     print("        Run contracts/verify_deployment.py from a repo clone to compare the deployed")

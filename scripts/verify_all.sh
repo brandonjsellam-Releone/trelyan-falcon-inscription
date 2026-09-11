@@ -5,7 +5,7 @@
 #   Axis A  build the pinned deterministic Falcon-1024 lib   (pinned source + pinned flags)
 #   Axis B  pinned-source digest + emulated-FP-backend gate   (ci/verify_pinned_digest.py)
 #   Axis C  byte-identity KAT vs the committed golden         (tests/test_signature_kat.py)
-#   Axis D  read-only on-chain verify of the deployed app     (examples/verify_trelyan.py) [needs network]
+#   Axis D  read-only on-chain verify of the deployed approval program + boxes (examples/verify_trelyan.py) [needs network]
 #
 # Mirrors the .github/workflows/ci.yml `signature-kat` job recipe EXACTLY: tarball fetch of commit
 # ce15e75b... (NOT git clone — autocrlf would corrupt the digest), the digest+FP gate, the
@@ -153,7 +153,7 @@ if [ "${SKIP_ONCHAIN:-0}" = "1" ]; then
   printf '  [SKIP] %s\n' "Axis D — on-chain check skipped (SKIP_ONCHAIN=1)"
 else
   if python sdk/examples/verify_trelyan.py; then
-    record PASS "Axis D — deployed app bytecode + on-chain boxes verify (read-only)"
+    record PASS "Axis D — deployed approval program + on-chain boxes verify (read-only; clear-state not compared)"
   else
     record FAIL "Axis D — on-chain verification failed (or no network)"
   fi

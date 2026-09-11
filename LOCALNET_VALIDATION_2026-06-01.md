@@ -6,7 +6,7 @@
 > regenerated, and the suite has since grown to **28 tests**. Those run on LocalNet in CI (job
 > `contract-tests`, "Contract suite on LocalNet", added 2026-08-13; last run on `main` 28/28 on
 > 2026-09-04, Actions run 33836856910). The TestNet follow-up (`testnet-followup.yml`) compares the
-> live app to the committed TEAL and is **green** for app `770964251`, which replaced `763809096` on
+> live app's approval program with what the committed approval TEAL assembles to (clear-state not compared) and is **green** for app `770964251`, which replaced `763809096` on
 > 2026-09-03 (last run 2026-09-07, Actions run 34123818653; see [`BLOCKERS.md`](BLOCKERS.md)). It does **not** re-run this functional suite.
 > For current evidence use the `contract-tests` CI job, not this record.
 

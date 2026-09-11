@@ -34,7 +34,7 @@ nothing anywhere compares the source to the artifact. The reviewer reads one pro
 the network runs another, and every gate is green.
 
 That is precisely the failure `verify_deployment.py` warns about in its own output -
-"before treating any review of this source as a review of the live application" - arriving
+"Do not treat any review of this source as a review of the live app's approval program until the follow-up workflow is green" - arriving
 through the door nobody was watching.
 
 WHY NOT SIMPLY RUN `verify_deployment.py --recompile` IN CI?
@@ -44,7 +44,7 @@ That closes most of the hole and is worth doing as well. It does not close all o
 after its own repair it compares ASSEMBLED BYTECODE, deliberately, so comment churn cannot
 raise a false alarm about behaviour. Sound for its purpose - and it means a stale
 `// inscription.py:NNN` reference passes, because the assembler discards comments. It also
-checks only the two .teal files, not the source maps or the ARC-56 client contract.
+checks only the approval .teal file, not the clear-state TEAL, the source maps or the ARC-56 client contract.
 
 So this check compares all five artifacts as TEXT, and separates two failure modes that
 warrant very different responses:

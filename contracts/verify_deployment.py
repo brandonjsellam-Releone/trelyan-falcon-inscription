@@ -26,8 +26,8 @@ lie consistently across both. Pass --compile-url pointing at an independent
 node (or a local `goal clerk compile`) to split that trust. The comparison is
 only as strong as the weaker of the two sources.
 
-Exit codes:  0 deployed approval program matches the committed approval TEAL
-             1 DRIFT - deployed approval program differs from the committed approval TEAL
+Exit codes:  0 deployed approval program is what the committed approval TEAL assembles to
+             1 DRIFT - deployed approval program differs from what the committed approval TEAL assembles to
              2 could not complete the check (network, missing artifact, ...)
 """
 
