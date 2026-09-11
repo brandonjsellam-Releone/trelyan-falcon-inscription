@@ -1,9 +1,13 @@
 # Verifying a `trelyan-pq` release
 
-Every tagged release (`v*`) of the `trelyan-pq` SDK is published by
+Tagged releases (`v*`) of the `trelyan-pq` SDK cut after 2026-06-18 are published by
 [`.github/workflows/release.yml`](.github/workflows/release.yml) with two
-independent supply-chain proofs that the artifact you downloaded was built from
-**this repository at that exact tag**:
+supply-chain proofs (separate toolchains, both rooted in this repo's GitHub Actions
+OIDC identity and Sigstore) that the artifact you downloaded was built from
+**this repository at that exact tag**. **No release has been cut through it yet:**
+`v0.2.0` and `v0.2.1` predate the workflow and carry no assets or attestations, and
+PyPI `trelyan-pq` 0.1.0 (uploaded 2026-06-12) was published outside it. What it will
+produce:
 
 1. **SLSA provenance** (`*.intoto.jsonl`) — a Sigstore-signed, Build-L3
    attestation produced by the official
@@ -13,7 +17,8 @@ independent supply-chain proofs that the artifact you downloaded was built from
    a Sigstore blob signature tied to this repo's GitHub Actions OIDC identity,
    verifiable with `cosign`.
 
-Both are attached to the GitHub Release alongside the `.whl` and `.tar.gz`.
+Once a release runs through `release.yml`, both are attached to the GitHub Release
+alongside the `.whl` and `.tar.gz`.
 
 > **Status / honesty note.** TRELYAN is an UNAUDITED reference implementation.
 > These steps prove *build provenance and artifact integrity* (the bytes came

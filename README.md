@@ -60,7 +60,8 @@ committed signatures **byte-for-byte**, then verifies the live deployment — re
 `pytest -rs` prints every reason); contract suite **28/28** on LocalNet; byte-identity KAT green on Linux / macOS / Windows (3-OS CI);
 coverage-guided fuzzing of the encoder (atheris) and the C verifier (libFuzzer · ASan/UBSan) ran 13.8M +
 2.07M inputs with zero crashes. Audit scope: [`AUDIT_READINESS.md`](AUDIT_READINESS.md). Supply-chain
-provenance (SLSA + cosign) on tagged releases: [`RELEASES.md`](RELEASES.md).
+provenance (SLSA + cosign) is wired for future tagged releases in `release.yml` ([`RELEASES.md`](RELEASES.md)); it
+has not run yet: tags v0.2.0 / v0.2.1 predate it and carry no attestations, and PyPI `trelyan-pq` 0.1.0 was not built by it.
 
 ## Why this exists — two integration traps, solved and documented
 Algorand ships `falcon_verify` as a live native AVM opcode, but two non‑obvious things will cost the
