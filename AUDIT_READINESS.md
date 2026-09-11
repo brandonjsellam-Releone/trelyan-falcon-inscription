@@ -202,7 +202,7 @@ auditor spends week one on the real surface, not rediscovery.
 | Toolchain | python **3.13** · `trelyan-pq` **0.2.2** in-tree (`Dockerfile.verify` pins PyPI **0.1.0**, the only published release; `Dockerfile.repro` installs the in-tree source) · PuyaPy **5.8.1** · algokit-utils **v4** · AVM target **v12** |
 
 > **Independence caveat — read the two rows above together.** The on-chain verifier is
-> `go-algorand`'s `falcon_verify`, which vendors `github.com/algorand/falcon` **v0.1.0**; that tag
+> `go-algorand`'s `falcon_verify`, whose `go.mod` requires `github.com/algorand/falcon` **v0.1.0**; that tag
 > dereferences to `ce15e75b`. That is the **same commit** this repository pins for its off-chain
 > signer. So the signer and the verifier are the *same C source at the same commit*, and on-chain
 > acceptance of a signature is a **sign/verify round-trip within one implementation** — not
