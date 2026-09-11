@@ -152,9 +152,9 @@ inscription signatures except the target. Goals: G1 forge, G2 mutate, G3 replay,
 
 ### 6.2 Goal-by-goal
 - **G1 forge:** blocked by C1 ∧ C5 ∧ C4 → reduces to Falcon-1024 EUF-CMA break or key/Cell theft.
-- **G2 mutate:** blocked by I1/C2 and **[INVARIANT I5 — non-upgradable, HARDENED]** the app's
-  update & clear-state programs are set to always-fail at deploy; verified via `goal app info`
-  that no update authority remains, OR upgrade is permanently Stiftung/DAO-gated behind
+- **G2 mutate:** blocked by I1/C2 and **[INVARIANT I5 — non-upgradable, HARDENED]** the approval
+  program rejects UpdateApplication and DeleteApplication unconditionally (on_update/on_delete in `contracts/inscription.py`); the clear-state program is puya's default approve and writes no state, and no check compares the deployed clear-state program
+  (no `goal app info` verification is recorded), OR upgrade is permanently Stiftung/DAO-gated behind
   re-audit. **[FIX/Hermes#1]** Algorand apps are upgradable by default; this is the single most
   important deploy-time control and an auditor MUST confirm it on the deployed app.
 - **G3 replay:** blocked by domain tag + **app_id** + cell_id + genesis_id_hash in M.
