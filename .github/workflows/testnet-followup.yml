@@ -57,7 +57,7 @@ jobs:
           fi
           exit "$rc"
         # Read-only. No account, no mnemonic, no secrets.
-        # Exit 1 = a check failed (today: committed-approval-TEAL vs deployed-approval-program drift).
+        # Exit 1 = a check failed (e.g. the deployed approval program is not what the committed approval TEAL assembles to).
         # Exit 2 = a check did not run. Never treated as agreement.
 
   contract-drift:

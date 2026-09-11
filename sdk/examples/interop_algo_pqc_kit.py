@@ -76,7 +76,7 @@ def main() -> None:
         # There is no SDK method that accepts one: inscribe() and inscribe_bytes() both take a
         # PRIVATE KEY and sign internally. Writing this branch against the current API would mean
         # passing pq.sign(M) into the `privkey` parameter, which is what this file used to do --
-        # it failed at falcon.py:192 ("privkey must be 2305 bytes"), in both branches, so the
+        # it failed at the privkey-length check (falcon.py:210 today) ("privkey must be 2305 bytes"), in both branches, so the
         # example had never run as shipped. Stopping here is the honest state of the interop.
         raise SystemExit(
             "INTEROP_RECONCILED=True cannot run yet: trelyan-pq has no inscribe_presigned() entry "
