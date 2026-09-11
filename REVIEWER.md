@@ -76,8 +76,8 @@ construction (all CI runners are little-endian x86-64) rather than machine-exerc
 | Claim | Where to check |
 |---|---|
 | Signature is over a fixed 102-byte domain-separated `M` (tag‖app_id‖cell_id‖artifact_hash‖genesis_hash), signed **raw** | `sdk/src/trelyan_pq/message.py` (build), `contracts/inscription.py` `_build_message` (on-chain rebuild) |
-| On-chain `M` is rebuilt from chain state (`Global.current_application_id`, `Global.genesis_hash`), never from caller args | `contracts/inscription.py:302-311` |
-| Verification is the AVM `falcon_verify` opcode (outside our TCB), not a hand-rolled in-contract check | `contracts/inscription.py:288`; `SECURITY.md` |
+| On-chain `M` is rebuilt from chain state (`Global.current_application_id`, `Global.genesis_hash`), never from caller args | `contracts/inscription.py:297` (call) and `_build_message` from `:319` |
+| Verification is the AVM `falcon_verify` opcode (outside our TCB), not a hand-rolled in-contract check | `contracts/inscription.py:304`; `SECURITY.md` |
 | Public key is committed write-once per cell in box storage; `inscribe` takes no pubkey argument (no key substitution) | `contracts/inscription.py` register/inscribe paths |
 | Write-once: a cell cannot be re-inscribed; Update/Delete OnCompletions blocked | invariants I1–I5, `THREAT_MODEL_AND_TRACEABILITY.md` |
 | Deterministic signing is RFC-6979/Ed25519-style (`SHAKE256(logn‖privkey‖data)`), **not** a zeroed nonce | `contracts/falcon_det1024.py`; spec §1 |
