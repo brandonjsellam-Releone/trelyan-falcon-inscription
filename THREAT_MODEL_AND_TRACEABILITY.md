@@ -102,7 +102,7 @@ algokit generate client contracts/out/TrelyanInscription.arc56.json --output con
 
 # 4. Start localnet and run the suite:
 algokit localnet start
-python -m pytest contracts/test_inscription.py -v     # expect 20 passed
+python -m pytest contracts/test_inscription.py -v     # expect 28 passed (20 on 2026-06-01)
 ```
 
 (The repo ships `compile_contract.ps1` which builds the isolated 3.13 venv and runs step 2 on

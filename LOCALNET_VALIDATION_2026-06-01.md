@@ -3,15 +3,15 @@
 > [!IMPORTANT]
 > **This is a dated record of the 1 June 2026 run, not a statement about the current tree.**
 > On **2026-06-16** (`2ec798e`) `contracts/inscription.py` changed and the emitted TEAL was
-> regenerated, and the suite grew from **20 to 22 tests**. Those 22 tests have **no recorded
-> localnet run**; CI does not execute `contracts/test_inscription.py` (it has no localnet).
-> The TestNet follow-up (`testnet-followup.yml`) compares the live app to the committed TEAL and
-> is **red** until app `763809096` is replaced (660 B on chain vs 709 B assembled — see
-> [`BLOCKERS.md`](BLOCKERS.md)). It does **not** re-run this functional suite.
-> Re-run on localnet and supersede this record before relying on it as current evidence.
+> regenerated, and the suite has since grown to **28 tests**. Those run on LocalNet in CI (job
+> `contract-tests`, "Contract suite on LocalNet", added 2026-08-13; last run on `main` 28/28 on
+> 2026-09-04, Actions run 33836856910). The TestNet follow-up (`testnet-followup.yml`) compares the
+> live app to the committed TEAL and is **green** for app `770964251`, which replaced `763809096` on
+> 2026-09-03 (last run 2026-09-07, Actions run 34123818653; see [`BLOCKERS.md`](BLOCKERS.md)). It does **not** re-run this functional suite.
+> For current evidence use the `contract-tests` CI job, not this record.
 
 **Artifact under test:** `contracts/inscription.py` *(as of 1 June 2026 — since changed)*
-**Suite:** `contracts/test_inscription.py` — **20 / 20 passing** on Algorand localnet *(suite is now 22 tests)*
+**Suite:** `contracts/test_inscription.py` — **20 / 20 passing** on Algorand localnet *(suite is now 28 tests)*
 **Toolchain:** algokit localnet · AVM target v12 · PuyaPy 5.8.1 · deterministic Falcon-1024
 (`contracts/falcon_det1024.py`, native `falcon_verify` opcode)
 

@@ -32,9 +32,9 @@ post‑quantum authorization in their own contract.
 > **What this means for a reviewer:** reading this source is reviewing app `770964251` through two checked links: the chain's program matches the committed TEAL (`verify_deployment.py`, run by the TestNet follow-up), and the committed TEAL is what this source compiles to (CI job `teal-matches-source`). Both passed on `1b349f7` on 2026-09-07 (runs 34123818653 and 34123725705).
 > `sdk/examples/verify_trelyan.py` reports **18 passed, 0 failed**.
 
-**Status (honest):** last localnet validation was **20/20 on 2026-06-01**; the contract changed on
-2026-06-16 and the suite is now **22 tests with no recorded localnet run** (see
-[`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md)). **Deployed on TestNet,
+**Status (honest):** the contract suite (`contracts/test_inscription.py`, **28 tests**) runs on LocalNet in CI on pushes and
+PRs (not on the weekly schedule) and last passed **28/28 on 2026-09-04** (run 33836856910, `f8ae52c`; `contracts/` unchanged
+since); [`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md) is the dated 20/20 record of the earlier contract. **Deployed on TestNet,
 and the deployed app IS this source's committed compiled TEAL** — the follow-up job checks the live app's bytecode
 fingerprint against the committed TEAL and has passed since the 2026-09-03 redeploy; it is kept
 out of the required merge gates only because it needs live algod, and it is never silenced.
@@ -55,7 +55,9 @@ docker build -f Dockerfile.repro -t trelyan-repro . \
 The hermetic build compiles the pinned Falcon source, asserts the source-tree digest, and reproduces the
 committed signatures **byte-for-byte**, then verifies the live deployment — read-only, from a clean container.
 
-**Validation:** SDK suite 34/34 (1 env-skip); byte-identity KAT green on Linux / macOS / Windows (3-OS CI);
+**Validation:** SDK suite **144 passed, 6 skipped** with the pinned library built (Linux and macOS; Windows 145 passed,
+5 skipped — CI run 33836856910, 2026-09-04; 4 of the 6 skips are the optional algo-pqc-kit interop differential, and
+`pytest -rs` prints every reason); contract suite **28/28** on LocalNet; byte-identity KAT green on Linux / macOS / Windows (3-OS CI);
 coverage-guided fuzzing of the encoder (atheris) and the C verifier (libFuzzer · ASan/UBSan) ran 13.8M +
 2.07M inputs with zero crashes. Audit scope: [`AUDIT_READINESS.md`](AUDIT_READINESS.md). Supply-chain
 provenance (SLSA + cosign) on tagged releases: [`RELEASES.md`](RELEASES.md).
@@ -74,7 +76,7 @@ next team a week. This repo solves both, with the reasoning written down:
 ## What's here
 - `contracts/inscription.py` — the reference contract (Algorand Python / PuyaPy, AVM v12).
 - `contracts/falcon_det1024.py` — off‑chain deterministic Falcon‑1024 signer (ctypes over `algorand/falcon`).
-- `contracts/test_inscription.py` — the 20‑test localnet suite.
+- `contracts/test_inscription.py` — the 28-test contract suite, run on LocalNet in CI.
 - `contracts/deploy_testnet.py` — one‑command end‑to‑end TestNet demo (deploy → mint → register → inscribe → verify).
 - `TRELYAN_PROTOCOL_SPEC_v0.2.md`, `THREAT_MODEL_AND_TRACEABILITY.md`, `LOCALNET_VALIDATION_2026-06-01.md`,
   `FALCON_ENCODING_2026-06-01.md`, `FALCON_BUDGET_2026-06-01.md` — spec, threat model + invariant→test→code
@@ -97,7 +99,7 @@ python contracts/falcon_det1024.py
 (cd contracts && puyapy inscription.py --out-dir out --target-avm-version 12)
 algokit generate client contracts/out/TrelyanInscription.arc56.json --output contracts/trelyan_client.py
 # run the suite (localnet) or deploy to TestNet:
-python -m pytest contracts/test_inscription.py -v          # 20 passed
+python -m pytest contracts/test_inscription.py -v          # 28 passed
 python contracts/deploy_testnet.py                          # needs DEPLOYER_MNEMONIC + a funded TestNet account
 ```
 

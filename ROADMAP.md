@@ -4,17 +4,18 @@ All roadmap work ships as **FOSS (MIT)** in this repository. Dates are intent,
 not commitments.
 
 ## Done
-- Reference contract (`contracts/inscription.py`), AVM v12 — compiles; 20/20 on
-  localnet as of 2026-06-01 (suite now 22 tests, not re-run on localnet since the
-  2026-06-16 contract change).
+- Reference contract (`contracts/inscription.py`), AVM v12 — compiles; its 28-test
+  suite runs on LocalNet in CI (last run on `main` 28/28, 2026-09-04). The 20/20 hand
+  run of 2026-06-01 predates the 2026-06-16 contract change.
 - Deployed + verified on Algorand TestNet (app `770964251`).
 - Spec v0.2, threat model + invariant->test->code traceability, localnet
   validation record, Falcon encoding/budget notes.
+- Continuous integration (`.github/workflows/ci.yml`): the committed TEAL checked
+  against a fresh compile, the signer byte-identity KAT on 3 OSes, and the full
+  contract suite on LocalNet (the runner provides Docker), on pushes and PRs that
+  touch the filtered paths.
 
 ## Next (near-term)
-- **Continuous integration:** compile + off-chain signer self-test + the unit
-  portion of the suite on every push (full localnet remains a documented manual
-  step — it needs Docker).
 - **1,024-record cap test:** add a static/unit check for the `cells_registered <
   TOTAL_RECORDS` cap (currently reasoned, not unit-tested).
 - **Signature-suite agility:** document and prototype an **ML-DSA (FIPS 204)**

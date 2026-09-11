@@ -2,8 +2,8 @@
 
 **Project:** TRELYAN — Falcon-1024 Inscription (open reference implementation).
 **Repo:** `github.com/brandonjsellam-Releone/trelyan-falcon-inscription` · MIT (`LICENSE`).
-**Status:** Reference implementation. Last localnet validation 20/20 on 2026-06-01; contract changed
-2026-06-16 and the suite is now 22 tests with no recorded localnet run. Deployed to **Algorand TestNet**
+**Status:** Reference implementation. Contract suite (28 tests) 28/28 on LocalNet in CI (job `contract-tests`, run 33836856910,
+`f8ae52c`, 2026-09-04; `contracts/` unchanged since); the 20/20 of 2026-06-01 predates the 2026-06-16 contract change. Deployed to **Algorand TestNet**
 (app `770964251`). **UNAUDITED — not for MainNet value.** Falcon here provides a **signature**
 (integrity / authenticity), **not** encryption — no confidentiality is claimed.
 **Date:** 2026-06-17.
@@ -62,7 +62,7 @@ as of 2026-06-17; the invariant/check IDs are stable and match `THREAT_MODEL_AND
 | **C5** | Key is the one committed at mint (no substitution) | `inscribe` reads `committed_pubkey[cid]` (≈L278); `inscribe` takes **no** pubkey argument | `test_inscribe_rejects_wrong_key`, `test_inscribe_accepts_valid` |
 
 **Primary audit ask for this block:** confirm that **no reachable path writes an `inscriptions[cid]`
-box without passing C1–C5**, and that I1/I4/I5 hold across arbitrary prior histories (not just the 20
+box without passing C1–C5**, and that I1/I4/I5 hold across arbitrary prior histories (not just the 28
 exercised paths). The finite localnet suite *exercises* these paths; it is not a proof over all
 histories — that gap is exactly the engagement.
 
@@ -172,14 +172,14 @@ auditor spends week one on the real surface, not rediscovery.
 | Reference contract | `contracts/inscription.py` | The TEAL-source-of-truth (Algorand Python / PuyaPy 5.8.1 → AVM v12). Inline `AUDIT-NOTE A1–A9`. |
 | Compiled output | `contracts/out/` | Approval/clear TEAL + ARC-56 app spec (diff against your own compile). |
 | Off-chain signer | `contracts/falcon_det1024.py` | Deterministic Falcon-1024 ctypes signer/verifier; the byte-exact `M` builder. |
-| Localnet suite | `contracts/test_inscription.py` | 22 tests: register→inscribe→read-back + attack-rejection vectors. Last recorded localnet run was the 20-test suite on 2026-06-01; not re-run since. |
+| Localnet suite | `contracts/test_inscription.py` | 28 tests: register→inscribe→read-back + attack-rejection vectors. Run on LocalNet in CI (job `contract-tests`, since 2026-08-13); last run on `main` 28/28 on `f8ae52c`, 2026-09-04 (run 33836856910). The 20-test run of 2026-06-01 is the dated record of the earlier contract. |
 | Published SDK | `sdk/src/trelyan_pq/` | `trelyan-pq` 0.1.0 (PyPI): `message.py`, `falcon.py`, `seal.py`. |
 | Signature KAT | `sdk/tests/test_signature_kat.py`, `sdk/tests/vectors/det1024_kat.json` | Byte-identity goldens (begin `ba00`); 3-OS reproduction in CI. |
 | Seeded fuzz / differential oracle | `sdk/tests/test_signature_fuzz.py` | Off-chain↔on-chain encoding differential (seed 1469, 300 iters). |
 | Pinned-build verifier | `sdk/ci/verify_pinned_digest.py` | Recomputes the 27-file tree + `deterministic.c` digests + FP-emulation pin. |
 | Read-only on-chain check | `sdk/examples/verify_trelyan.py` | **18 passed, 0 failed** against live app `770964251` (run 2026-09-03), including the check now labelled `deployed bytecode matches the committed TEAL artifact`. The superseded app `763809096` returned 17 passed / 1 failed: its program predated this source and control I5 forbids updating a deployed app in place. The divergence lasted 79 days, of which **58 went undetected** because the then-current verifier compared the chain to itself; once the check could fail (2026-08-13, #12) it was left failing in public rather than weakened, and was closed on 2026-09-03 by deploying a new app from the committed artifact. |
 | Hermetic checker | `Dockerfile.verify` | Pins python 3.13 + `trelyan-pq` 0.1.0; read-only. |
-| CI | `.github/workflows/ci.yml` | wire-format / verify-live / signature-kat (3-OS) / testnet-e2e + a sanitizer (alignment/UBSan) gate. |
+| CI | `.github/workflows/ci.yml`, `rust-ci.yml`, `testnet-followup.yml` | ci.yml (local gates, aggregated by the `Required merge gates (local)` job): gitleaks, build-recipe consistency, vendored-Falcon integrity, wire-format, committed-TEAL-matches-source, reviewer containers, signature-kat (3-OS) + sanitizer (alignment/UBSan) gate, contract suite on LocalNet; testnet-e2e is manual only. testnet-followup.yml (not a merge gate): live TestNet verify + committed-TEAL-vs-deployed drift. rust-ci.yml: Rust fmt/clippy, tests incl. the det1024 KAT, MSRV build. |
 | Encoding / budget / arg-order memos | `contracts/FALCON_ENCODING_2026-06-01.md`, `contracts/FALCON_BUDGET_2026-06-01.md`, `contracts/A1_RESOLUTION_2026-06-01.md` | How encoding, opcode cost, and argument order were pinned, with sources. |
 | Threat model & traceability | `THREAT_MODEL_AND_TRACEABILITY.md` | Actors, boundaries, invariant→test→code matrix, reproduction, TestNet checklist. |
 | Formal-verification brief | **not yet written** (`AUDIT_READINESS_PACK.md` / `AUDITOR_HANDOFF.md` are cited elsewhere but do not exist) | Obligations are in `TRELYAN_PROTOCOL_SPEC_v0.2.md`; the A1–A9 ledger is in `THREAT_MODEL_AND_TRACEABILITY.md` §6. |
@@ -242,7 +242,7 @@ Pinned-build digest:
 python3 sdk/ci/verify_pinned_digest.py <path-to-falcon-source-tree>   # -> PINNED BUILD VERIFIED
 ```
 
-Full contract reproduction (localnet, PuyaPy → AVM v12, 20/20 as of 2026-06-01) is in
+Full contract reproduction (localnet, PuyaPy → AVM v12; 28/28 in CI on 2026-09-04, 20/20 by hand on 2026-06-01) is in
 `THREAT_MODEL_AND_TRACEABILITY.md` §4.
 
 ---
@@ -255,7 +255,7 @@ Full contract reproduction (localnet, PuyaPy → AVM v12, 20/20 as of 2026-06-01
 - **Off-chain key hygiene is best-effort**, not secure erasure, and not a defense against a local
   attacker present during the single signing event.
 - **Cross-endianness** byte-identity is argued by construction, not machine-tested.
-- The 20 localnet tests *exercise* the paths and *reject* the exercised attack vectors; they are
+- The 28 contract tests *exercise* the paths and *reject* the exercised attack vectors; they are
   **not** a proof of the invariants over all histories, encodings, or upgrade paths.
 
 We would rather an auditor find a claim here too strong than discover it later. Corrections welcome

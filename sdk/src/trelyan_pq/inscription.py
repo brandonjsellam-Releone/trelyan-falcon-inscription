@@ -7,7 +7,8 @@ Turns the validated end-to-end flow into a few method calls:
     inscribe (sign M off-chain, submit only the signature) -> read back
 
 and encapsulates the opcode-budget / box-reference / fee handling the `falcon_verify`
-inscribe path needs (the two-strategy submit proven on localnet 20/20 and on TestNet).
+inscribe path needs (the two-strategy submit proven on localnet — 20/20 on 2026-06-01, against
+the pre-2026-06-16 contract — and on TestNet).
 
 Requires the `algorand` extra:
 

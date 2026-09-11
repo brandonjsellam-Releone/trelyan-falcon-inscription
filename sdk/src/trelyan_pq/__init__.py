@@ -14,8 +14,10 @@ Two layers:
 * **On-chain client (`[algorand]` extra):** `trelyan_pq.inscription.TrelyanInscriptionClient`
   wraps the full deploy/register/inscribe/verify flow over algokit-utils.
 
-Status: alpha. Validated on localnet (20/20) and Algorand TestNet; NOT externally audited and
-NOT for MainNet value. See the reference repo for the spec, threat model, and validation record.
+Status: alpha. The reference contract's 28-test suite runs on LocalNet in the reference repo's CI
+(last run 28/28, 2026-09-04) and the contract is deployed on Algorand TestNet; NOT externally
+audited and NOT for MainNet value. See the reference repo for the spec, threat model, and validation
+record.
 """
 
 from __future__ import annotations

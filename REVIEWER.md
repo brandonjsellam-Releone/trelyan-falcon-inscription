@@ -41,7 +41,7 @@ public inputs. Deeper analysis lives in `TRELYAN_PROTOCOL_SPEC_v0.2.md` and
 pip install trelyan-pq
 python3 sdk/examples/verify_trelyan.py
 ```
-*Hermetic alternative* (pins python 3.13 + `trelyan-pq` 0.1.0, read-only): `docker build -f Dockerfile.verify -t trelyan-verify . && docker run --rm trelyan-verify`. For the **full** offline rebuild — compile the pinned Falcon lib + byte-identity KAT + digest gate, all in one container, then the on-chain check: `docker build -f Dockerfile.repro -t trelyan-repro . && docker run --rm trelyan-repro sh scripts/verify_all.sh` runs Axes A–D and prints one PASS/FAIL (both containers verified green on 2026-06-17: `verify` 15/15, `repro` 4/4).
+*Hermetic alternative* (pins python 3.13 + `trelyan-pq` 0.1.0, read-only): `docker build -f Dockerfile.verify -t trelyan-verify . && docker run --rm trelyan-verify`. For the **full** offline rebuild — compile the pinned Falcon lib + byte-identity KAT + digest gate, all in one container, then the on-chain check: `docker build -f Dockerfile.repro -t trelyan-repro . && docker run --rm trelyan-repro sh scripts/verify_all.sh` runs Axes A–D and prints one PASS/FAIL (the CI job `reviewer-containers` builds both images — the `repro` build runs the byte-identity KAT — and runs `Dockerfile.verify`: 18 passed, 0 failed, 0 not checked in run 33836856910 on `f8ae52c`, 2026-09-04; it syntax-checks `scripts/verify_all.sh` but does not execute it, so the last full `repro` run on record is the 4/4 of 2026-06-17).
 Read-only. Confirms: the package constants (domain tag, 102-byte message, `0xBA` det-header, sig ≤1423 /
 pubkey 1793); offline golden vectors (`sha512_256`, `build_message`, box names `k_`/`o_`/`i_`); the **live**
 TestNet app `770964251` (prints its bytecode `sha512_256` fingerprint — diff it against your compile of
@@ -65,7 +65,7 @@ Recomputes the 27-file tree digest, `deterministic.c` digest, and the FP-emulati
 
 ### Cross-platform reproducibility (already demonstrated)
 The CI `signature-kat` job runs the byte-identity KAT on **Linux (gcc), macOS (clang), and Windows (MSVC)**;
-the last run (commit `e49470a`) reproduced the committed goldens **byte-for-byte on all three OSes**, with the
+its most recent run on `main` (run 33836856910, commit `f8ae52c`, 2026-09-04) reproduced the committed goldens **byte-for-byte on all three OSes**, with the
 alignment/UBSan sanitizer gate green on the Linux leg. The only residual is cross-**endianness**, argued by
 construction (all CI runners are little-endian x86-64) rather than machine-exercised.
 
@@ -82,7 +82,7 @@ construction (all CI runners are little-endian x86-64) rather than machine-exerc
 | Write-once: a cell cannot be re-inscribed; Update/Delete OnCompletions blocked | invariants I1–I5, `THREAT_MODEL_AND_TRACEABILITY.md` |
 | Deterministic signing is RFC-6979/Ed25519-style (`SHAKE256(logn‖privkey‖data)`), **not** a zeroed nonce | `contracts/falcon_det1024.py`; spec §1 |
 | det-compressed signature: typically ~1222–1233 B (KAT goldens), ≤1423 B; compressed average ≈1262 B; padded fixed 1280 B; pubkey 1793 B | `TRELYAN_PROTOCOL_SPEC_v0.2.md` §param; `verify.html` |
-| localnet suite 20/20 **as of 2026-06-01** (register→inscribe→read-back + attack-rejection vectors); suite is now **22 tests, no recorded localnet run** since the 2026-06-16 contract change — CI has no localnet, so this is not re-checked automatically | `contracts/test_inscription.py`, `LOCALNET_VALIDATION_2026-06-01.md` |
+| Contract suite: **28 tests** (register→inscribe→read-back + attack-rejection vectors), run on LocalNet by the CI job `contract-tests` ("Contract suite on LocalNet") on pushes and PRs that touch the filtered paths, not on the weekly schedule; last run on `main` 28/28 on `f8ae52c`, 2026-09-04 (run 33836856910). The 20/20 of 2026-06-01 is the dated hand-run record of the earlier contract | `contracts/test_inscription.py`, `.github/workflows/ci.yml` (`contract-tests`), `LOCALNET_VALIDATION_2026-06-01.md` |
 
 ---
 

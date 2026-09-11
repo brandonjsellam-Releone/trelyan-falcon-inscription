@@ -1,9 +1,10 @@
 # Security Policy
 
 TRELYAN — Falcon-1024 Inscription (open reference). This repository is a
-**reference implementation**. Its last localnet validation was 20/20 on
-2026-06-01; the contract has since changed and the suite is now 22 tests with
-no recorded localnet run (see `LOCALNET_VALIDATION_2026-06-01.md`). It is
+**reference implementation**. Its contract suite (`contracts/test_inscription.py`,
+28 tests) runs on LocalNet in CI and last passed 28/28 on 2026-09-04 (run 33836856910,
+`f8ae52c`; `contracts/` unchanged since); `LOCALNET_VALIDATION_2026-06-01.md` is the
+dated 20/20 record of the earlier contract. It is
 deployed to **Algorand TestNet**, but it is **not externally audited and is not
 intended for MainNet value**. Treat it as a reference, not production-ready software.
 
