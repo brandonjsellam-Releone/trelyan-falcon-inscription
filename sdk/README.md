@@ -16,7 +16,8 @@ reference solved:
    pubkey-box-commit + box-name helpers that mirror the contract's layout, so you commit the key
    once and pass only the signature at inscribe.
 
-> **Status: alpha.** Validated on localnet (20/20) and Algorand TestNet. **Not externally
+> **Status: alpha.** The reference contract's 28-test suite runs on LocalNet in the reference repo's
+> CI (last run 28/28, 2026-09-04), and the contract is deployed on Algorand TestNet. **Not externally
 > audited; not for MainNet value.** Treat as a reference/building block.
 
 ## Install
@@ -98,8 +99,16 @@ PYTHONPATH=src pytest tests -v        # pure-Python wire-format tests (no lib/ne
 - **Scope:** this is **app-level post-quantum inscription signing** — a contract verifies a
   Falcon-1024 signature and writes a write-once record. It is **not** a replacement for
   Algorand account/transaction authentication or consensus security.
-- **Unaudited, alpha.** Validated on localnet (20/20) and TestNet; **not externally audited**
-  and **not for MainNet value**. An independent audit is planned before any MainNet use.
+- **Which Falcon:** the signer is Algorand's deterministic variant of round-3 Falcon-1024
+  (`falcon_det1024`, header `0xBA`). It is **not** FN-DSA: FIPS 206 is unpublished, and NIST's
+  provisional plan for it permits randomized signing only. The 0.1.0 PyPI metadata listed
+  `fn-dsa` / `fips-206` keywords in error; they were removed from the source on 2026-08-28.
+- **Unaudited, alpha.** Contract suite 28/28 on LocalNet in the reference repo's CI (2026-09-04); deployed on
+  Algorand TestNet. TestNet acceptance runs the same pinned
+  `algorand/falcon` code (`ce15e75b`) this package's build recipe uses, so it is a consistency
+  check, not independent verification. **Not externally audited** and **not for MainNet value**.
+  An independent audit is a precondition for any MainNet use; it would have to be a paid
+  engagement or an alternative grant not yet identified, and none is engaged or funded yet (the NLnet route was declined on 2026-06-29).
 - **Native C dependency.** The signer is a `ctypes` binding to the `algorand/falcon` C library
   you build yourself — provenance and a reproducible build are your responsibility (the pinned
   tree is now vendored at `third_party/falcon-det1024/src`, see its `PROVENANCE.md`). No

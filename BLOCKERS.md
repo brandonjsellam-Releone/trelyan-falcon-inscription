@@ -190,7 +190,7 @@ Faucet: https://bank.testnet.algorand.network/ — a few ALGO is enough.
    pretend it implements the current source.
 
 7. **Confirm the follow-up is green.**
-   `TestNet follow-up` / `Committed TEAL vs deployed app` and
+   `TestNet follow-up` / `Committed approval TEAL vs deployed approval program` and
    `Live TestNet verification` must both exit 0. Then this item is closed.
    After that, branch protection **may** require those checks; until then it
    must not.

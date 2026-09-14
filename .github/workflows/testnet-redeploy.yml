@@ -101,7 +101,7 @@ jobs:
           fi
           echo "new TestNet app id: $app_id"
 
-      - name: Assembled committed TEAL must MATCH the new app
+      - name: Assembled committed approval TEAL must MATCH the approval program of the new app
         if: always() && !cancelled() && steps.deploy.conclusion != 'skipped' && steps.deploy.outputs.app_id != ''
         run: |
           app_id="${{ steps.deploy.outputs.app_id }}"
@@ -110,7 +110,7 @@ jobs:
           rc=$?
           set -e
           if [ "$rc" != "0" ]; then
-            echo "::error::new app $app_id does not match the committed TEAL (exit $rc). See BLOCKERS.md."
+            echo "::error::new app $app_id approval program is not what the committed approval TEAL assembles to (exit $rc). See BLOCKERS.md."
             exit "$rc"
           fi
 

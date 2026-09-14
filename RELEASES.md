@@ -1,9 +1,13 @@
 # Verifying a `trelyan-pq` release
 
-Every tagged release (`v*`) of the `trelyan-pq` SDK is published by
-[`.github/workflows/release.yml`](.github/workflows/release.yml) with two
-independent supply-chain proofs that the artifact you downloaded was built from
-**this repository at that exact tag**:
+Tagged releases (`v*`) of the `trelyan-pq` SDK cut after 2026-06-18 will be published by
+[`.github/workflows/release.yml`](.github/workflows/release.yml) with a signed SLSA
+provenance attestation and a cosign keyless blob signature (separate tools, both rooted in this repo's GitHub Actions
+OIDC identity and Sigstore) that together will let you check the artifact you downloaded was built (SLSA) and signed (cosign)
+by this repository's release workflow at **that exact tag**. **No release has been cut through it yet:**
+`v0.2.0` and `v0.2.1` predate the workflow and carry no assets or attestations, and
+PyPI `trelyan-pq` 0.1.0 (uploaded 2026-06-12) was published outside it. What it will
+produce:
 
 1. **SLSA provenance** (`*.intoto.jsonl`) — a Sigstore-signed, Build-L3
    attestation produced by the official
@@ -13,10 +17,11 @@ independent supply-chain proofs that the artifact you downloaded was built from
    a Sigstore blob signature tied to this repo's GitHub Actions OIDC identity,
    verifiable with `cosign`.
 
-Both are attached to the GitHub Release alongside the `.whl` and `.tar.gz`.
+Once a release runs through `release.yml`, both are attached to the GitHub Release
+alongside the `.whl` and `.tar.gz`.
 
 > **Status / honesty note.** TRELYAN is an UNAUDITED reference implementation.
-> These steps prove *build provenance and artifact integrity* (the bytes came
+> These steps check a signed provenance attestation and an artifact signature (*build provenance and artifact integrity*: the bytes came
 > from this repo+tag and were not altered) — they do **not** constitute a
 > security audit of the code itself. The commands below have not yet been run
 > against a real published tag; the first actual `v*` release run is required to
@@ -27,7 +32,7 @@ Both are attached to the GitHub Release alongside the `.whl` and `.tar.gz`.
 
 ## 0. Download the release assets
 
-Pick a tag (here `v0.1.0`) and fetch the artifact plus its proofs. With the
+Pick a tag (here `v0.1.0`) and fetch the artifact plus its provenance and signature files. With the
 GitHub CLI:
 
 ```bash

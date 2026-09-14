@@ -2,7 +2,7 @@
 
 **Version:** 0.2 (post-Council-review draft for external audit preparation)
 **Date:** 1 June 2026
-**Status:** DRAFT — not yet audited. Prepared for Runtime Verification review.
+**Status:** DRAFT — not yet audited. Written to be handed to an external auditor (originally prepared with Runtime Verification in mind); no audit is engaged or funded — see `AUDIT_READINESS.md`.
 **Authors:** TRELYAN Foundation (in formation, Zug, CH), with the TRELYAN AI Council
 (Claude Opus, Gemini 3.1 Pro technical-verification seat, Hermes, IBM watsonx, Mistral).
 
@@ -34,7 +34,7 @@ fixes adopted from the Council review are tagged **[FIX]** with attribution.
 
 ## 1. Primitives and provenance
 
-### 1.1 Falcon-1024 (FN-DSA)
+### 1.1 Falcon-1024 (Algorand deterministic variant, det1024 — not FN-DSA)
 - GPV hash-and-sign over NTRU lattices, FFT trapdoor sampler. Falcon-1024 targets **NIST
   security level V**. **NIST-selected (2022); FN-DSA in the forthcoming FIPS 206 (draft, NOT
   published as of June 2026).** Published PQC FIPS: 203 ML-KEM, 204 ML-DSA, 205 SLH-DSA
@@ -152,10 +152,10 @@ inscription signatures except the target. Goals: G1 forge, G2 mutate, G3 replay,
 
 ### 6.2 Goal-by-goal
 - **G1 forge:** blocked by C1 ∧ C5 ∧ C4 → reduces to Falcon-1024 EUF-CMA break or key/Cell theft.
-- **G2 mutate:** blocked by I1/C2 and **[INVARIANT I5 — non-upgradable, HARDENED]** the app's
-  update & clear-state programs are set to always-fail at deploy; verified via `goal app info`
-  that no update authority remains, OR upgrade is permanently Stiftung/DAO-gated behind
-  re-audit. **[FIX/Hermes#1]** Algorand apps are upgradable by default; this is the single most
+- **G2 mutate:** blocked by I1/C2 and **[INVARIANT I5 — non-upgradable, HARDENED]** the approval
+  program rejects UpdateApplication and DeleteApplication unconditionally (on_update/on_delete in `contracts/inscription.py`); the clear-state program is puya's default approve and writes no state, and no check compares the deployed clear-state program
+  (no `goal app info` verification is recorded). A Stiftung/DAO-gated upgrade path behind an external audit was
+  considered in drafting and is not implemented: on_update has no gated branch. **[FIX/Hermes#1]** Algorand apps are upgradable by default; this is the single most
   important deploy-time control and an auditor MUST confirm it on the deployed app.
 - **G3 replay:** blocked by domain tag + **app_id** + cell_id + genesis_id_hash in M.
 - **G4 repudiate:** record + signature is the evidence; `inscriber`/`inscribed_round`
@@ -212,4 +212,4 @@ budget mode documented · §1.2 version/cost/byte-format pinned to live referenc
 ---
 
 *Council-reviewed (Gemini verification seat + Hermes + watsonx, three independent lineages).
-For Runtime Verification audit. Not a security guarantee prior to that audit.*
+For an external audit (none engaged or funded as of 2026-09). Not a security guarantee prior to that audit.*

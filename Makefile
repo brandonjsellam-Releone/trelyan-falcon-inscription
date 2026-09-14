@@ -1,10 +1,10 @@
-# TRELYAN — independent verification entry point. See REVIEWER.md for what each step proves.
+# TRELYAN — reviewer verification entry point (reviewer-run, not independent). See REVIEWER.md for what each step proves and what it still trusts.
 # Uses .RECIPEPREFIX='>' instead of TAB indentation for portability. Requires GNU make >= 3.82.
 .RECIPEPREFIX = >
 .PHONY: help verify verify-onchain verify-kat verify-digest
 
 help:
-> @echo "TRELYAN independent verification (read-only). Targets:"
+> @echo "TRELYAN reviewer verification (read-only). Targets:"
 > @echo "  make verify          on-chain + offline reviewer checks (needs network; pip installs trelyan-pq)"
 > @echo "  make verify-kat      signer byte-identity KAT      (FALCON_DET1024_LIB=/path/to/libfalcon_det1024.so)"
 > @echo "  make verify-digest   pinned Falcon source digest   (TREE=/path/to/falcon-src)"

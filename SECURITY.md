@@ -1,9 +1,10 @@
 # Security Policy
 
 TRELYAN — Falcon-1024 Inscription (open reference). This repository is a
-**reference implementation**. Its last localnet validation was 20/20 on
-2026-06-01; the contract has since changed and the suite is now 22 tests with
-no recorded localnet run (see `LOCALNET_VALIDATION_2026-06-01.md`). It is
+**reference implementation**. Its contract suite (`contracts/test_inscription.py`,
+28 tests) runs on LocalNet in CI and last passed 28/28 on 2026-09-04 (run 33836856910,
+`f8ae52c`; `contracts/inscription.py`, `contracts/out/` and `contracts/test_inscription.py` unchanged since); `LOCALNET_VALIDATION_2026-06-01.md` is the
+dated 20/20 record of the earlier contract. It is
 deployed to **Algorand TestNet**, but it is **not externally audited and is not
 intended for MainNet value**. Treat it as a reference, not production-ready software.
 
@@ -56,7 +57,9 @@ not published test vectors.
 
 ## Planned hardening
 
-An **independent third-party security audit** is planned before any MainNet
-deployment. If supported, we intend to pursue NLnet's audit path via Radically
-Open Security. Until that audit completes, every public claim in this repo is
-deliberately scoped to "reference / TestNet / unaudited."
+An **independent third-party security audit** is required before any MainNet
+deployment. The NLnet NGI Zero → Radically Open Security route named in earlier
+revisions was **declined on 2026-06-29** (NLnet: the NGI Zero programmes have ended
+and no audit funding is available), so the audit would have to be a **paid engagement or an alternative grant not yet identified; none is
+engaged or funded yet**. No MainNet deployment until an audit closes. Until then, every public
+claim in this repo is deliberately scoped to "reference / TestNet / unaudited."

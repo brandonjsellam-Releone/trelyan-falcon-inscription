@@ -2,8 +2,8 @@
 
 WHY THIS FILE EXISTS
 --------------------
-`contracts/verify_deployment.py` reports DRIFT: live app 763809096 serves bytecode that predates
-the committed contract. The fix is a redeploy — and a redeploy issues a **new** app id, because
+`contracts/verify_deployment.py` reported DRIFT until 2026-09-03: live app 763809096 served bytecode that predated
+the committed contract. The fix was a redeploy — and a redeploy issues a **new** app id, because
 the contract blocks Update and Delete (invariants I1/I5), so 763809096 cannot be patched in place.
 
 The app id is written down in roughly two dozen places. Retargeting them is mechanical, and that

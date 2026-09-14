@@ -1,5 +1,5 @@
 """
-Guard: the C binding surface stays inside the audited subset of algorand/falcon.
+Guard: the C binding surface stays inside the allowlisted subset of algorand/falcon.
 
 WHY THIS TEST EXISTS
 ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ import pytest
 _SDK_SRC = pathlib.Path(__file__).resolve().parents[1] / "src" / "trelyan_pq"
 _FALCON_PY = _SDK_SRC / "falcon.py"
 
-# The audited binding surface. Every symbol TRELYAN is permitted to call in the pinned build.
+# The allowlisted binding surface. Every symbol TRELYAN is permitted to call in the pinned build.
 _ALLOWED = frozenset({
     "shake256_init_prng_from_system",
     "falcon_det1024_keygen",
@@ -92,7 +92,7 @@ def test_binding_surface_is_exactly_the_audited_set():
 
     unexpected = bound - _ALLOWED
     assert not unexpected, (
-        "New C symbol(s) bound that are outside the audited surface: "
+        "New C symbol(s) bound that are outside the allowlisted surface: "
         f"{sorted(unexpected)}.\n"
         + "".join(
             f"  - {s}: {_QUARANTINED[s]}\n" for s in sorted(unexpected) if s in _QUARANTINED

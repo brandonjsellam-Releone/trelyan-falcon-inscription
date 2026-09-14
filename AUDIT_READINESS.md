@@ -2,14 +2,14 @@
 
 **Project:** TRELYAN — Falcon-1024 Inscription (open reference implementation).
 **Repo:** `github.com/brandonjsellam-Releone/trelyan-falcon-inscription` · MIT (`LICENSE`).
-**Status:** Reference implementation. Last localnet validation 20/20 on 2026-06-01; contract changed
-2026-06-16 and the suite is now 22 tests with no recorded localnet run. Deployed to **Algorand TestNet**
+**Status:** Reference implementation. Contract suite (28 tests) 28/28 on LocalNet in CI (job `contract-tests`, run 33836856910,
+`f8ae52c`, 2026-09-04; `contracts/inscription.py`, `contracts/out/` and `contracts/test_inscription.py` unchanged since); the 20/20 of 2026-06-01 predates the 2026-06-16 contract change. Deployed to **Algorand TestNet**
 (app `770964251`). **UNAUDITED — not for MainNet value.** Falcon here provides a **signature**
 (integrity / authenticity), **not** encryption — no confidentiality is claimed.
 **Date:** 2026-06-17.
 
 This document is the **scope sheet for an independent security audit of the on-chain (TEAL) contract
-and the Falcon signing/verification path.** Audit path: **a paid engagement, not yet funded.** The NLnet
+and the Falcon signing/verification path.** Audit path: **a paid engagement or an alternative grant not yet identified; none is engaged or funded yet.** The NLnet
 NGI0 → Radically Open Security route named in earlier revisions was **declined on 2026-06-29**
 (NLnet: NGI Zero has ended, no audit funding available); this line was not updated for 67 days
 and is corrected as of 2026-09-04. It is written to be auditor-agnostic and to let a reviewer
@@ -35,8 +35,8 @@ A Cell holder binds an off-chain artifact to the Algorand ledger by having a sma
 **deterministic Falcon-1024** signature — via the AVM native `falcon_verify` opcode (`0x85`, AVM v12 /
 consensus v41 / go-algorand v4.3.0, published cost `costly(1700)`) — over a domain-separated message,
 then writing a **write-once** record into box storage. The Falcon public key is committed once per Cell
-at mint and read from chain state at inscribe, so it never rides in the call arguments. The value is
-durable, third-party re-verifiable, quantum-resistant attestation. It is a **reference** on TestNet,
+at mint and read from chain state at inscribe, so it never rides in the call arguments. The value is a
+durable, write-once record whose Falcon-1024 authorization anyone can re-check — so far only with the same `algorand/falcon@ce15e75b` implementation; no independent verifier has been run (see the independence caveat in §6) — and it is post-quantum *authorization at the inscription layer*, not total quantum resistance: the ledger storing the record is still secured by Algorand's own account and consensus cryptography. It is a **reference** on TestNet,
 not a production system.
 
 ---
@@ -44,25 +44,25 @@ not a production system.
 ## 2. In scope (what we are asking the auditor to attack and confirm)
 
 Every item maps to a file and the exact control. Line numbers are against `contracts/inscription.py`
-as of 2026-06-17; the invariant/check IDs are stable and match `THREAT_MODEL_AND_TRACEABILITY.md` §3.
+at `205d874` (its last change, 2026-08-27); the invariant/check IDs are stable and match `THREAT_MODEL_AND_TRACEABILITY.md` §3.
 
 ### 2.1 Inscription-contract invariants & checks (I1–I5, C1–C5)
 
 | ID | Property | Control in `contracts/inscription.py` | Evidence |
 |----|----------|----------------------------------------|----------|
-| **I1** | Inscriptions are write-once & tamper-evident | `inscribe` C2 `assert cid not in self.inscriptions` (≈L272); `on_delete` = `assert False` (≈L353–356) | `test_double_inscribe_*`, `test_rejects_delete` |
-| **I2** | Message integrity — M binds app, cell, artifact, network | `_build_message` (≈L302–311) | `test_cross_cell_replay_rejected`, `test_inscribe_rejects_tampered_sig` |
-| **I3** | Public re-verifiability of the record | `get_inscription` (≈L335–342) + boxes `k_`/`i_` | `test_inscribe_accepts_valid` (read-back), `test_get_inscription_missing_raises` |
-| **I4** | Key committed at mint, fixed (no rotation) | `register_cell` writes `committed_pubkey[cid]` once (≈L222–225); register-once asserts (≈L219–220) | `test_register_rejects_bad_pubkey_length`, `test_reregister_rejected`, `test_inscribe_rejects_wrong_key` |
-| **I5** | Non-upgradable & non-deletable | `on_update` / `on_delete` = `assert False` (≈L348–356) | `test_rejects_update`, `test_rejects_delete` |
-| **C1** | Ownership: holds the ASA ∧ is the recorded controlling owner | `inscribe` C1 (≈L266–269): `AssetHoldingGet` balance==1 **and** `controlling_owner[cid] == Txn.sender` | `test_flash_custody_rejected`, `test_update_owner_then_inscribe` |
-| **C2** | Single-use / write-once | `inscribe` C2 (≈L272) | `test_double_inscribe_*` |
-| **C3** | M reconstructed on-chain (never caller-supplied) | `_build_message` (≈L302–311), read from `Global.current_application_id` + `Global.genesis_hash` | `test_inscribe_accepts_valid`, `test_cross_cell_replay_rejected` |
-| **C4** | Falcon-1024 signature valid (opcode) | `inscribe` (≈L288): `op.falcon_verify(m, falcon_sig.native, pubkey)` | `test_inscribe_accepts_valid`, `_rejects_tampered_sig`, `_rejects_wrong_key` |
-| **C5** | Key is the one committed at mint (no substitution) | `inscribe` reads `committed_pubkey[cid]` (≈L278); `inscribe` takes **no** pubkey argument | `test_inscribe_rejects_wrong_key`, `test_inscribe_accepts_valid` |
+| **I1** | Inscriptions are write-once & tamper-evident | `inscribe` C2 `assert cid not in self.inscriptions` (L288); `on_delete` = `assert False` (L409–412) | `test_double_inscribe_*`, `test_rejects_delete` |
+| **I2** | Message integrity — M binds app, cell, artifact, network | `_build_message` (L318–327) | `test_cross_cell_replay_rejected`, `test_inscribe_rejects_tampered_sig` |
+| **I3** | Public re-verifiability of the record | `get_inscription` (L391–398) + boxes `k_`/`i_` | `test_inscribe_accepts_valid` (read-back), `test_get_inscription_missing_raises` |
+| **I4** | Key committed at mint, fixed (no rotation) | `register_cell` writes `committed_pubkey[cid]` once (L239); register-once asserts (L235–236) | `test_register_rejects_bad_pubkey_length`, `test_reregister_rejected`, `test_inscribe_rejects_wrong_key` |
+| **I5** | Non-upgradable & non-deletable | `on_update` / `on_delete` = `assert False` (L404–412) | `test_rejects_update`, `test_rejects_delete` |
+| **C1** | Ownership: holds the ASA ∧ is the recorded controlling owner | `inscribe` C1 (L282–285): `AssetHoldingGet` balance==1 **and** `controlling_owner[cid] == Txn.sender` | `test_flash_custody_rejected`, `test_update_owner_then_inscribe` |
+| **C2** | Single-use / write-once | `inscribe` C2 (L288) | `test_double_inscribe_*` |
+| **C3** | M reconstructed on-chain (never caller-supplied) | `_build_message` (L318–327), read from `Global.current_application_id` + `Global.genesis_hash` | `test_inscribe_accepts_valid`, `test_cross_cell_replay_rejected` |
+| **C4** | Falcon-1024 signature valid (opcode) | `inscribe` (L304): `op.falcon_verify(m, falcon_sig.native, pubkey)` | `test_inscribe_accepts_valid`, `_rejects_tampered_sig`, `_rejects_wrong_key` |
+| **C5** | Key is the one committed at mint (no substitution) | `inscribe` reads `committed_pubkey[cid]` (L294); `inscribe` takes **no** pubkey argument | `test_inscribe_rejects_wrong_key`, `test_inscribe_accepts_valid` |
 
 **Primary audit ask for this block:** confirm that **no reachable path writes an `inscriptions[cid]`
-box without passing C1–C5**, and that I1/I4/I5 hold across arbitrary prior histories (not just the 20
+box without passing C1–C5**, and that I1/I4/I5 hold across arbitrary prior histories (not just the 28
 exercised paths). The finite localnet suite *exercises* these paths; it is not a proof over all
 histories — that gap is exactly the engagement.
 
@@ -73,12 +73,12 @@ histories — that gap is exactly the engagement.
 - **In scope:** that the contract *calls it correctly* — argument order, that `data` is the on-chain
   rebuilt `M` (not a caller arg), that `signature` is the raw compressed bytes (`.native`, no ARC4
   length prefix), that `public_key` is the committed key read from box state, and that the result is
-  asserted (not ignored). Evidence: `contracts/inscription.py` (≈L288), `contracts/A1_RESOLUTION_2026-06-01.md`.
+  asserted (not ignored). Evidence: `contracts/inscription.py` (L304), `contracts/A1_RESOLUTION_2026-06-01.md`.
 - **Out of scope:** the opcode's internal correctness (see §3).
 
 ### 2.3 Deterministic-Falcon encoding & salt handling (off-chain signer ↔ on-chain rebuild)
 
-- Scheme: **round-3 deterministic Falcon-1024** (`falcon_det1024`), **not** FN-DSA / draft FIPS 206.
+- Scheme: **round-3 deterministic Falcon-1024** (`falcon_det1024`), **not** FN-DSA / FIPS 206 (unpublished).
 - Compressed encoding header byte **`0xBA`** (`0x3A | 0x80`, deterministic variant) + a 1-byte salt
   version (`CURRENT_SALT_VERSION = 0`); deterministic signing is RFC-6979 / Ed25519-style
   (`SHAKE256(logn‖privkey‖data)`), **not** a zeroed nonce.
@@ -94,7 +94,7 @@ histories — that gap is exactly the engagement.
 
 - **Commit-at-mint, fixed:** the full 1793-byte Falcon public key is written once at
   `register_cell` and never rewritten; length (`PUBKEY_LEN = 1793`) and header byte (`0x0A`, logn=10)
-  are validated at the **only** point a key enters state (≈L210–215). Evidence:
+  are validated at the **only** point a key enters state (L221, L226). Evidence:
   `contracts/inscription.py` and its tests. (`CELL_MINT_SPEC.md` was cited here and **does not
   exist**; the mint semantics are specified in `TRELYAN_PROTOCOL_SPEC_v0.2.md` §4–§5.)
 - **No rotation / loss is irrecoverable by design** (intentional per I4/I5).
@@ -112,20 +112,20 @@ histories — that gap is exactly the engagement.
 ### 2.5 Opcode budget
 
 - `inscribe` self-budgets with `ensure_budget(UInt64(2100), fee_source=OpUpFeeSource.GroupCredit)`
-  (≈L286), placed **after** the cheap structural/ownership checks so unauthorized attempts reject
+  (L302), placed **after** the cheap structural/ownership checks so unauthorized attempts reject
   cheaply (fail-fast), funded from the caller's own fee surplus.
 - **In scope:** budget sufficiency for `falcon_verify` (cost 1700), fee-source correctness, and that
   the OpUp inner-txn fees are drawn from the caller (not the app). Evidence:
-  `contracts/inscription.py` (≈L283–288), `contracts/FALCON_BUDGET_2026-06-01.md`.
+  `contracts/inscription.py` (L299–304), `contracts/FALCON_BUDGET_2026-06-01.md`.
 
 ### 2.6 Box-storage authorization
 
 - Three BoxMaps, each keyed by `uint64_be(cell_id)`: `committed_pubkey` (`k_`), `controlling_owner`
   (`o_`), `inscriptions` (`i_`). Layout mirrored off-chain in `sdk/src/trelyan_pq/message.py`.
-- **In scope:** register-once (`cid not in committed_pubkey / controlling_owner`, ≈L219–220),
-  write-once (≈L272), admin-only `register_cell` (≈L197), the pure-NFT / no-clawback / no-freeze /
-  no-manager binding (≈L199–207), `update_owner` authorization (current owner only, pre-inscription,
-  ≈L317–329), and BoxMap miss-read semantics (a missing read **raises**, per `AUDIT-NOTE A3`).
+- **In scope:** register-once (`cid not in committed_pubkey / controlling_owner`, L235–236),
+  write-once (L288), admin-only `register_cell` (L208), the pure-NFT / no-clawback / no-freeze /
+  no-manager binding (L210–218), `update_owner` authorization (current owner only, pre-inscription,
+  L333–385), and BoxMap miss-read semantics (a missing read **raises**, per `AUDIT-NOTE A3`).
 - Evidence: `contracts/inscription.py`, `sdk/src/trelyan_pq/message.py`.
 
 ---
@@ -172,14 +172,14 @@ auditor spends week one on the real surface, not rediscovery.
 | Reference contract | `contracts/inscription.py` | The TEAL-source-of-truth (Algorand Python / PuyaPy 5.8.1 → AVM v12). Inline `AUDIT-NOTE A1–A9`. |
 | Compiled output | `contracts/out/` | Approval/clear TEAL + ARC-56 app spec (diff against your own compile). |
 | Off-chain signer | `contracts/falcon_det1024.py` | Deterministic Falcon-1024 ctypes signer/verifier; the byte-exact `M` builder. |
-| Localnet suite | `contracts/test_inscription.py` | 22 tests: register→inscribe→read-back + attack-rejection vectors. Last recorded localnet run was the 20-test suite on 2026-06-01; not re-run since. |
-| Published SDK | `sdk/src/trelyan_pq/` | `trelyan-pq` 0.1.0 (PyPI): `message.py`, `falcon.py`, `seal.py`. |
+| Localnet suite | `contracts/test_inscription.py` | 28 tests: register→inscribe→read-back + attack-rejection vectors. Run on LocalNet in CI (job `contract-tests`, since 2026-08-13); last run on `main` 28/28 on `f8ae52c`, 2026-09-04 (run 33836856910). The 20-test run of 2026-06-01 is the dated record of the earlier contract. |
+| SDK source | `sdk/src/trelyan_pq/` | `trelyan-pq` 0.2.2 in this tree (unreleased): `message.py`, `falcon.py`, `seal.py`. The only PyPI release is 0.1.0, which predates this source and still carries the `fn-dsa` / `fips-206` keywords removed from `sdk/pyproject.toml` on 2026-08-28. |
 | Signature KAT | `sdk/tests/test_signature_kat.py`, `sdk/tests/vectors/det1024_kat.json` | Byte-identity goldens (begin `ba00`); 3-OS reproduction in CI. |
 | Seeded fuzz / differential oracle | `sdk/tests/test_signature_fuzz.py` | Off-chain↔on-chain encoding differential (seed 1469, 300 iters). |
 | Pinned-build verifier | `sdk/ci/verify_pinned_digest.py` | Recomputes the 27-file tree + `deterministic.c` digests + FP-emulation pin. |
-| Read-only on-chain check | `sdk/examples/verify_trelyan.py` | **18 passed, 0 failed** against live app `770964251` (run 2026-09-03), including `deployed bytecode matches the committed contract`. The superseded app `763809096` returned 17 passed / 1 failed: its program predated this source and control I5 forbids updating a deployed app in place. The divergence lasted 79 days, of which **58 went undetected** because the then-current verifier compared the chain to itself; once the check could fail (2026-08-13, #12) it was left failing in public rather than weakened, and was closed on 2026-09-03 by deploying a new app from the committed artifact. |
-| Hermetic checker | `Dockerfile.verify` | Pins python 3.13 + `trelyan-pq` 0.1.0; read-only. |
-| CI | `.github/workflows/ci.yml` | wire-format / verify-live / signature-kat (3-OS) / testnet-e2e + a sanitizer (alignment/UBSan) gate. |
+| Read-only on-chain check | `sdk/examples/verify_trelyan.py` | **18 passed, 0 failed** against live app `770964251` (run 2026-09-03), including the check now labelled `deployed approval program is what the committed approval TEAL assembles to`. The superseded app `763809096` returned 17 passed / 1 failed: its program predated this source and control I5 forbids updating a deployed app in place. The divergence lasted 79 days, of which **58 went undetected** because the then-current verifier compared the chain to itself; once the check could fail (2026-08-13, #12) it was left failing in public rather than weakened, and was closed on 2026-09-03 by deploying a new app from the committed artifact. |
+| Hermetic checker | `Dockerfile.verify` | Pins python 3.13 + `trelyan-pq` 0.1.0 from PyPI (the only published release; it predates the in-tree 0.2.2 SDK); read-only. |
+| CI | `.github/workflows/ci.yml`, `rust-ci.yml`, `testnet-followup.yml` | ci.yml (local gates, aggregated by the `Required merge gates (local)` job): gitleaks, build-recipe consistency, vendored-Falcon integrity, wire-format, committed-TEAL-matches-source, reviewer containers, signature-kat (3-OS) + sanitizer (alignment/UBSan) gate, contract suite on LocalNet; testnet-e2e is manual only. testnet-followup.yml (not a merge gate): live TestNet verify + committed-approval-TEAL-vs-deployed-approval-program drift. rust-ci.yml: Rust fmt/clippy, tests incl. the det1024 KAT, MSRV build. |
 | Encoding / budget / arg-order memos | `contracts/FALCON_ENCODING_2026-06-01.md`, `contracts/FALCON_BUDGET_2026-06-01.md`, `contracts/A1_RESOLUTION_2026-06-01.md` | How encoding, opcode cost, and argument order were pinned, with sources. |
 | Threat model & traceability | `THREAT_MODEL_AND_TRACEABILITY.md` | Actors, boundaries, invariant→test→code matrix, reproduction, TestNet checklist. |
 | Formal-verification brief | **not yet written** (`AUDIT_READINESS_PACK.md` / `AUDITOR_HANDOFF.md` are cited elsewhere but do not exist) | Obligations are in `TRELYAN_PROTOCOL_SPEC_v0.2.md`; the A1–A9 ledger is in `THREAT_MODEL_AND_TRACEABILITY.md` §6. |
@@ -199,10 +199,10 @@ auditor spends week one on the real surface, not rediscovery.
 | Source-tree digest | `sha512_256 = c6adf487…` (27 files); `deterministic.c = 601390dc…` |
 | FP backend (pinned) | `FALCON_FPEMU=1`, `FALCON_FPNATIVE=0` (integer-only emulated fixed point) |
 | Build flags | `-DFALCON_UNALIGNED=0 -fno-strict-aliasing` (proven byte-identical; -D/-f flags, source unchanged) |
-| Toolchain | python **3.13** · `trelyan-pq` **0.1.0** · PuyaPy **5.8.1** · algokit-utils **v4** · AVM target **v12** |
+| Toolchain | python **3.13** · `trelyan-pq` **0.2.2** in-tree (`Dockerfile.verify` pins PyPI **0.1.0**, the only published release; `Dockerfile.repro` installs the in-tree source) · PuyaPy **5.8.1** · algokit-utils **v4** · AVM target **v12** |
 
 > **Independence caveat — read the two rows above together.** The on-chain verifier is
-> `go-algorand`'s `falcon_verify`, which vendors `github.com/algorand/falcon` **v0.1.0**; that tag
+> `go-algorand`'s `falcon_verify`, whose `go.mod` requires `github.com/algorand/falcon` **v0.1.0**; that tag
 > dereferences to `ce15e75b`. That is the **same commit** this repository pins for its off-chain
 > signer. So the signer and the verifier are the *same C source at the same commit*, and on-chain
 > acceptance of a signature is a **sign/verify round-trip within one implementation** — not
@@ -217,14 +217,14 @@ auditor spends week one on the real surface, not rediscovery.
 
 ## 7. Reproduction entry (start here — read-only)
 
-The fast, no-trust path is **`REVIEWER.md`** (≈5 minutes, read-only, from public inputs):
+The fast, run-it-yourself path is **`REVIEWER.md`** (≈5 minutes, read-only, from public inputs):
 
 ```
 pip install trelyan-pq
 python3 sdk/examples/verify_trelyan.py          # 18 passed, 0 failed vs live app 770964251 (2026-09-03)
 ```
 
-Hermetic alternative (pins python 3.13 + `trelyan-pq` 0.1.0):
+Hermetic alternative (pins python 3.13 + `trelyan-pq` 0.1.0 from PyPI, the only published release; the in-tree SDK is 0.2.2):
 
 ```
 docker build -f Dockerfile.verify -t trelyan-verify . && docker run --rm trelyan-verify
@@ -242,7 +242,7 @@ Pinned-build digest:
 python3 sdk/ci/verify_pinned_digest.py <path-to-falcon-source-tree>   # -> PINNED BUILD VERIFIED
 ```
 
-Full contract reproduction (localnet, PuyaPy → AVM v12, 20/20 as of 2026-06-01) is in
+Full contract reproduction (localnet, PuyaPy → AVM v12; 28/28 in CI on 2026-09-04, 20/20 by hand on 2026-06-01) is in
 `THREAT_MODEL_AND_TRACEABILITY.md` §4.
 
 ---
@@ -255,7 +255,7 @@ Full contract reproduction (localnet, PuyaPy → AVM v12, 20/20 as of 2026-06-01
 - **Off-chain key hygiene is best-effort**, not secure erasure, and not a defense against a local
   attacker present during the single signing event.
 - **Cross-endianness** byte-identity is argued by construction, not machine-tested.
-- The 20 localnet tests *exercise* the paths and *reject* the exercised attack vectors; they are
+- The 28 contract tests *exercise* the paths and *reject* the exercised attack vectors; they are
   **not** a proof of the invariants over all histories, encodings, or upgrade paths.
 
 We would rather an auditor find a claim here too strong than discover it later. Corrections welcome

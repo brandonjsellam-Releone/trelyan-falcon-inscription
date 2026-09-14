@@ -368,10 +368,10 @@ def test_register_rejects_clawback_cell(algorand, deployed):
 
 
 def test_register_rejects_freeze_cell(algorand, deployed):
-    """The freeze guard (inscription.py:206), which no test reached.
+    """The freeze guard (inscription.py:217), which no test reached.
 
     test_register_rejects_clawback_cell's docstring claims to cover "clawback (or freeze/manager)"
-    but sets only `clawback`, so it trips :205 and :206 is never evaluated. The three asserts are
+    but sets only `clawback`, so it trips :216 and :217 is never evaluated. The three asserts are
     sequential, so one fixture can only ever exercise the first one it violates.
 
     A live freeze address is not cosmetic: it can freeze the holder AFTER registration, which is
@@ -392,7 +392,7 @@ def test_register_rejects_freeze_cell(algorand, deployed):
 
 
 def test_register_rejects_manager_cell(algorand, deployed):
-    """The manager guard (inscription.py:207), which no test reached.
+    """The manager guard (inscription.py:218), which no test reached.
 
     The most consequential of the three: a live manager can RE-ADD clawback and freeze after
     registration, so leaving it set restores both vectors the other two guards close. The cell's

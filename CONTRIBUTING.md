@@ -6,10 +6,10 @@ and improve the pattern.
 
 ## Project status (honest)
 
-- **Reference implementation.** Last localnet validation 20/20 on 2026-06-01; the contract
-  changed 2026-06-16 and the suite is now 22 tests (CI LocalNet). TestNet app `770964251` is
-  byte-for-byte the committed TEAL (deployed 2026-09-03, closing the `763809096`
-  drift) — see [`BLOCKERS.md`](BLOCKERS.md). **Not externally audited;
+- **Reference implementation.** Contract suite 28/28 on LocalNet in CI (run 33836856910,
+  2026-09-04); the 20/20 of 2026-06-01 was the earlier contract. TestNet app `770964251`'s approval program is
+  byte-for-byte what the committed approval TEAL assembles to (deployed 2026-09-03, closing the `763809096`
+  drift; the clear-state program is not compared) — see [`BLOCKERS.md`](BLOCKERS.md). **Not externally audited;
   not on MainNet.**
 - **Currently solo-maintained** by Brandon J. Sellam. The project is actively
   **seeking a co-maintainer** (cryptography / Algorand smart-contract review).
@@ -24,7 +24,7 @@ algorand-python on Python 3.13, algokit localnet (Docker), AVM target v12.
 ```
 python contracts/falcon_det1024.py                         # signer self-test
 (cd contracts && puyapy inscription.py --out-dir out --target-avm-version 12)
-python -m pytest contracts/test_inscription.py -v          # 20 passed
+python -m pytest contracts/test_inscription.py -v          # 28 passed
 ```
 
 The compile step runs **from `contracts/` with the bare filename**, and that is not a style

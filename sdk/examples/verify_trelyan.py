@@ -3,7 +3,7 @@
 TRELYAN reviewer verification — one command, no trust required.
   pip install trelyan-pq && python3 verify_trelyan.py
 Checks: [1] package constants  [2] pinned golden vectors (offline)
-        [3] live TestNet app 770964251 (bytecode fingerprint + source correspondence)
+        [3] live TestNet app 770964251 (approval-program fingerprint + committed-approval-TEAL correspondence)
         [4] on-chain boxes (registered Falcon keys / inscription records)
         [5] message reconstruction for a live cell (byte-exact, recomputed locally)
 Read-only. Only dependency: trelyan-pq (stdlib otherwise).
@@ -16,9 +16,9 @@ APP_ID = 770964251
 # Read what this constant can and cannot tell you. Because the contract blocks Update and
 # Delete (invariants I1/I5) the deployed bytecode is immutable, so comparing it to this value
 # can only ever succeed. It is evidence that the application was not replaced; it is NOT
-# evidence that the deployment matches contracts/inscription.py, and it was previously
-# presented as though it were. Those are separate claims and only the second one matters to a
-# reviewer. The second is checked below, and needs the committed artifact to answer.
+# evidence that the deployed approval program is what the committed approval TEAL assembles to,
+# and it was previously presented as though it were. Only the second claim matters to a reviewer.
+# It is checked below (approval program only; TEAL-to-source is CI job teal-matches-source).
 PINNED_ON_CHAIN_SHA512_256 = "6fa5cee145762e4a0c2ba93738a0e6f51e93b02c71f23e4e663ac6d73b981c4b"
 # Committed build artifact, when this script is run from a repo clone rather than downloaded
 # on its own. sdk/examples/ -> repo root -> contracts/out/.
@@ -56,7 +56,7 @@ def not_checked(name, why):
     Added 2026-08-16. Skipped checks were previously printed as prose and counted as NOTHING,
     so the pass count was IDENTICAL whether or not they ran: from a repo clone this script
     reported 17 passed / 1 failed, and from the advertised hermetic container 17 passed /
-    0 failed - green, on the exact divergence the contract-drift CI job is red on, with no
+    0 failed - green, on the exact divergence the contract-drift CI job was red on until 2026-09-03, with no
     signal that a check had been dropped. Counting them and exiting 2 mirrors
     contracts/verify_deployment.py, which already separates "could not check" from "agreed".
     """
@@ -96,9 +96,9 @@ ap = base64.b64decode(app["params"]["approval-program"])
 check("approval program fetched", len(ap) > 0, f"{len(ap)} bytes")
 fp = t.sha512_256(ap).hex()
 check("deployed app not replaced since the 2026-09-03 pin", fp == PINNED_ON_CHAIN_SHA512_256, fp[:16] + "...")
-print(f"        bytecode sha512_256: {fp}")
+print(f"        approval program sha512_256: {fp}")
 
-# The claim that actually matters: is the deployed program what the committed contract builds?
+# The claim that actually matters: is the deployed approval program what the committed approval TEAL assembles to?
 # Answering it requires assembling the committed TEAL, so it is only possible from a repo
 # clone. When it cannot be answered it is reported as NOT CHECKED and counted as neither a
 # pass nor a failure - silently omitting it is how the weaker check above came to stand in for
@@ -109,21 +109,21 @@ if COMMITTED_TEAL.exists():
     with urllib.request.urlopen(_req, timeout=20) as _r:
         _built = base64.b64decode(json.load(_r)["result"])
     _built_fp = t.sha512_256(_built).hex()
-    check("deployed bytecode matches the committed contract", _built_fp == fp, f"source builds to {_built_fp[:16]}...")
+    check("deployed approval program is what the committed approval TEAL assembles to", _built_fp == fp, f"committed approval TEAL assembles to {_built_fp[:16]}...")
     if _built_fp != fp:
-        print(f"        committed source builds to : {_built_fp}  ({len(_built)} B)")
+        print(f"        committed TEAL assembles to: {_built_fp}  ({len(_built)} B)")
         print(f"        chain is actually serving  : {fp}  ({len(ap)} B)")
         print(f"AWAITING TESTNET REDEPLOY of app {APP_ID}.")
-        print("        This is not a silent skip. The live program predates the committed")
+        print("        This is not a silent skip. The live approval program predates the committed")
         print("        contract (Update/Delete blocked — cannot patch in place).")
         print("        Deploy a NEW TestNet app from the committed TEAL, then retarget")
         print("        APP_ID / PINNED_ON_CHAIN_SHA512_256. Checklist: BLOCKERS.md")
 else:
-    not_checked("deployed bytecode matches the committed contract",
+    not_checked("deployed approval program is what the committed approval TEAL assembles to",
                 f"no committed artifact found at {COMMITTED_TEAL} "
                 f"(set TRELYAN_COMMITTED_TEAL to override)")
     print("        Run contracts/verify_deployment.py from a repo clone to compare the deployed")
-    print("        program against a fresh assembly of contracts/out/*.teal.")
+    print("        approval program against a fresh assembly of contracts/out/TrelyanInscription.approval.teal (clear-state is not compared).")
 
 print("== [4] on-chain boxes ==")
 boxes = get(f"/v2/applications/{APP_ID}/boxes")["boxes"]

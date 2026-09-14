@@ -32,14 +32,14 @@ WORKDIR /trelyan
 # location, so `parents[2]` on a two-deep path raised IndexError at MODULE LEVEL - before the
 # first print - and the documented command (REVIEWER.md, AUDIT_READINESS.md) produced a
 # traceback and ran zero checks. The script is defensive about that now, but the layout is
-# fixed here as well so the source-correspondence check actually RUNS rather than being
+# fixed here as well so the deployed-vs-committed-TEAL check actually RUNS rather than being
 # skipped: a hermetic reviewer container that cannot compare the deployment against the
-# committed source is not doing the job the docs claim for it.
+# committed TEAL artifact is not doing the job the docs claim for it.
 COPY sdk/examples/verify_trelyan.py sdk/examples/
 COPY contracts/out/ contracts/out/
 
-# Read-only: package constants, offline golden vectors, live app 763809096 bytecode fingerprint
-# (asserted against the pinned value), source correspondence against the committed TEAL,
+# Read-only: package constants, offline golden vectors, live app 770964251 bytecode fingerprint
+# (asserted against the pinned value), approval-program correspondence against the committed TEAL,
 # on-chain boxes, and byte-exact message reconstruction.
 # Exit 0 = all checks passed. 1 = a check FAILED. 2 = a check could not run (see the SKIP lines).
 CMD ["python", "sdk/examples/verify_trelyan.py"]

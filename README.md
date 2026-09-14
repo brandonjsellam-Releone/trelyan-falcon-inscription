@@ -10,12 +10,12 @@ post‑quantum authorization in their own contract.
 > only *after* the Falcon‑1024 signature verifies on‑chain and every authorization check passes, so the
 > deployment is a real, publicly verifiable post‑quantum inscription.
 >
-> **The deployed program is byte-for-byte the contract in this repository.** Run
-> `python contracts/verify_deployment.py` and it prints `MATCH`: the chain serves 709 B
-> (`6fa5cee1…`) and this source assembles to the same 709 B and the same digest. It cannot
-> drift away from that silently, *by design* — control **I5 (non-upgradability)** makes
-> `on_update` and `on_delete` reject unconditionally (`contracts/inscription.py:404-412`),
-> which is enforced by the contract itself, not by deployment convention.
+> **The deployed approval program is byte-for-byte what this repository's committed approval TEAL assembles to** (the clear-state program is not compared).
+> Run `python contracts/verify_deployment.py` and it prints `MATCH`: the chain serves 709 B (`6fa5cee1…`) and the
+> committed TEAL (`contracts/out/TrelyanInscription.approval.teal`) assembles to the same 709 B and digest. A separate
+> CI job (`teal-matches-source`) recompiles `inscription.py` with the pinned puya and checks the committed TEAL is what
+> it compiles to; `verify_deployment.py --recompile` does both locally (needs puya). The deployed program itself cannot
+> change, *by design*: control **I5 (non-upgradability)** makes `on_update` and `on_delete` reject unconditionally (`contracts/inscription.py:404-412`), enforced by the contract itself, not by deployment convention.
 >
 > **The history is kept on purpose, including the part that reflects badly on us.** The previous
 > app **`763809096`** (deployed 2 June 2026) served 660 B (`d24d9071…`) and did **not** match this
@@ -29,21 +29,22 @@ post‑quantum authorization in their own contract.
 > ever silenced, but nothing caught it early either. `763809096` remains on chain, unmodified, as
 > the historical record.
 >
-> **What this means for a reviewer:** reading this source *is* reviewing app `770964251`.
+> **What this means for a reviewer:** reading this source is reviewing the approval program of app `770964251` through two checked links: the chain's approval program matches what the committed approval TEAL assembles to (`verify_deployment.py`, run by the TestNet follow-up; the clear-state program is not compared), and the committed TEAL is what this source compiles to (CI job `teal-matches-source`). Both passed on `1b349f7` on 2026-09-07 (runs 34123818653 and 34123725705).
 > `sdk/examples/verify_trelyan.py` reports **18 passed, 0 failed**.
 
-**Status (honest):** last localnet validation was **20/20 on 2026-06-01**; the contract changed on
-2026-06-16 and the suite is now **22 tests with no recorded localnet run** (see
-[`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md)). **Deployed on TestNet,
-and the deployed app IS this source** — the follow-up job checks the live app's bytecode
-fingerprint against the committed TEAL and has passed since the 2026-09-03 redeploy; it is kept
+**Status (honest):** the contract suite (`contracts/test_inscription.py`, **28 tests**) runs on LocalNet in CI on pushes and
+PRs (not on the weekly schedule) and last passed **28/28 on 2026-09-04** (run 33836856910, `f8ae52c`; `contracts/inscription.py`,
+`contracts/out/` and `contracts/test_inscription.py` unchanged since); [`LOCALNET_VALIDATION_2026-06-01.md`](LOCALNET_VALIDATION_2026-06-01.md) is the dated 20/20 record of the earlier contract. **Deployed on TestNet,
+and the deployed approval program IS what this source's committed approval TEAL assembles to** — the follow-up job assembles
+`contracts/out/TrelyanInscription.approval.teal` and compares the result with the deployed bytecode; it has passed since the 2026-09-03 redeploy (latest: run 34123818653, 2026-09-07); it is kept
 out of the required merge gates only because it needs live algod, and it is never silenced.
 **Not yet externally audited; not on MainNet.** Treat as a reference, not production‑ready. MIT licensed.
 
 ## Verify it yourself
 
-You don't have to trust us — **[`REVIEWER.md`](REVIEWER.md)** is a 5-minute, read-only independent
-verification guide. The short version:
+**[`REVIEWER.md`](REVIEWER.md)** is a 5-minute, read-only guide to checking these claims yourself — and it
+names what you still have to trust (our package and scripts, the algod endpoint, and the pinned Falcon C
+source, which the AVM verifier also runs). The short version:
 
 ```
 pip install trelyan-pq && python3 sdk/examples/verify_trelyan.py        # live TestNet + pinned-bytecode assert
@@ -54,10 +55,13 @@ docker build -f Dockerfile.repro -t trelyan-repro . \
 The hermetic build compiles the pinned Falcon source, asserts the source-tree digest, and reproduces the
 committed signatures **byte-for-byte**, then verifies the live deployment — read-only, from a clean container.
 
-**Validation:** SDK suite 34/34 (1 env-skip); byte-identity KAT green on Linux / macOS / Windows (3-OS CI);
+**Validation:** SDK suite **144 passed, 6 skipped** with the pinned library built (Linux and macOS; Windows 145 passed,
+5 skipped — CI run 33836856910, 2026-09-04; 4 of the 6 skips are the optional algo-pqc-kit interop differential, and
+`pytest -rs` prints every reason); contract suite **28/28** on LocalNet; byte-identity KAT green on Linux / macOS / Windows (3-OS CI);
 coverage-guided fuzzing of the encoder (atheris) and the C verifier (libFuzzer · ASan/UBSan) ran 13.8M +
 2.07M inputs with zero crashes. Audit scope: [`AUDIT_READINESS.md`](AUDIT_READINESS.md). Supply-chain
-provenance (SLSA + cosign) on tagged releases: [`RELEASES.md`](RELEASES.md).
+provenance (SLSA + cosign) is wired for future tagged releases in `release.yml` ([`RELEASES.md`](RELEASES.md)); it
+has not run yet: tags v0.2.0 / v0.2.1 predate it and carry no attestations, and PyPI `trelyan-pq` 0.1.0 was not built by it.
 
 ## Why this exists — two integration traps, solved and documented
 Algorand ships `falcon_verify` as a live native AVM opcode, but two non‑obvious things will cost the
@@ -73,7 +77,7 @@ next team a week. This repo solves both, with the reasoning written down:
 ## What's here
 - `contracts/inscription.py` — the reference contract (Algorand Python / PuyaPy, AVM v12).
 - `contracts/falcon_det1024.py` — off‑chain deterministic Falcon‑1024 signer (ctypes over `algorand/falcon`).
-- `contracts/test_inscription.py` — the 20‑test localnet suite.
+- `contracts/test_inscription.py` — the 28-test contract suite, run on LocalNet in CI.
 - `contracts/deploy_testnet.py` — one‑command end‑to‑end TestNet demo (deploy → mint → register → inscribe → verify).
 - `TRELYAN_PROTOCOL_SPEC_v0.2.md`, `THREAT_MODEL_AND_TRACEABILITY.md`, `LOCALNET_VALIDATION_2026-06-01.md`,
   `FALCON_ENCODING_2026-06-01.md`, `FALCON_BUDGET_2026-06-01.md` — spec, threat model + invariant→test→code
@@ -96,15 +100,19 @@ python contracts/falcon_det1024.py
 (cd contracts && puyapy inscription.py --out-dir out --target-avm-version 12)
 algokit generate client contracts/out/TrelyanInscription.arc56.json --output contracts/trelyan_client.py
 # run the suite (localnet) or deploy to TestNet:
-python -m pytest contracts/test_inscription.py -v          # 20 passed
+python -m pytest contracts/test_inscription.py -v          # 28 passed
 python contracts/deploy_testnet.py                          # needs DEPLOYER_MNEMONIC + a funded TestNet account
 ```
 
 ## Scope of the claim
 Post‑quantum **authorization at the inscription layer** — not total quantum resistance (Algorand's own
 consensus‑crypto upgrades are separate). Falcon‑1024 is NIST‑selected and the basis of the forthcoming
-**FIPS 206 (FN‑DSA)** standard, **not yet finalized**; this reference tracks the current Falcon spec and
-Algorand's opcode and will version when FIPS 206 finalizes.
+**FIPS 206 (FN‑DSA)**, which is **not yet published**. This reference signs with Algorand's **deterministic**
+Falcon‑1024 variant (det1024, header `0xBA`) pinned at `algorand/falcon@ce15e75b` — the variant the AVM
+`falcon_verify` opcode accepts — and makes **no FIPS 206 / FN‑DSA conformance claim**: NIST's provisional plan
+for FIPS 206 permits randomized signing only, so det1024 would not conform unless that changes, and any migration
+depends on Algorand changing its opcode (see `THREAT_MODEL_AND_TRACEABILITY.md`, "Standards trajectory"). When
+FIPS 206 is published we will document how it relates to this reference.
 
 ## Scope & relationship to TRELYAN
 

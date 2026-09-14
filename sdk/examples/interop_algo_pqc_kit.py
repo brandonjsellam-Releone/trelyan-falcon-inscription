@@ -23,7 +23,7 @@ STATUS (honest)
 
   2. **trelyan-pq has no entry point that submits an externally produced signature.**
      `TrelyanInscriptionClient.inscribe(cell_id, artifact_hash, privkey, ...)` takes a PRIVATE KEY
-     and re-derives M and re-signs internally (inscription.py:135-136). So the full cross-library
+     and re-derives M and re-signs internally (inscription.py:136-137). So the full cross-library
      flow — where the algo-pqc-kit account signs and TRELYAN submits those bytes — cannot be
      expressed against today's SDK at all, regardless of how issue #1 lands. It needs a new
      `inscribe_presigned(cell_id, artifact_hash, signature, ...)`, which is a design decision, not
@@ -76,7 +76,7 @@ def main() -> None:
         # There is no SDK method that accepts one: inscribe() and inscribe_bytes() both take a
         # PRIVATE KEY and sign internally. Writing this branch against the current API would mean
         # passing pq.sign(M) into the `privkey` parameter, which is what this file used to do --
-        # it failed at falcon.py:192 ("privkey must be 2305 bytes"), in both branches, so the
+        # it failed at the privkey-length check (falcon.py:210 today) ("privkey must be 2305 bytes"), in both branches, so the
         # example had never run as shipped. Stopping here is the honest state of the interop.
         raise SystemExit(
             "INTEROP_RECONCILED=True cannot run yet: trelyan-pq has no inscribe_presigned() entry "
@@ -99,7 +99,7 @@ def main() -> None:
     # --- inscribe + verify --------------------------------------------------------------------
     c.inscribe(cell, artifact_hash, priv, b"ipfs://demo")
     assert c.read_back_matches(cell, artifact), "on-chain record did not match!"
-    print("VERIFIED on TestNet: the write-once post-quantum inscription is written and re-verifies.")
+    print("Inscription written on TestNet (accepted by the AVM falcon_verify) and its artifact_hash reads back.")
     print("  (The full PQ-account-authorizes-PQ-inscription flow needs inscribe_presigned(); see STATUS.)")
 
 

@@ -3,9 +3,10 @@ trelyan_pq.falcon — Deterministic Falcon-1024 signer in the EXACT encoding Alg
 `falcon_verify` opcode accepts: deterministic, COMPRESSED, header byte 0xBA.
 
 Why this module exists: generic liboqs / pqcrypto Falcon does NOT interoperate with the AVM
-opcode (randomized signatures, wrong header) and gets rejected on-chain. This is a thin,
-audited-shape ctypes wrapper over the `algorand/falcon` C library — the same code path
-Algorand uses — exposing keygen / sign / verify.
+opcode (randomized signatures, wrong header) and gets rejected on-chain. This is a thin ctypes
+wrapper (not externally audited) over the `algorand/falcon` C library — built from the commit
+pinned below, `ce15e75b` (tag v0.1.0, the release go-algorand's go.mod requires for
+`falcon_verify`; see PINNED_BUILD.md) — exposing keygen / sign / verify.
 
 Build the shared library once and point FALCON_DET1024_LIB at it:
 

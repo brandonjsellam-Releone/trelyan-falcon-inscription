@@ -7,11 +7,11 @@ on:
   # precisely what happened in 2ec798e (2026-06-16), and it went unseen for two months.
   # third_party/** was added 2026-08-18 with the vendored Falcon tree: every job that builds the
   # library now builds it from there, so a change to those bytes must run the KAT and the
-  # sanitizer gate exactly like a change to the SDK would.
+  # sanitizer gate exactly like a change to the SDK would. scripts/**, Dockerfile.repro and Dockerfile.verify were added 2026-09-11: the reviewer-containers job builds and checks them, and a change to them alone previously ran no CI.
   push:
-    paths: ["sdk/**", "contracts/**", "third_party/**", ".github/workflows/ci.yml", "BLOCKERS.md"]
+    paths: ["sdk/**", "contracts/**", "third_party/**", "scripts/**", "Dockerfile.repro", "Dockerfile.verify", ".github/workflows/ci.yml", "BLOCKERS.md"]
   pull_request:
-    paths: ["sdk/**", "contracts/**", "third_party/**", ".github/workflows/ci.yml", "BLOCKERS.md"]
+    paths: ["sdk/**", "contracts/**", "third_party/**", "scripts/**", "Dockerfile.repro", "Dockerfile.verify", ".github/workflows/ci.yml", "BLOCKERS.md"]
   schedule:
     - cron: "23 6 * * 1"   # Mondays 06:23 UTC — local gates + (via testnet-followup.yml) live drift
   workflow_dispatch: {}
@@ -220,14 +220,14 @@ jobs:
     #     silently did not run. Because a skipped check counted as neither pass nor fail, the PASS
     #     COUNT WAS IDENTICAL either way: 17 passed / 1 failed from a clone, 17 passed / 0 failed
     #     from the container. It returned clean green on the exact divergence the TestNet
-    #     follow-up is red on, and nothing signalled the dropped check.
+    #     follow-up was red on until 2026-09-03, and nothing signalled the dropped check.
     #
     # WHAT THIS JOB ASSERTS, and deliberately what it does NOT.
     #
     # It asserts the containers BUILD, RUN, and report "0 not checked" - i.e. every check they
     # claim to perform actually executed. It does NOT assert a particular verdict: whether the
-    # deployment matches the committed contract is testnet-followup.yml's job, and encoding
-    # today's known drift here would make this job wrong the moment the redeploy lands.
+    # deployed approval program is what the committed approval TEAL assembles to is testnet-followup.yml's job, and encoding
+    # the drift that existed until 2026-09-03 here would have made this job wrong once the redeploy landed.
     #
     # So this job stays valid across the redeploy, and it CAN fail: it goes red if a container
     # stops building, if the script crashes again, or if any check silently stops running.
@@ -449,7 +449,7 @@ jobs:
         # /EXPORT is load-bearing, not tidiness. MSVC exports NOTHING from a DLL without
         # __declspec(dllexport) or explicit /EXPORT, whereas ELF and Mach-O export every
         # non-static symbol. The upstream Falcon sources carry no dllexport annotations, and
-        # S2.6 forbids editing the audited reference to add them - so the exports are declared
+        # S2.6 forbids editing the pinned upstream reference to add them - so the exports are declared
         # here, at link time, instead.
         #
         # Without this the DLL built, linked, and loaded, and had an EMPTY export table: every
@@ -460,7 +460,7 @@ jobs:
         # reporting green, and the cross-platform reproducibility claim it exists to support
         # (reviewer Q11/Q7) held only on Linux and macOS.
         #
-        # The four names are exactly the SDK's audited binding surface, so the Windows export
+        # The four names are exactly the SDK's allowlisted binding surface, so the Windows export
         # table is the allowlist: adding a binding without exporting it fails loudly here.
         run: |
           cd falcon-src

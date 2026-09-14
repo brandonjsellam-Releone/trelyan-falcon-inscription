@@ -3,8 +3,8 @@
 //! The goldens in `sdk/tests/vectors/det1024_kat.json` were produced by the Python SDK's ctypes
 //! binding over the SAME pinned C tree this crate compiles (`pinned_commit` in the fixture must
 //! equal the crate's `PINNED_FALCON_COMMIT`), with the emulated FP backend. If this test passes,
-//! the Rust core, the Python SDK, and — because those signatures were accepted on the Algorand
-//! test network by `falcon_verify` — the chain all agree byte for byte. That is the property that makes a Rust
+//! the Rust core and the Python SDK agree byte for byte (the fixture's keypair is a throwaway that
+//! was never used on-chain; see its `_security` field). That is the property that makes a Rust
 //! port safe to introduce: not "it verifies", but "it produces the same bytes".
 //!
 //! Constitution §2.5: KATs first. This file is the first test that must be green before any

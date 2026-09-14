@@ -3,7 +3,22 @@
 All notable changes to `trelyan-pq` are documented here. Versions follow SemVer;
 pre-1.0 the public API may change.
 
-## [0.1.0] — 2026-06-03
+## [Unreleased] — source version 0.2.2 (not yet on PyPI)
+Changes since 0.1.0, the only PyPI release (written 2026-09-11 from the repository history; not
+exhaustive).
+
+### Changed
+- Removed the `fn-dsa` and `fips-206` keywords published with 0.1.0 (2026-08-28). This package
+  implements Algorand's deterministic Falcon-1024 (`falcon_det1024`), not FN-DSA; FIPS 206 is
+  unpublished.
+- The README's build recipe fetches the pinned `algorand/falcon` commit `ce15e75b` and compiles
+  with `-DFALCON_UNALIGNED=0 -fno-strict-aliasing` (see `PINNED_BUILD.md`); the 0.1.0 README built
+  the default branch without those flags.
+- Documented that `sign()` hangs, rather than raising, on a header-valid but corrupt private key.
+- Status wording: the reference contract's suite is now 28 tests, run on LocalNet in CI; the 0.1.0
+  "localnet (20/20)" figure is the 2026-06-01 run against an earlier contract.
+
+## [0.1.0] — 2026-06-03 (uploaded to PyPI 2026-06-12)
 Initial release.
 
 ### Added

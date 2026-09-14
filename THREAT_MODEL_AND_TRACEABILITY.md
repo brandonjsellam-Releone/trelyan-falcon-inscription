@@ -2,10 +2,10 @@
 
 Companion to `LOCALNET_VALIDATION_2026-06-01.md`. Built at the council's request so a formal auditor
 does not spend week one reconstructing the trust surface, the invariant→test mapping, or the
-reproduction steps. **Scope honesty up front:** the 20-test suite *exercises* the listed execution
+reproduction steps. **Scope honesty up front:** the contract suite (20 tests on 2026-06-01; 28 today, run on LocalNet by the CI job `contract-tests`) *exercises* the listed execution
 paths and *rejects the exercised attack vectors* on a live localnet AVM. It does **not** constitute a
 proof of the invariants over all histories, encodings, or upgrade paths — that inductive/exhaustive
-argument is exactly what we are engaging Runtime Verification to provide.
+argument is what we will ask an external auditor to provide; no auditor is engaged or funded yet (see `AUDIT_READINESS.md`).
 
 ---
 
@@ -13,7 +13,7 @@ argument is exactly what we are engaging Runtime Verification to provide.
 
 | Actor | Power | Trust assumption |
 | --- | --- | --- |
-| **Admin / Foundation** | `register_cell` only (mint a cell, set its controlling_owner + committed Falcon key). NO power over existing inscriptions. | Trusted at mint; custody is Stiftung multisig (see GOVERNANCE doc). Compromise blast radius = mis-minting *unregistered* cells only. |
+| **Admin / Foundation** | `register_cell` only (mint a cell, set its controlling_owner + committed Falcon key). NO power over existing inscriptions. | Trusted at mint. On the current TestNet deployment the admin is the single-key deployer account (`create` sets `admin = Txn.sender`); Stiftung multisig custody is planned for any MainNet deployment and not yet implemented, and no governance document exists yet. Compromise blast radius = mis-minting *unregistered* cells only. |
 | **Controlling owner** (per cell) | The sole address allowed to `inscribe` that cell, and to `update_owner` it (pre-inscription). Recorded immutably at mint, moved only by the prior owner. | A normal Algorand account; authenticates via the transaction signature. |
 | **Falcon-1024 key holder** | Produces the signature over the domain-separated message M. The key is committed in full at mint. | The post-quantum authority for the cell. Key loss ⇒ cell permanently un-inscribable (by design). |
 | **Inscriber** (txn sender) | Submits `inscribe`. C1 forces `sender == controlling_owner`, so the recorded inscriber is necessarily the authorized owner. | Same key as the controlling owner. |
@@ -102,7 +102,7 @@ algokit generate client contracts/out/TrelyanInscription.arc56.json --output con
 
 # 4. Start localnet and run the suite:
 algokit localnet start
-python -m pytest contracts/test_inscription.py -v     # expect 20 passed
+python -m pytest contracts/test_inscription.py -v     # expect 28 passed (20 on 2026-06-01)
 ```
 
 (The repo ships `compile_contract.ps1` which builds the isolated 3.13 venv and runs step 2 on
@@ -127,7 +127,7 @@ is the one packaging item still to add.
 
 App-account MBR funding policy (~737 ALGO if fully minted; user-paid-at-register is an option worth
 evaluating); lost-key cells irrecoverable by design (disclose to holders); admin mis-mint limited to
-*unregistered* cells (Stiftung multisig custody); committed pubkey + inscriber permanent on-chain
+*unregistered* cells (admin is a single-key deployer on TestNet; Stiftung multisig custody is planned for MainNet, not implemented); committed pubkey + inscriber permanent on-chain
 (GDPR DPIA at the Foundation layer — the inscriber address is inherent to any Algorand transaction);
 1,024 cap left to static verification; OpUp fees drawn from the caller's own surplus.
 
@@ -195,12 +195,12 @@ re-inscribing the identical artifact into the identical cell on the identical ne
 
 **Residual risk, ranked.** (a) **Caller-side retry of `inscribe()`.** This is the most *reachable*
 path, because it needs no deliberate re-inscription — only ordinary error handling.
-`TrelyanInscriptionClient.inscribe()` signs internally (`inscription.py:136`), so **every call
+`TrelyanInscriptionClient.inscribe()` signs internally (`inscription.py:137`), so **every call
 re-signs**. A caller who wraps it in a retry loop for a network blip or a fee spike re-signs the
 identical `(privkey, cell_id, artifact_hash, genesis_hash)`, producing an identical M — precondition
 P2, met by accident. Nothing in the docstring warns against this.
 *Note the SDK's own two-strategy submit is NOT affected*: `sig` is computed once and the fallback at
-`inscription.py:149` re-sends the same `args` tuple rather than re-signing. The exposure is external
+`inscription.py:182` re-sends the same `args` tuple rather than re-signing. The exposure is external
 retry, not internal fallback. **Fix: document that `inscribe()` must not be wrapped in a retry, and
 provide a sign-once/submit-many entry point that caches the signed args and re-submits those bytes.**
 (b) An operator who retains a key via the general API and re-signs the same M across two builds that
@@ -216,8 +216,8 @@ existing `test_kat_private_key_does_not_leak_into_source` guardrail means the ve
 data, not embedded in source; (3) carry both natively into the recommended `trelyan-pq` Rust port
 (self-KAT at library init, `zeroize` + `subtle`, `#![forbid(unsafe_code)]` outside the FFI module).
 
-**Standards trajectory (a claims-accuracy consequence, not a bug).** Because FN-DSA will only permit
-randomized signing, **`det1024` can never be FIPS 206 conformant as specified.** Algorand owns the
+**Standards trajectory (a claims-accuracy consequence, not a bug).** FIPS 206 (FN-DSA) is unpublished; NIST's provisional
+plan permits randomized signing only, so **`det1024` would not be FIPS 206 conformant unless that changes.** Algorand owns the
 identical problem for its opcode, so any migration is coupled to Algorand's protocol roadmap and is not
 TRELYAN's to solve unilaterally. Public materials must therefore **not** claim FIPS 206 / FN-DSA
 conformance for the deterministic on-chain path (this repo's `PUBLIC_CLAIMS_HARDENING_2026-06-01.md`

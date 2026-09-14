@@ -3,7 +3,7 @@ deploy_testnet.py — TRELYAN inscription, end-to-end on Algorand TestNet.
 
 Runs the §5 TestNet checklist as one command: deploy → fund → mint a clean pure-NFT Cell →
 register (commit the full Falcon key) → inscribe with the off-chain deterministic signer against the
-LIVE falcon_verify opcode → read the record back and re-verify. Mirrors the 20/20 localnet suite, so
+LIVE falcon_verify opcode → read the record back (artifact_hash) and run the off-chain det1024 check (same pinned code, not independent). Mirrors the localnet contract suite (28 tests in CI; 20/20 on 2026-06-01), so
 it is the validated code path pointed at TestNet rather than localnet.
 
 PREREQS
@@ -126,7 +126,7 @@ def main() -> None:
     print(f"5/6 inscribing cell {cell} (sig {len(sig)} B, header 0x{sig[0]:02x}) ...")
     inscribe_args = (cell, artifact_hash, sig, b"ipfs://demo-artifact")
     try:
-        # Strategy 1 (proven on localnet 20/20): fat static_fee + manual box/asset refs, no simulate.
+        # Strategy 1 (the contract LocalNet suite's parameters): fat static_fee + manual box/asset refs, no simulate.
         client.send.inscribe(
             args=inscribe_args,
             # validity_window=1000 (max): the inscribe is opcode-heavy (falcon_verify + OpUp simulate),
@@ -153,7 +153,7 @@ def main() -> None:
             raise
     print(f"inscribed cell {cell}")
 
-    # 6. read back + re-verify (I3): on-chain record matches, and the signature re-verifies off-chain.
+    # 6. read back (I3): the on-chain artifact_hash matches, and the signature passes the off-chain det1024 check (same pinned code, not independent).
     # The inscription box is already written by step 5; this readonly read-back is a convenience, so a
     # transient timing failure here must NOT mask the success.
     try:
@@ -167,8 +167,8 @@ def main() -> None:
         print(f"(note: read-back call hit {type(e).__name__}: {e} — the inscription box is already "
               f"written on-chain; verify it directly on the explorer.)")
     assert falcon_det1024.verify_compressed(sig, pk, m), "off-chain re-verify failed!"
-    print(f"\nVERIFIED on TestNet: app {app_id}, cell {cell} — inscription written on-chain and the "
-          f"Falcon-1024 signature re-verifies. {EXPLORER}/application/{app_id}/")
+    print(f"\nInscription written on TestNet: app {app_id}, cell {cell} (accepted by the AVM falcon_verify); the "
+          f"signature also passes the off-chain det1024 check (same pinned code, not independent). {EXPLORER}/application/{app_id}/")
 
 
 if __name__ == "__main__":

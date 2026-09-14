@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that the deployed application is what the committed source builds.
+"""Verify the deployed approval program against the committed approval TEAL (clear-state is not compared).
 
 This check is deliberately capable of FAILING. Its predecessor was not: the
 reviewer example pinned a constant that had been copied from the deployed
@@ -26,8 +26,8 @@ lie consistently across both. Pass --compile-url pointing at an independent
 node (or a local `goal clerk compile`) to split that trust. The comparison is
 only as strong as the weaker of the two sources.
 
-Exit codes:  0 deployment matches committed source
-             1 DRIFT - deployment differs from committed source
+Exit codes:  0 deployed approval program is what the committed approval TEAL assembles to
+             1 DRIFT - deployed approval program differs from what the committed approval TEAL assembles to
              2 could not complete the check (network, missing artifact, ...)
 """
 
@@ -238,7 +238,7 @@ def main() -> int:
 
     print()
     if expected == deployed:
-        print(f"MATCH - application {args.app_id} is running the committed source.")
+        print(f"MATCH - the approval program of application {args.app_id} is what the committed approval TEAL assembles to.")
         return 0
 
     print_awaiting_redeploy(
@@ -264,19 +264,19 @@ def print_awaiting_redeploy(
     App 763809096 cannot be patched in place (Update/Delete are blocked, I1/I5).
     The one-shot checklist is BLOCKERS.md.
     """
-    print(f"DRIFT - application {app_id} is NOT running the committed source.")
-    print(f"  committed source builds to : {expected_hash}  ({expected_len} B)")
+    print(f"DRIFT - the approval program of application {app_id} is NOT what the committed approval TEAL assembles to.")
+    print(f"  committed TEAL assembles to: {expected_hash}  ({expected_len} B)")
     print(f"  chain is actually serving  : {deployed_hash}  ({deployed_len} B)")
     print()
     print(f"AWAITING TESTNET REDEPLOY of app {app_id}.")
-    print("  This is not a silent skip. The live program predates the committed")
+    print("  This is not a silent skip. The live approval program predates the committed")
     print("  contract. Update/Delete are blocked, so this app cannot be patched")
     print("  in place. Deploy a NEW TestNet app from the committed TEAL, then")
     print("  retarget APP_ID / PINNED_ON_CHAIN_SHA512_256. Checklist: BLOCKERS.md")
     print("  Local source-to-TEAL gates can stay green; chain match cannot until then.")
     print()
-    print("  Do not treat any review of this source as a review of the live")
-    print("  application until the follow-up workflow is green.")
+    print("  Do not treat any review of this source as a review of the live app's")
+    print("  approval program until the follow-up workflow is green (clear-state is not compared).")
 
 
 if __name__ == "__main__":

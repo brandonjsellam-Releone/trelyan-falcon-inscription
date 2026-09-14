@@ -4,8 +4,8 @@ Why this exists
 ---------------
 `examples/interop_algo_pqc_kit.py` passed a Falcon *signature* into `inscribe()`'s third
 positional parameter -- which is a *private key*. The client re-derives M and re-signs
-internally (inscription.py:135-136), so the argument reached
-`falcon.py:192  raise ValueError("privkey must be 2305 bytes, got ...")`.
+internally (inscription.py:136-137), so the argument reached
+`falcon.py:210  raise ValueError("privkey must be 2305 bytes, got ...")`.
 
 The example could not run in EITHER branch, and nothing caught it, because no test in this
 repo imports or otherwise touches `examples/`. Its own docstring conceded "NOT yet executed
