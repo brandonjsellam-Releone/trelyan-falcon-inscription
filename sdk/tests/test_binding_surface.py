@@ -3,8 +3,10 @@ Guard: the C binding surface stays inside the allowlisted subset of algorand/fal
 
 WHY THIS TEST EXISTS
 ────────────────────────────────────────────────────────────────────────────────────────────────
-The pinned build (`algorand/falcon` @ ce15e75b, which IS tag v0.1.0 — the release go-algorand
-vendors) contains a confirmed out-of-bounds read in `falcon_det1024_convert_compressed_to_ct`:
+The pinned build (`algorand/falcon` @ ce15e75b, which IS tag v0.1.0 — the version go-algorand's
+go.mod requires; go-algorand does not vendor it, checked 2026-09-14, see
+third_party/falcon-det1024/PROVENANCE.md) contains a confirmed out-of-bounds read in
+`falcon_det1024_convert_compressed_to_ct`:
 it computes `sig_compressed_len - 2`, which wraps to SIZE_MAX on a short input, after which
 `comp_decode`'s `v >= max_in_len` guard can never fire. Proven by varying only out-of-buffer
 memory: the pinned build returns -2 / **0 (success!)** / 0 / -2 depending on adjacent bytes,

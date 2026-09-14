@@ -61,7 +61,9 @@ jobs:
         with:
           python-version: "3.13"
 
-      # The pinned Falcon source, byte-exact to the commit go-algorand vendors. Without this the
+      # The pinned Falcon source: algorand/falcon@ce15e75b, the commit tag v0.1.0 resolves to.
+      # go-algorand's go.mod requires that version; go-algorand does not vendor it (checked
+      # 2026-09-14, see third_party/falcon-det1024/PROVENANCE.md). Without this the
       # release gate ran `pytest` with no shared library, every lib-gated test SKIPPED, and the
       # 15-test floor was satisfied entirely by tests that touch no cryptography — after which the
       # artifact was signed and SLSA-attested. Locally that is 59 passed, 19 skipped: the gate goes
