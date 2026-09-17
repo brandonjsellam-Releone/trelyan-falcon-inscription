@@ -13,9 +13,11 @@ name: TestNet redeploy
 #   any MainNet mnemonic or token
 #
 # Dispatch: Actions → TestNet redeploy → Run workflow → type TESTNET.
-# Success is verify_deployment.py MATCH at 709 B (or whatever the committed
-# TEAL assembles to that day) on the NEW app id printed in the log.
-# Then retarget APP_ID / PINNED_ON_CHAIN_SHA512_256 (BLOCKERS.md).
+# Success is verify_deployment.py MATCH on every component it compares (approval and
+# clear-state programs, both state schemas, extra-program-pages; approval program at
+# 709 B or whatever the committed TEAL assembles to that day) on the NEW app id printed
+# in the log. Then retarget APP_ID / PINNED_ON_CHAIN_SHA512_256 /
+# PINNED_CLEAR_STATE_SHA512_256 (BLOCKERS.md).
 # Live follow-up jobs stay red until that retarget lands.
 
 on:
@@ -90,7 +92,7 @@ jobs:
           python deploy_testnet.py
 
       # create() writes app_id before mint/register/inscribe. If a later step
-      # fails, the new app still exists and bytecode match is still the goal.
+      # fails, the new app still exists and a verify_deployment.py MATCH is still the goal.
       - name: Require a numeric app id from the deploy step
         if: always() && !cancelled() && steps.deploy.conclusion != 'skipped'
         run: |
@@ -101,7 +103,7 @@ jobs:
           fi
           echo "new TestNet app id: $app_id"
 
-      - name: Assembled committed approval TEAL must MATCH the approval program of the new app
+      - name: The new app must MATCH the committed artifacts (programs, state schemas, extra-program-pages)
         if: always() && !cancelled() && steps.deploy.conclusion != 'skipped' && steps.deploy.outputs.app_id != ''
         run: |
           app_id="${{ steps.deploy.outputs.app_id }}"
@@ -110,7 +112,7 @@ jobs:
           rc=$?
           set -e
           if [ "$rc" != "0" ]; then
-            echo "::error::new app $app_id approval program is not what the committed approval TEAL assembles to (exit $rc). See BLOCKERS.md."
+            echo "::error::new app $app_id does not MATCH the committed artifacts (exit $rc; 1 = the log names each differing component, 2 = could not check). See BLOCKERS.md."
             exit "$rc"
           fi
 
@@ -120,11 +122,11 @@ jobs:
           app_id="${{ steps.deploy.outputs.app_id }}"
           echo "MATCH on new TestNet app $app_id is the redeploy success criterion."
           if [ "${{ steps.deploy.outcome }}" != "success" ]; then
-            echo "::warning::deploy_testnet.py did not finish (register/inscribe may have failed). Bytecode match is still what closes the drift."
+            echo "::warning::deploy_testnet.py did not finish (register/inscribe may have failed). A verify_deployment.py MATCH is still what closes the drift."
           fi
           echo "The previous app is unchanged (I1/I5). Retarget:"
           echo "  contracts/verify_deployment.py  DEFAULT_APP_ID"
-          echo "  sdk/examples/verify_trelyan.py  APP_ID + PINNED_ON_CHAIN_SHA512_256"
+          echo "  sdk/examples/verify_trelyan.py  APP_ID + PINNED_ON_CHAIN_SHA512_256 + PINNED_CLEAR_STATE_SHA512_256"
           echo "  README.md, REVIEWER.md, sdk/docs/DEMO.md, ROADMAP.md, AUDIT_READINESS.md"
           echo "  BLOCKERS.md — close the OPEN section once TestNet follow-up is green"
           echo "Explorer: https://lora.algokit.io/testnet/application/${app_id}"

@@ -7,9 +7,10 @@ and improve the pattern.
 ## Project status (honest)
 
 - **Reference implementation.** Contract suite 28/28 on LocalNet in CI (run 33836856910,
-  2026-09-04); the 20/20 of 2026-06-01 was the earlier contract. TestNet app `770964251`'s approval program is
-  byte-for-byte what the committed approval TEAL assembles to (deployed 2026-09-03, closing the `763809096`
-  drift; the clear-state program is not compared) — see [`BLOCKERS.md`](BLOCKERS.md). **Not externally audited;
+  2026-09-04); the 20/20 of 2026-06-01 was the earlier contract. TestNet app `770964251`'s approval and clear-state
+  programs are byte-for-byte what the committed TEAL assembles to, and its state schemas and extra-program-pages
+  equal the committed artifacts (`contracts/verify_deployment.py`; deployed 2026-09-03, closing the `763809096`
+  drift; the app's global-state contents (including the admin address), box contents and creator are not compared) — see [`BLOCKERS.md`](BLOCKERS.md). **Not externally audited;
   not on MainNet.**
 - **Currently solo-maintained** by Brandon J. Sellam. The project is actively
   **seeking a co-maintainer** (cryptography / Algorand smart-contract review).

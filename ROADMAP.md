@@ -7,7 +7,7 @@ not commitments.
 - Reference contract (`contracts/inscription.py`), AVM v12 — compiles; its 28-test
   suite runs on LocalNet in CI (last run on `main` 28/28, 2026-09-04). The 20/20 hand
   run of 2026-06-01 predates the 2026-06-16 contract change.
-- Deployed on Algorand TestNet (app `770964251`); its approval program is what the committed approval TEAL assembles to (`verify_deployment.py`; clear-state not compared).
+- Deployed on Algorand TestNet (app `770964251`); its approval and clear-state programs are what the committed TEAL assembles to, and its state schemas and extra-program-pages equal the committed artifacts (`verify_deployment.py`; the app's global-state contents (including the admin address), box contents and creator are not compared).
 - Spec v0.2, threat model + invariant->test->code traceability, localnet
   validation record, Falcon encoding/budget notes.
 - Continuous integration (`.github/workflows/ci.yml`): the committed TEAL checked

@@ -17,7 +17,7 @@ on:
   workflow_dispatch: {}
 
 # Merge-gate split (2026-08-30). Local jobs in THIS workflow are the required
-# merge gates (plus rust-ci.yml). Live TestNet bytecode match is a separate
+# merge gates (plus rust-ci.yml). Live TestNet deployment match is a separate
 # follow-up in testnet-followup.yml: it still runs and still fails on drift.
 # It went GREEN on 2026-09-03 when app 770964251 was deployed from the committed
 # artifact, closing the 763809096 drift. Kept out of the required gates because it
@@ -226,7 +226,8 @@ jobs:
     #
     # It asserts the containers BUILD, RUN, and report "0 not checked" - i.e. every check they
     # claim to perform actually executed. It does NOT assert a particular verdict: whether the
-    # deployed approval program is what the committed approval TEAL assembles to is testnet-followup.yml's job, and encoding
+    # deployed app matches the committed artifacts (approval and clear-state programs, state
+    # schemas, extra-program-pages) is testnet-followup.yml's job, and encoding
     # the drift that existed until 2026-09-03 here would have made this job wrong once the redeploy landed.
     #
     # So this job stays valid across the redeploy, and it CAN fail: it goes red if a container
@@ -324,7 +325,7 @@ jobs:
               print("Live TestNet match is a separate follow-up — see BLOCKERS.md.")
               sys.exit(1)
           print("Local merge gates passed (skipped = schedule-only exclusions).")
-          print("Live TestNet bytecode match is NOT in this set. It lives in")
+          print("Live TestNet deployment match is NOT in this set. It lives in")
           print("testnet-followup.yml, which went green on 2026-09-03 when app")
           print("770964251 replaced the drifted 763809096. See BLOCKERS.md.")
           PY

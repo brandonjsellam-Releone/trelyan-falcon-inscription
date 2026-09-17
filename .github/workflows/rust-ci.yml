@@ -271,5 +271,5 @@ jobs:
               print("Rust merge gates failed: " + ", ".join(failed))
               sys.exit(1)
           print("Rust merge gates passed (lint, test+KAT, MSRV, supply-chain).")
-          print("Live TestNet bytecode match is a separate follow-up — see BLOCKERS.md.")
+          print("Live TestNet deployment match is a separate follow-up — see BLOCKERS.md.")
           PY

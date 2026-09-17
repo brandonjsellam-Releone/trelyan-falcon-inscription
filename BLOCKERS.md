@@ -107,8 +107,8 @@ MainNet:
 2. Or Actions → **trelyan-pq CI** → **Run workflow** (`testnet-e2e`).
 
 Both fail closed with the table above if the secret is missing. Neither prints
-the mnemonic. Success is a **new** TestNet app id whose assembled bytecode
-**MATCH**es at **709 B**. Then continue at step 5 below.
+the mnemonic. Success is a **new** TestNet app id on which `verify_deployment.py` prints
+**MATCH** for every component it compares (approval program **709 B**). Then continue at step 5 below.
 
 ### One-shot redeploy checklist (Brandon, or the keyed job above)
 
@@ -162,7 +162,8 @@ Faucet: https://bank.testnet.algorand.network/ — a few ALGO is enough.
 
    - Actions → **TestNet redeploy** → type `TESTNET`. This path runs
      `contracts/deploy_testnet.py` and then
-     `verify_deployment.py --app-id <NEW>` (must MATCH / 709 B).
+     `verify_deployment.py --app-id <NEW>` (must MATCH on every compared component;
+     approval program 709 B).
    - Actions → **trelyan-pq CI** → **Run workflow** (`testnet-e2e`). That path
      uses `sdk/examples/quickstart.py` and also prints a new app id.
 
@@ -173,7 +174,9 @@ Faucet: https://bank.testnet.algorand.network/ — a few ALGO is enough.
    python contracts/verify_deployment.py --app-id <NEW_APP_ID>
    ```
 
-   Success is `MATCH` and **709 B** (or whatever the committed TEAL assembles
+   Success is `MATCH` on every component the script compares (approval and
+   clear-state programs, both state schemas, extra-program-pages), with the
+   approval program at **709 B** (or whatever the committed TEAL assembles
    to on that day) on both sides. Exit 1 is still drift. Exit 2 is “could not
    check” — do not treat that as a match.
 
@@ -182,7 +185,7 @@ Faucet: https://bank.testnet.algorand.network/ — a few ALGO is enough.
    | What | Where |
    |---|---|
    | Default app id | `contracts/verify_deployment.py` (`DEFAULT_APP_ID`) |
-   | Reviewer script | `sdk/examples/verify_trelyan.py` (`APP_ID`, `PINNED_ON_CHAIN_SHA512_256`) |
+   | Reviewer script | `sdk/examples/verify_trelyan.py` (`APP_ID`, `PINNED_ON_CHAIN_SHA512_256`, `PINNED_CLEAR_STATE_SHA512_256`) |
    | Status / explorer links | `README.md`, `REVIEWER.md`, `sdk/docs/DEMO.md`, `ROADMAP.md`, `AUDIT_READINESS.md` |
    | This blocker | close the section below once the follow-up is green |
 
@@ -190,7 +193,7 @@ Faucet: https://bank.testnet.algorand.network/ — a few ALGO is enough.
    pretend it implements the current source.
 
 7. **Confirm the follow-up is green.**
-   `TestNet follow-up` / `Committed approval TEAL vs deployed approval program` and
+   `TestNet follow-up` / `Committed artifacts vs deployed app - programs, state schemas, extra pages` and
    `Live TestNet verification` must both exit 0. Then this item is closed.
    After that, branch protection **may** require those checks; until then it
    must not.

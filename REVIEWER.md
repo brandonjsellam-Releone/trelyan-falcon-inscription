@@ -4,7 +4,7 @@
 *our reports*; it is not an independent-implementation check. What you still trust: the `trelyan-pq`
 package and the scripts in this repository (they are short — read them first); the algod endpoint
 (`verify_trelyan.py` reads everything through one provider, while
-`contracts/verify_deployment.py --compile-url` can split assembly from the deployed-program read); and
+`contracts/verify_deployment.py --compile-url` can split assembly from the deployed-app read); and
 the pinned `algorand/falcon@ce15e75b` C source, which is also what the AVM `falcon_verify` opcode runs —
 so on-chain acceptance is a sign/verify round-trip within one implementation, not independent
 verification (`AUDIT_READINESS.md` §6).
@@ -26,6 +26,8 @@ public inputs. Deeper analysis lives in `TRELYAN_PROTOCOL_SPEC_v0.2.md` and
 |---|---|
 | TestNet application | `770964251` (asset `770964264`) |
 | Approval-program fingerprint | `sha512_256 = 6fa5cee145762e4a0c2ba93738a0e6f51e93b02c71f23e4e663ac6d73b981c4b` (709 B; `verify_trelyan.py` asserts this — Update is blocked, so it is fixed) |
+| Clear-state-program fingerprint | `sha512_256 = 8292475190892234698c4449d07ef6a6d92f0dad7a8667ee19d3343f00de130b` (4 B; pin recorded 2026-09-14; `verify_trelyan.py` asserts this) |
+| State schemas, extra pages | global 1 uint + 1 byte-slice, local 0 + 0, extra-program-pages 0 (`contracts/verify_deployment.py` compares these with `contracts/out/TrelyanInscription.arc56.json` and the assembled program sizes) |
 | Pinned Falcon source | `algorand/falcon` commit `ce15e75bceb372867daf6b8e81918ab6978686eb` |
 | Source-tree digest | `sha512_256 = c6adf487…` (27 files); `deterministic.c = 601390dc…` |
 | FP backend (pinned) | `FALCON_FPEMU=1`, `FALCON_FPNATIVE=0` (integer-only emulated fixed point) |
@@ -41,12 +43,12 @@ public inputs. Deeper analysis lives in `TRELYAN_PROTOCOL_SPEC_v0.2.md` and
 pip install trelyan-pq
 python3 sdk/examples/verify_trelyan.py
 ```
-*Hermetic alternative* (pins python 3.13 + `trelyan-pq` 0.1.0 from PyPI — the only published release, which predates this tree's 0.2.2 SDK; read-only): `docker build -f Dockerfile.verify -t trelyan-verify . && docker run --rm trelyan-verify`. For the **full** offline rebuild — compile the pinned Falcon lib + byte-identity KAT + digest gate, all in one container, then the on-chain check: `docker build -f Dockerfile.repro -t trelyan-repro . && docker run --rm trelyan-repro sh scripts/verify_all.sh` runs Axes A–D and prints one PASS/FAIL (the CI job `reviewer-containers` builds both images — the `repro` build runs the byte-identity KAT — and runs `Dockerfile.verify`: 18 passed, 0 failed, 0 not checked in run 33836856910 on `f8ae52c`, 2026-09-04; it syntax-checks `scripts/verify_all.sh` but does not execute it, so the last full `repro` run on record is the 4/4 of 2026-06-17).
+*Hermetic alternative* (pins python 3.13 + `trelyan-pq` 0.1.0 from PyPI — the only published release, which predates this tree's 0.2.2 SDK; read-only): `docker build -f Dockerfile.verify -t trelyan-verify . && docker run --rm trelyan-verify`. For the **full** offline rebuild — compile the pinned Falcon lib + byte-identity KAT + digest gate, all in one container, then the on-chain check: `docker build -f Dockerfile.repro -t trelyan-repro . && docker run --rm trelyan-repro sh scripts/verify_all.sh` runs Axes A–D and prints one PASS/FAIL (the CI job `reviewer-containers` builds both images — the `repro` build runs the byte-identity KAT — and runs `Dockerfile.verify`: 18 passed, 0 failed, 0 not checked in run 33836856910 on `f8ae52c`, 2026-09-04, before the script gained its three clear-state checks; it syntax-checks `scripts/verify_all.sh` but does not execute it, so the last full `repro` run on record is the 4/4 of 2026-06-17).
 Read-only. Confirms: the package constants (domain tag, 102-byte message, `0xBA` det-header, sig ≤1423 /
 pubkey 1793); offline golden vectors (`sha512_256`, `build_message`, box names `k_`/`o_`/`i_`); the **live**
-TestNet app `770964251` (prints its approval program's `sha512_256` fingerprint — compare it with the assembled
-`contracts/out/TrelyanInscription.approval.teal`, or your own assembled compile of `contracts/inscription.py`; the clear-state program is not compared); the registered 1793-byte Falcon public keys in box storage; and a byte-exact
-local reconstruction of the domain-separated message `M` a live inscription must have signed. On 2026-09-03, against the newly deployed app, this returned **18/18 PASS** — 1 registered cell (`770964264`) and 1 on-chain inscription — including the check now labelled `deployed approval program is what the committed approval TEAL assembles to`. (The same script returned 17 passed / 1 failed against the superseded app `763809096`, whose program predated this source; that failure is what the 2026-09-03 redeploy closed.)
+TestNet app `770964251` (prints its approval and clear-state programs' `sha512_256` fingerprints and checks each against its pin and against the assembled
+`contracts/out/TrelyanInscription.approval.teal` / `.clear.teal` — or compare them with your own assembled compile of `contracts/inscription.py`; the state schemas and extra-program-pages are compared by `contracts/verify_deployment.py`, not by this script); the registered 1793-byte Falcon public keys in box storage; and a byte-exact
+local reconstruction of the domain-separated message `M` a live inscription must have signed. On 2026-09-03, against the newly deployed app, this returned **18/18 PASS** — 1 registered cell (`770964264`) and 1 on-chain inscription — including the check now labelled `deployed approval program is what the committed approval TEAL assembles to`. (The same script returned 17 passed / 1 failed against the superseded app `763809096`, whose program predated this source; that failure is what the 2026-09-03 redeploy closed.) On 2026-09-17, with the three clear-state checks added, a local run against app `770964251` returned **21 passed, 0 failed, 0 not checked**.
 
 ### 2. Signer byte-identity KAT (offline — proves determinism)
 Build the pinned Falcon library, then:
