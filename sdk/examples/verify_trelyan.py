@@ -114,13 +114,20 @@ check("approval program fetched", len(ap) > 0, f"{len(ap)} bytes")
 fp = t.sha512_256(ap).hex()
 check("deployed app not replaced since the 2026-09-03 pin", fp == PINNED_ON_CHAIN_SHA512_256, fp[:16] + "...")
 print(f"        approval program sha512_256: {fp}")
-# The clear-state program, the same way. A missing field reads as empty and FAILS the checks below
-# rather than raising, so an algod that omits it cannot end the run with a traceback.
-cp = base64.b64decode(app["params"].get("clear-state-program") or "")
-check("clear-state program fetched", len(cp) > 0, f"{len(cp)} bytes")
-cfp = t.sha512_256(cp).hex()
-check("deployed clear-state program matches its 2026-09-14 pin", cfp == PINNED_CLEAR_STATE_SHA512_256, cfp[:16] + "...")
-print(f"        clear-state program sha512_256: {cfp}")
+# The clear-state program, the same way. An absent or empty field is NOT CHECKED (exit 2), never a
+# FAIL: no program was read, so nothing can be said to differ from the pin or the committed TEAL.
+# contracts/verify_deployment.py treats the same response as "could not check" too.
+_cp_field = app["params"].get("clear-state-program")
+cp = base64.b64decode(_cp_field) if _cp_field else b""
+if _cp_field:
+    check("clear-state program fetched", len(cp) > 0, f"{len(cp)} bytes")
+    cfp = t.sha512_256(cp).hex()
+    check("deployed clear-state program matches its 2026-09-14 pin", cfp == PINNED_CLEAR_STATE_SHA512_256, cfp[:16] + "...")
+    print(f"        clear-state program sha512_256: {cfp}")
+else:
+    _no_clear = f"algod returned no clear-state-program for app {APP_ID}"
+    not_checked("clear-state program fetched", _no_clear)
+    not_checked("deployed clear-state program matches its 2026-09-14 pin", _no_clear)
 
 # The claim that actually matters: is the deployed approval program what the committed approval TEAL assembles to?
 # Answering it requires assembling the committed TEAL, so it is only possible from a repo
@@ -145,9 +152,14 @@ else:
                 f"(set TRELYAN_COMMITTED_TEAL to override)")
     print("        Run contracts/verify_deployment.py from a repo clone to compare the deployed")
     print("        approval and clear-state programs against fresh assemblies of the committed TEAL,")
-    print("        and the state schemas and extra-program-pages against the committed artifacts.")
+    print("        the state schemas against the committed ARC-56 spec, and extra-program-pages against")
+    print("        the minimum the assembled programs need.")
 
-if COMMITTED_CLEAR_TEAL.exists():
+if not cp:
+    # The redeploy banner below is only for a program that was actually read and differs.
+    not_checked("deployed clear-state program is what the committed clear-state TEAL assembles to",
+                "no clear-state program was read from the app")
+elif COMMITTED_CLEAR_TEAL.exists():
     _built_clear = assemble(COMMITTED_CLEAR_TEAL)
     _built_clear_fp = t.sha512_256(_built_clear).hex()
     check("deployed clear-state program is what the committed clear-state TEAL assembles to", _built_clear_fp == cfp, f"committed clear-state TEAL assembles to {_built_clear_fp[:16]}...")
