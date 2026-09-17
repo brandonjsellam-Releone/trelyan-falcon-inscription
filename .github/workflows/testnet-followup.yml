@@ -54,7 +54,7 @@ jobs:
           rc=$?
           set -e
           if [ "$rc" = "1" ]; then
-            echo "::error::verify_trelyan.py reported a FAILED check against app 770964251 (see the FAIL lines). If it is the approval or clear-state program, the live app differs from the committed TEAL: AWAITING TESTNET REDEPLOY, see BLOCKERS.md."
+            echo "::error::verify_trelyan.py reported a FAILED check against app 770964251 (see the FAIL lines). If a FAIL line is one of the two 'deployed ... program is what the committed ... TEAL assembles to' checks, the live app differs from the committed TEAL: AWAITING TESTNET REDEPLOY, see BLOCKERS.md. A pin FAIL alone means the app or the pin constant changed."
           fi
           exit "$rc"
         # Read-only. No account, no mnemonic, no secrets.
@@ -88,7 +88,8 @@ jobs:
             echo "::error::AWAITING TESTNET REDEPLOY of app 770964251. The live app differs from the committed artifacts in the component(s) named on its 'differing:' line. See BLOCKERS.md."
           fi
           exit "$rc"
-        # Exit 1 = drift: the approval program, clear-state program, global or local state schema, or
-        #          extra-program-pages of the deployed app differs from the committed artifacts.
+        # Exit 1 = drift: the deployed approval or clear-state program differs from what the committed
+        #          TEAL assembles to, a deployed state schema differs from the committed ARC-56 spec's,
+        #          or extra-program-pages differs from the minimum the assembled programs need.
         # Exit 2 = could not check (network, missing artifact, missing field). Distinct on purpose:
         # an unreachable node must never be reported as agreement, nor as drift.

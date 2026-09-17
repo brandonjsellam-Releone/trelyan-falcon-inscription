@@ -244,7 +244,8 @@ jobs:
 
   # Single required check for this workflow. Branch protection should require THIS
   # job (and ci.yml's "Required merge gates (local)"). falcon-ct is observation-only
-  # and is deliberately omitted. Live TestNet match is testnet-followup.yml.
+  # and is deliberately omitted. The live TestNet comparison (programs, state schemas, extra pages)
+  # is testnet-followup.yml.
   required-merge-gates:
     name: Required merge gates (rust)
     if: always() && !cancelled()
@@ -271,5 +272,5 @@ jobs:
               print("Rust merge gates failed: " + ", ".join(failed))
               sys.exit(1)
           print("Rust merge gates passed (lint, test+KAT, MSRV, supply-chain).")
-          print("Live TestNet deployment match is a separate follow-up — see BLOCKERS.md.")
+          print("The live TestNet comparison (programs, state schemas, extra pages) is a separate follow-up - see BLOCKERS.md.")
           PY
