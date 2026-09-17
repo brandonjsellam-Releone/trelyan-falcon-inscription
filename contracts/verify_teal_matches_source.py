@@ -54,7 +54,7 @@ warrant very different responses:
 
   * TRACEABILITY drift - instructions identical, only comments and source references
     differ. Bytecode is unaffected, so nothing deployed is wrong; but an auditor following
-    `// inscription.py:156` lands on the wrong line, and the repository's claim to commit
+    `// inscription.py:NNN` lands on the wrong line, and the repository's claim to commit
     "both source and TEAL" (constitution section 5) is no longer true of the tree in front
     of them.
 
@@ -68,8 +68,8 @@ forms in two different places. Getting either wrong produces a large, entirely s
 diff, so the exact invocation is part of the artifact and is pinned below:
 
   * The .teal comments carry the path as typed. Compiling from the repository root
-    (`puyapy contracts/inscription.py`) emits `// contracts/inscription.py:156`, while the
-    committed artifacts carry `// inscription.py:156`. That single difference accounts for
+    (`puyapy contracts/inscription.py`) emits `// contracts/inscription.py:NNN`, while the
+    committed artifacts carry `// inscription.py:NNN`. That single difference accounts for
     124 differing lines - all of them cosmetic, none of them a real change.
 
   * The .puya.map `sources` entry is the source path RELATIVE TO THE OUT-DIR. The committed
