@@ -18,7 +18,12 @@ THREAT_MODEL_AND_TRACEABILITY.md and contracts/verify_teal_matches_source.py sai
 TEAL carries `// inscription.py:156`. `contracts/out/` stopped carrying that comment when it was
 regenerated on 2026-08-27 (`14515d4`), and line 156 of the contract is blank. Those sentences give
 the comment's FORM, not a line, so they now say `NNN`, the placeholder the verifier's docstring
-already used for the same comment.
+already used for the same comment. Those three, README.md and contracts/requirements.txt also said
+a repository-root compile gives "124 differing lines". That was the approval TEAL when the phrase
+was written (`58b61ff`, 2026-08-16): 62 `// inscription.py:` comments, each removed and re-added.
+At `205d874` the approval TEAL carries 67, and a root compile with the pinned puya changes those
+67 lines and the ARC-56 JSON line that embeds that TEAL. The five places now say 67, and check 6
+ties that number to `contracts/out/`.
 
 WHAT IS CHECKED
 ---------------
@@ -44,12 +49,19 @@ WHAT IS CHECKED
    commit. The file must still be the blob that commit holds, so the banner cannot go stale
    while every needle happens to survive.
 5. The extracted count is non-zero, includes AUDIT_READINESS.md, and equals the table size.
+6. CONTRIBUTING.md, README.md, THREAT_MODEL_AND_TRACEABILITY.md, contracts/requirements.txt and
+   contracts/verify_teal_matches_source.py each state how many lines of the approval TEAL a
+   repository-root compile changes: one per `// inscription.py:` comment. Each must state it
+   exactly once, as "N lines of the approval TEAL", with N equal to the number of lines holding
+   that comment in the committed approval TEAL; none may use the old "N differing lines" form;
+   and the ARC-56 JSON must embed that TEAL on one line. N is read from `contracts/out/`, not
+   from a compile: the teal-matches-source CI job is what ties `contracts/out/` to the compiler.
 
 The checks are themselves mutation-tested in this file: a contract whose functions move, a
 citation nobody reviewed, a citation that was deleted, another copy of a needle landing on a
-cited line, a range whose needles all occur elsewhere too, and an exemption planted in a live
-document each make the real test functions above fail (the functions are re-run against
-monkeypatched inputs, not re-implemented).
+cited line, a range whose needles all occur elsewhere too, an exemption planted in a live
+document, and a stated line count that no longer matches the TEAL each make the real test
+functions above fail (the functions are re-run against monkeypatched inputs, not re-implemented).
 
 WHAT IS NOT CHECKED
 -------------------
@@ -88,7 +100,9 @@ test_the_scan_skips_what_the_cited_documents_sweep_skips holds them to that.
 from __future__ import annotations
 
 import ast
+import base64
 import hashlib
+import json
 import re
 import sys
 from collections.abc import Iterable, Mapping
@@ -329,6 +343,18 @@ CONTRACT_BLOB_AT: dict[str, str] = {
 }
 BANNER = re.compile(r"Line numbers are against `contracts/inscription\.py` at `([0-9a-f]{7,40})`")
 
+# Check 6. puya writes the source path as typed into one `// inscription.py:NNN` comment per source
+# reference, so a compile from the repository root changes every line that holds one.
+APPROVAL_TEAL = "contracts/out/TrelyanInscription.approval.teal"
+ARC56_JSON = "contracts/out/TrelyanInscription.arc56.json"
+SOURCE_REFERENCE = "// inscription.py:"
+ROOT_COMPILE_DOCS = (
+    "CONTRIBUTING.md", "README.md", "THREAT_MODEL_AND_TRACEABILITY.md",
+    "contracts/requirements.txt", "contracts/verify_teal_matches_source.py",
+)
+STATED_COUNT = re.compile(r"(\d+) lines of the approval TEAL")
+OLD_COUNT_FORM = re.compile(r"\d+[ -](?:differing|cosmetically-different) lines")
+
 
 # ---------------------------------------------------------------------------------------------
 # Extraction
@@ -408,6 +434,16 @@ def _scanned_documents() -> dict[str, str]:
 def _target_lines() -> dict[str, list[str]]:
     # read_text uses universal newlines, so a CRLF checkout (core.autocrlf=true) reads the same.
     return {t: (REPO / t).read_text(encoding="utf-8").splitlines() for t in TARGETS}
+
+
+def _approval_teal() -> str:
+    return (REPO / APPROVAL_TEAL).read_text(encoding="utf-8")
+
+
+def _prose(text: str) -> str:
+    """Leading `#` markers dropped and whitespace collapsed, so a sentence wrapped across comment
+    lines reads as one."""
+    return _collapse(" ".join(re.sub(r"^\s*#+", "", line) for line in text.splitlines()))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -626,6 +662,35 @@ def test_the_extractor_recognises_every_citation_form():
     assert not result.orphaned
 
 
+def test_each_stated_root_compile_line_count_is_the_committed_count():
+    """Check 6: the build instructions' "N lines of the approval TEAL" is the committed TEAL's count."""
+    count = sum(SOURCE_REFERENCE in line for line in _approval_teal().splitlines())
+    assert count, f"{APPROVAL_TEAL} holds no {SOURCE_REFERENCE!r} line; the check would be vacuous"
+    docs = _scanned_documents()
+    wrong = []
+    for doc in ROOT_COMPILE_DOCS:
+        assert doc in docs, f"{doc} is no longer scanned"
+        text = _prose(docs[doc])
+        stated = [int(n) for n in STATED_COUNT.findall(text)]
+        old = OLD_COUNT_FORM.findall(text)
+        if stated != [count] or old:
+            wrong.append(f"  {doc}: states {stated}, old form {old}")
+    assert not wrong, (
+        f"{APPROVAL_TEAL} has {count} lines holding {SOURCE_REFERENCE!r}, and a repository-root "
+        "compile changes every one of them. These documents say otherwise:\n" + "\n".join(wrong)
+        + f"\n\nEach must say '{count} lines of the approval TEAL' exactly once."
+    )
+
+
+def test_the_arc56_json_embeds_the_approval_teal_on_one_line():
+    """The same sentences say a root compile also changes 'the ARC-56 JSON line that embeds that TEAL'."""
+    arc56 = (REPO / ARC56_JSON).read_text(encoding="utf-8")
+    embedded = json.loads(arc56)["source"]["approval"]
+    teal = (REPO / APPROVAL_TEAL).read_bytes().replace(b"\r\n", b"\n")
+    assert base64.b64decode(embedded, validate=True) == teal, f"{ARC56_JSON} does not embed {APPROVAL_TEAL}"
+    assert sum(embedded in line for line in arc56.splitlines()) == 1
+
+
 # ---------------------------------------------------------------------------------------------
 # Mutation tests: the real test functions above, re-run against altered inputs, must FAIL.
 # ---------------------------------------------------------------------------------------------
@@ -774,6 +839,35 @@ def test_mutation_g_an_exemption_in_a_live_document_fails(monkeypatch):
         with pytest.raises(AssertionError, match=r"must sit in a dated record") as failure:
             test_every_table_entry_is_still_cited()
         assert f"{_AR} [306]" in str(failure.value) and f"kind={kind}" in str(failure.value)
+
+
+def test_mutation_h_a_stale_root_compile_line_count_fails(monkeypatch):
+    """One source-reference comment fewer in the TEAL fails all five documents; the old
+    "124 differing lines" put back into one document, or a second statement of the right count,
+    fails that document alone."""
+    teal = _approval_teal().splitlines()
+    first = next(i for i, text in enumerate(teal) if SOURCE_REFERENCE in text)
+    with monkeypatch.context() as patch:
+        patch.setattr(_THIS_MODULE, "_approval_teal", lambda: "\n".join(teal[:first] + teal[first + 1:]))
+        with pytest.raises(AssertionError, match=r"These documents say otherwise") as failure:
+            test_each_stated_root_compile_line_count_is_the_committed_count()
+    report = str(failure.value)
+    assert all(f"  {doc}: states" in report for doc in ROOT_COMPILE_DOCS), report
+
+    docs = _scanned_documents()
+    count = sum(SOURCE_REFERENCE in text for text in teal)
+    for doc, extra, shown in (
+        ("CONTRIBUTING.md", "\nFrom the root: 124 differing lines.\n", "'124 differing lines'"),
+        ("README.md", f"\n# Again: {count} lines of the approval TEAL.\n", f"states [{count}, {count}]"),
+    ):
+        with monkeypatch.context() as patch:
+            planted = {**docs, doc: docs[doc] + extra}
+            patch.setattr(_THIS_MODULE, "_scanned_documents", lambda planted=planted: planted)
+            with pytest.raises(AssertionError, match=r"These documents say otherwise") as failure:
+                test_each_stated_root_compile_line_count_is_the_committed_count()
+        report = str(failure.value)
+        assert f"  {doc}: states" in report and shown in report, report
+        assert [d for d in ROOT_COMPILE_DOCS if f"  {d}: states" in report] == [doc], report
 
 
 def test_the_scan_skips_what_the_cited_documents_sweep_skips():
