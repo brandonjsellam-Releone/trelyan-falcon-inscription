@@ -35,8 +35,9 @@ of this tree for it. It is also the commit the SDK's KAT goldens
   as its `Origin.Hash`.
 - At both refs, `go.sum` pins `github.com/algorand/falcon v0.1.0` to
   `h1:xl832kfZ7hHG6B4p90DQynjfKFGbIUgUOnsRiMZXfAo=`. Recomputing that hash over the 27 files of
-  `src/` gives the same value (Go's `dirhash` Hash1: SHA-256 over the sorted lines
-  `<sha256 of file>  github.com/algorand/falcon@v0.1.0/<path>`, base64-encoded).
+  `src/` gives the same value (Go's `dirhash` Hash1: one line per file, ordered by path in byte
+  order, each line `<hex sha256 of file>  github.com/algorand/falcon@v0.1.0/<path>` ending in a
+  newline; the value is `h1:` + base64 of the SHA-256 of the concatenated lines).
 - `go-algorand` has **no `vendor/` directory** at either ref. The Go toolchain downloads the
   module at build time and checks it against that `go.sum` line.
 - In that source, `opFalconVerify` (`data/transactions/logic/crypto.go`) calls

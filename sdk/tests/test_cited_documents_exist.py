@@ -172,6 +172,42 @@ def test_the_provenance_record_does_not_rest_on_a_missing_document():
     )
 
 
+CODE_SUFFIXES = {".py", ".cc", ".c", ".h", ".rs", ".yml", ".yaml", ".toml", ".sh", ".ps1", ".txt"}
+
+
+def test_code_and_workflow_files_do_not_cite_a_known_absent_document():
+    """_citations() reads only *.md, so a docstring or comment could cite a missing file unseen.
+
+    On 2026-09-17 sdk/tests/test_binding_surface.py still said "See PINNED_BUILD.md and
+    FALCON_PIN_BUMP_EVIDENCE_2026-08-11.md" — a file PROVENANCE.md says does not exist — and every
+    test here passed. Outside markdown, a KNOWN_ABSENT name may only appear next to a statement
+    that it does not exist, the same rule PROVENANCE.md is held to above. This file is exempt: it
+    is the list.
+    """
+    this = Path(__file__).resolve()
+    scanned = 0
+    offenders: list[str] = []
+    for path in REPO.rglob("*"):
+        if not path.is_file() or not _keep(path) or path.suffix not in CODE_SUFFIXES:
+            continue
+        if path.resolve() == this:
+            continue
+        scanned += 1
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for name in KNOWN_ABSENT:
+            at = text.find(name)
+            while at != -1:
+                if "does not exist" not in text[max(0, at - 400) : at + 400]:
+                    offenders.append(f"{path.relative_to(REPO).as_posix()}: {name}")
+                at = text.find(name, at + len(name))
+    assert scanned >= 50, f"only {scanned} code/workflow files scanned; the walk is broken"
+    assert not offenders, (
+        "these non-markdown files name a document that does not exist, without saying so:\n  "
+        + "\n  ".join(sorted(offenders))
+        + "\nRemove the citation, or state next to it that the document does not exist."
+    )
+
+
 def test_the_honesty_ledger_does_not_claim_an_unwritten_document():
     """It said `[x] Lifecycle policy drafted` and named a file that has never existed."""
     spec = (REPO / "TRELYAN_PROTOCOL_SPEC_v0.2.md").read_text(encoding="utf-8")

@@ -6,8 +6,12 @@
 //                                         const void *data, size_t datalen);
 //   (algorand/falcon, deterministic.c; returns 0 == VALID, non-zero == rejected.)
 //
-//   This is the SAME code path Algorand's native `falcon_verify` opcode runs on-chain, and the
-//   same symbol the python ctypes wrapper (sdk/src/trelyan_pq/falcon.py,
+//   This is the same C function, from the same source commit, that go-algorand's `falcon_verify`
+//   opcode reaches through cgo (opFalconVerify -> crypto.FalconVerifier.VerifyBytes ->
+//   falcon.PublicKey.Verify), but only after Go-side checks this harness deliberately skips: a
+//   1793-byte public key and a non-empty signature. Here it is built with sanitizers, not with the
+//   `#cgo CFLAGS` in the module's falcon.go, and which build any node runs is not checked. It is
+//   also the same symbol the python ctypes wrapper (sdk/src/trelyan_pq/falcon.py,
 //   contracts/falcon_det1024.py) binds. Fuzzing it directly with ASan/UBSan exercises the C
 //   memory safety of the compressed-signature DECODER (header 0xBA, salt-version byte, Gaussian
 //   bit-decompression, NTT/verify) on attacker-controlled signature, public-key, and message

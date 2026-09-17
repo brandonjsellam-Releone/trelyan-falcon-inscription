@@ -210,7 +210,8 @@ auditor spends week one on the real surface, not rediscovery.
 > independent Falcon: no other signer reproduces the bytes (see the interop note in
 > `sdk/tests/test_interop_algo_pqc_kit_kat.py` — det1024 `0xBA` vs randomized `0x3A` makes
 > byte-identity impossible by construction), and no other verifier has been asked to accept them.
-> The pin is deliberate and should NOT be bumped — matching what the chain runs is the point — but
+> The pin is deliberate and should NOT be bumped — matching the commit `go-algorand`'s source resolves
+> for `falcon_verify` is the point (which build any node runs is not checked) — but
 > it means "the AVM accepted it" must never be cited as independent verification.
 
 ---

@@ -6,9 +6,11 @@ All TRELYAN signing (`trelyan_pq.falcon`) builds the deterministic Falcon-1024 l
 **Pinned commit:** `ce15e75bceb372867daf6b8e81918ab6978686eb` (committed 2023-06-08)
 
 > [!IMPORTANT]
-> **This pin is deliberate: it is the release the Algorand network itself runs.**
-> `go-algorand`'s `go.mod` requires `github.com/algorand/falcon v0.1.0`, and that tag dereferences
-> to exactly `ce15e75b`. It is the repository's only tag. Pinning here is therefore *alignment with
+> **This pin is deliberate: it is the version `go-algorand`'s `go.mod` requires, and `go.sum` pins
+> these exact bytes, for the module its `falcon_verify` opcode calls** (see
+> `third_party/falcon-det1024/PROVENANCE.md`; which build any TestNet or MainNet node runs is not
+> checked). `go-algorand`'s `go.mod` requires `github.com/algorand/falcon v0.1.0`, and that tag
+> dereferences to exactly `ce15e75b`. It is the repository's only tag. Pinning here is therefore *alignment with
 > the code that defines on-chain `falcon_verify` behaviour*, not staleness — which is the whole
 > point for a signer whose output must be accepted byte-for-byte by that verifier.
 >
@@ -26,13 +28,13 @@ All TRELYAN signing (`trelyan_pq.falcon`) builds the deterministic Falcon-1024 l
 > SDK at all** (`trelyan_pq.falcon` binds only `shake256_init_prng_from_system`, `keygen`,
 > `sign_compressed`, `verify_compressed`), so it is unreachable from TRELYAN. It *is* reachable in
 > go-algorand via `GetFixedLengthHashableRepresentation` → `ConvertToCT`, which makes it an upstream
-> matter to report rather than a reason to diverge from the network's release.
+> matter to report rather than a reason to diverge from the version `go-algorand` pins.
 >
 > Bumping was tested rather than assumed: both trees were built with `FALCON_FPEMU=1` and compared
 > over **120 signatures (12 keypairs × 10 message shapes)** plus the committed KAT — byte-identical
 > throughout, with each build accepting the other's output. So a bump would be *safe*; it would
-> simply make this repo stricter than the deployed verifier for no reachable benefit. **Any future
-> pin bump MUST still be gated on re-running the byte-identity KAT** — a silent sampler or encoding
+> simply make this repo stricter than the verifier source `go-algorand` pins for no reachable
+> benefit. **Any future pin bump MUST still be gated on re-running the byte-identity KAT** — a silent sampler or encoding
 > change would be catastrophic for a deterministic signer.
 **Source-tree digest (sha512_256, 27 files):** `c6adf4871389dfdbf3ffbd853bd9e5ce15646b821d6dc84e327ab1b3d2adc980`
 **deterministic.c (sha512_256):** `601390dc53521fc1b00eb962ea63d64c2d65bfe774450cf4ec59a3478e0a54a4`

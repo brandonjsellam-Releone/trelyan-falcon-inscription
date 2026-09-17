@@ -16,9 +16,11 @@ TRELYAN's documented position is ACCEPT-AND-DOCUMENT, and it rests on exactly on
 
     the SDK never binds that function, so the defect is not reachable from this package.
 
-The pin itself is deliberately NOT bumped — ce15e75b is the network's release, and moving to the
-untagged fix commit would make TRELYAN stricter than the deployed on-chain verifier for no
-reachable benefit. See PINNED_BUILD.md and FALCON_PIN_BUMP_EVIDENCE_2026-08-11.md.
+The pin itself is deliberately NOT bumped — ce15e75b is the commit go-algorand's go.mod and go.sum
+resolve for the module its falcon_verify opcode calls (source checked; which build any node runs
+is not checked), and moving to the untagged fix commit would make TRELYAN stricter than that
+verifier source for no reachable benefit. See PINNED_BUILD.md and
+third_party/falcon-det1024/PROVENANCE.md ("Why this commit").
 
 That makes the acceptance only as durable as the binding surface. One `lib.falcon_det1024_
 convert_compressed_to_ct` added later — reasonably, by someone implementing CT-format support —

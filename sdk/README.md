@@ -104,9 +104,10 @@ PYTHONPATH=src pytest tests -v        # pure-Python wire-format tests (no lib/ne
   provisional plan for it permits randomized signing only. The 0.1.0 PyPI metadata listed
   `fn-dsa` / `fips-206` keywords in error; they were removed from the source on 2026-08-28.
 - **Unaudited, alpha.** Contract suite 28/28 on LocalNet in the reference repo's CI (2026-09-04); deployed on
-  Algorand TestNet. TestNet acceptance runs the same pinned
-  `algorand/falcon` code (`ce15e75b`) this package's build recipe uses, so it is a consistency
-  check, not independent verification. **Not externally audited** and **not for MainNet value**.
+  Algorand TestNet. TestNet acceptance uses `go-algorand`'s verifier, whose `go.mod`
+  and `go.sum` resolve the same pinned `algorand/falcon` source (`ce15e75b`) this package's build
+  recipe uses (the node's actual build is not checked), so it is a consistency check, not
+  independent verification. **Not externally audited** and **not for MainNet value**.
   An independent audit is a precondition for any MainNet use; it would have to be a paid
   engagement or an alternative grant not yet identified, and none is engaged or funded yet (the NLnet route was declined on 2026-06-29).
 - **Native C dependency.** The signer is a `ctypes` binding to the `algorand/falcon` C library
