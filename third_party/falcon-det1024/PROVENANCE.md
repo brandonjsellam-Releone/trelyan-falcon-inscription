@@ -3,8 +3,8 @@
 Vendored copy of the **deterministic Falcon-1024 reference C implementation** that TRELYAN's
 signing path is built from, at the commit tag `v0.1.0` resolves to: the version `go-algorand`'s
 `go.mod` requires for the module its `falcon_verify` opcode calls (what was checked, and when, is
-under "Why this commit" below). This directory is a byte-for-byte subset of one pinned upstream
-commit. It is **consumed, never edited**
+under "Why this commit" below). `src/` is a byte-for-byte copy of the complete tree at one pinned
+upstream commit. It is **consumed, never edited**
 (constitution §0 Tier 2, §2.6): if upstream must change, re-vendor from a new pinned tarball and
 update this file, `SHA256SUMS`, and the KAT goldens together in one reviewed diff.
 

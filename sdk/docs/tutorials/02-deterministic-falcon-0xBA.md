@@ -27,6 +27,7 @@ assert sig[0] == 0xBA
 Sizes you can rely on (asserted in the SDK): public key **1793 B**, deterministic compressed
 signature **≤ 1423 B**, salt-version byte `0`.
 
-The signer is a thin `ctypes` binding over the `algorand/falcon` C library — the same code path
-Algorand uses for State Proofs — so the bytes are interoperable by construction. Build it once
+The signer is a thin `ctypes` binding over the `algorand/falcon` C library — the same C functions
+`go-algorand`'s source calls through cgo for State Proofs (source checked; which build nodes run is
+not) — so the bytes are interoperable by construction. Build it once
 (see the [quickstart](01-quickstart.md)).

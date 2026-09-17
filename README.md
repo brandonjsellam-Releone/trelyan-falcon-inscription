@@ -44,7 +44,8 @@ out of the required merge gates only because it needs live algod, and it is neve
 
 **[`REVIEWER.md`](REVIEWER.md)** is a 5-minute, read-only guide to checking these claims yourself — and it
 names what you still have to trust (our package and scripts, the algod endpoint, and the pinned Falcon C
-source, which the AVM verifier also runs). The short version:
+source, which is also the source `go-algorand`'s `go.mod` and `go.sum` resolve for the AVM `falcon_verify`
+opcode; which build any node runs is not checked). The short version:
 
 ```
 pip install trelyan-pq && python3 sdk/examples/verify_trelyan.py        # live TestNet + pinned-bytecode assert

@@ -8,9 +8,12 @@ checked. What was checked is source: go-algorand's go.mod requires github.com/al
 v0.1.0, that tag peels to ce15e75b, go.sum pins those bytes, and there is no vendor/ directory.
 Which build any TestNet or MainNet node runs was not checked, and PROVENANCE.md now says so.
 
-A review on 2026-09-17 found the same node-level wording in eight more files, by hand. It also
+A review on 2026-09-17 found the same node-level wording in seven more files, by hand. It also
 put the old sentence back into PROVENANCE.md and deleted the not-checked bullet: the whole SDK
-suite still passed. This file makes that mutation fail.
+suite still passed. This file makes that mutation fail. A second review that day found two more
+that no phrase below matched at the time: README.md ("which the AVM verifier also runs") and
+sdk/docs/tutorials/02-deterministic-falcon-0xBA.md ("the same code path Algorand uses for State
+Proofs"). Both now say what was checked, and both phrases are retired below.
 
 WHAT THIS DOES NOT DO
 ---------------------
@@ -47,6 +50,11 @@ RETIRED = (
     "matching what the chain runs",
     "testnet acceptance runs the same pinned",
     "the same algorand/falcon@ce15e75b code this repo pins",
+    "verifier also runs",
+    # Not "code path algorand uses": TRELYAN_PROTOCOL_SPEC_v0.2.md §1.2 says "Same Falcon code
+    # path Algorand uses for State Proofs" under an [ASSUMPTION/PLATFORM] tag, which states it
+    # as an assumption, not as a checked fact.
+    "the same code path algorand uses",
 )
 
 # The two records of the pin must keep saying what was NOT checked.

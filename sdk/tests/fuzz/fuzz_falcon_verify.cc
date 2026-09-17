@@ -8,9 +8,12 @@
 //
 //   This is the same C function, from the same source commit, that go-algorand's `falcon_verify`
 //   opcode reaches through cgo (opFalconVerify -> crypto.FalconVerifier.VerifyBytes ->
-//   falcon.PublicKey.Verify), but only after Go-side checks this harness deliberately skips: a
-//   1793-byte public key and a non-empty signature. Here it is built with sanitizers, not with the
-//   `#cgo CFLAGS` in the module's falcon.go, and which build any node runs is not checked. It is
+//   falcon.PublicKey.Verify), but only after two Go-side checks on that path. The public key must
+//   be exactly 1793 bytes: this harness always passes a 1793-byte buffer, padded or truncated from
+//   fuzz input, so the C call sees the same key shape. The signature must be non-empty: this
+//   harness deliberately skips that check, so sig_len 0 reaches C. Here it is built with
+//   sanitizers, not with the `#cgo CFLAGS` in the module's falcon.go, and which build any node
+//   runs is not checked. It is
 //   also the same symbol the python ctypes wrapper (sdk/src/trelyan_pq/falcon.py,
 //   contracts/falcon_det1024.py) binds. Fuzzing it directly with ASan/UBSan exercises the C
 //   memory safety of the compressed-signature DECODER (header 0xBA, salt-version byte, Gaussian
@@ -18,9 +21,13 @@
 //   bytes — the part the python-level Atheris harness (fuzz_encoding_atheris.py) cannot reach.
 //
 // WHAT WE MUTATE
-//   One flat fuzzer buffer is split into three attacker-controlled regions: sig, pubkey, message.
-//   We deliberately do NOT constrain lengths to the "valid" sizes (sig<=1423, pubkey==1793) so the
-//   decoder's bounds handling on short/over-long/empty inputs is exercised. Roughly half the time
+//   After two control bytes, one flat fuzzer buffer is split into two attacker-controlled regions:
+//   sig and message. The pubkey is a fixed 1793-byte buffer filled from the start of the message
+//   region, because the C function reads exactly that many bytes. The signature and message
+//   lengths are not held to valid sizes, so the decoder's bounds handling on short and empty
+//   signatures is exercised. But the signature length is data[0] % size, so it is at most 255
+//   bytes: shorter than every signature in sdk/tests/vectors/det1024_kat.json (1232 or 1233
+//   bytes), so full-length and over-long signatures are NOT reached. Roughly half the time
 //   we stamp the expected header (0xBA) + salt-version (0x00) onto the signature so the fuzzer
 //   spends cycles PAST the cheap header gate, inside the bit-unpacking that historically harbors
 //   the interesting out-of-bounds reads.
