@@ -33,7 +33,11 @@ WHAT IS CHECKED
 3. For every LIVE row, each of its needles (exact substrings of the target file) must appear
    within the cited line or range. The needles were chosen by reading the sentence: they are the
    construct the sentence names (the assert, the method, the binding), not a token that happens
-   to be nearby. Every single-line row fails when the contract moves by one line in either
+   to be nearby. Presence alone would let a citation pass on ANOTHER copy of its needle, so a
+   single-line row's needle must occur on exactly one line of its target, or the row names which
+   occurrence it means and how many there are (`occurrence=(n, of)`, counted from the top), the
+   target must hold exactly `of` and the cited line must be the n-th; and a range row must hold
+   at least one needle that occurs on exactly one line of its target. Every single-line row fails when its target moves by one line in either
    direction, and every range row fails in at least one direction (a needle sits on its first or
    last line); test_the_check_fails_when_the_contract_moves_by_one_line holds the table to that.
 4. AUDIT_READINESS.md says its line numbers are against `contracts/inscription.py` at a named
@@ -42,8 +46,10 @@ WHAT IS CHECKED
 5. The extracted count is non-zero, includes AUDIT_READINESS.md, and equals the table size.
 
 The checks are themselves mutation-tested in this file: a contract whose functions move, a
-citation nobody reviewed, and a citation that was deleted each make the real test functions
-above fail (the functions are re-run against monkeypatched inputs, not re-implemented).
+citation nobody reviewed, a citation that was deleted, another copy of a needle landing on a
+cited line, a range whose needles all occur elsewhere too, and an exemption planted in a live
+document each make the real test functions above fail (the functions are re-run against
+monkeypatched inputs, not re-implemented).
 
 WHAT IS NOT CHECKED
 -------------------
@@ -52,10 +58,23 @@ WHAT IS NOT CHECKED
   in CI, so they cannot drift without that job failing.
 * L-numbers and "line N" are only recognised in files that name `inscription.py` somewhere. A
   document that cited `(L304)` without ever naming the file would not be seen.
-* A range can move by less than its slack on its un-anchored edge and still pass, because the
-  construct is still inside the cited span. A single-line citation cannot move at all.
-* UNCHECKED rows are reviewed classifications, not checks. A `dated` row must sit in a document
-  whose filename carries its date, so this list cannot be used to exempt a live document.
+* A range can move by less than its slack on its un-anchored edge and still pass, because its
+  unique needle is still inside the cited span; its other needles may also occur elsewhere. A
+  single-line citation cannot move by any number of lines and still pass: its needle occurs on
+  one line of the target, or the target holds exactly the number of copies the row names and the
+  cited line is the n-th. Copies of a needle that swap places are not detected.
+* UNCHECKED rows are reviewed classifications, not checks. Every UNCHECKED row, of either kind,
+  must sit in a document whose filename carries a date (`*_YYYY-MM-DD.md`), so this list cannot
+  exempt a citation in a live document such as AUDIT_READINESS.md. Whether a row in a dated
+  document is classified correctly is a matter of review.
+* CI does not run this file when a change touches only root-level documents. The push and
+  pull_request path filters in `.github/workflows/ci.yml` name sdk/, contracts/, third_party/,
+  scripts/, the two Dockerfiles, ci.yml itself and BLOCKERS.md, so a change confined to root
+  documents such as AUDIT_READINESS.md, README.md, REVIEWER.md, CONTRIBUTING.md or
+  THREAT_MODEL_AND_TRACEABILITY.md triggers no job; and the two jobs that run `pytest tests`
+  (wire-format, signature-kat) skip the Monday schedule. A wrong citation added in such a change
+  first fails on the next change that does trigger CI. test_cited_documents_exist.py and
+  test_app_id_references_are_coherent.py share the gap.
 
 RELATION TO test_cited_documents_exist.py
 -----------------------------------------
@@ -107,6 +126,10 @@ class Live(NamedTuple):
     quote: str            # from the citing line (or the line before it, for a wrapped sentence)
     target: str
     needles: tuple[str, ...]
+    # Single-line rows only, and required when the needle occurs on more than one line of the
+    # target: (n, of) = the sentence means the n-th, counted from the top, of exactly `of` lines
+    # holding the needle. See stale().
+    occurrence: tuple[int, int] | None = None
 
 
 class Unchecked(NamedTuple):
@@ -239,10 +262,11 @@ LIVE: tuple[Live, ...] = (
     Live("THREAT_MODEL_AND_TRACEABILITY.md", "137",
          "`TrelyanInscriptionClient.inscribe()` signs internally (`inscription.py:137`)",
          SDK_CLIENT, ("sig = self.signer.sign(privkey, m)",)),
-    # "the fallback at :182 re-sends the same `args` tuple rather than re-signing"
+    # "the fallback at :182 re-sends the same `args` tuple rather than re-signing". The client has
+    # two `self.app.send.inscribe(` calls: the first attempt, then the fallback this names.
     Live("THREAT_MODEL_AND_TRACEABILITY.md", "182",
          "the fallback at `inscription.py:182` re-sends the same `args` tuple",
-         SDK_CLIENT, ("self.app.send.inscribe(",)),
+         SDK_CLIENT, ("self.app.send.inscribe(",), occurrence=(2, 2)),
     Live("sdk/examples/interop_algo_pqc_kit.py", "136-137",
          "re-derives M and re-signs internally (inscription.py:136-137)",
          SDK_CLIENT, ("m = build_message(self.app_id, cell_id, artifact_hash",
@@ -420,7 +444,13 @@ def match(citations: Iterable[Citation], rows: Iterable[Live | Unchecked]) -> Ma
 
 
 def stale(row: Live, target_lines: list[str]) -> str | None:
-    """None if every needle is inside the cited span of `target_lines`, else the reason."""
+    """None if the cited span of `target_lines` still holds the row's construct, else the reason.
+
+    Every needle must be inside the span. That alone passes when ANOTHER copy of a needle lands on
+    the cited line, so a single-line row's needle must also occur on exactly one line of the
+    target, or be the n-th of exactly `of` lines holding it, as the row's `occurrence` names; and a
+    range must hold at least one needle that occurs on exactly one line of the target.
+    """
     a, _, b = row.lines.partition("-")
     first, last = int(a), int(b or a)
     if not 1 <= first <= last <= len(target_lines):
@@ -429,6 +459,26 @@ def stale(row: Live, target_lines: list[str]) -> str | None:
     missing = [needle for needle in row.needles if not any(needle in text for text in span)]
     if missing:
         return f"{row.target}:{row.lines} no longer contains {missing}"
+    holders = {
+        needle: [n for n, text in enumerate(target_lines, 1) if needle in text] for needle in row.needles
+    }
+    if first != last:
+        if row.occurrence is not None:
+            return f"{row.target}:{row.lines} is a range; `occurrence` is for single-line rows only"
+        if all(len(at) > 1 for at in holders.values()):
+            return (f"every needle of {row.target}:{row.lines} also occurs outside it {holders}; "
+                    "add a needle from the construct that occurs on one line only")
+        return None
+    for needle, at in holders.items():
+        if row.occurrence is None:
+            if len(at) > 1:
+                return (f"{row.target}:{row.lines} holds {needle!r}, which is on lines {at}; name the "
+                        "occurrence the sentence means")
+            continue
+        n, of = row.occurrence
+        if len(at) != of or not 1 <= n <= of or at[n - 1] != first:
+            return (f"{row.target}:{row.lines} is not occurrence {n} of exactly {of} lines holding "
+                    f"{needle!r} (it is on lines {at})")
     return None
 
 
@@ -493,10 +543,12 @@ def test_every_table_entry_is_still_cited():
         + "\n".join(f"  {_describe(r)}\n" + "\n".join(f"      {c.where()}" for c in cites)
                     for r, cites in result.reused)
     )
-    undated = [r for r in UNCHECKED if r.kind == "dated" and not re.search(r"_\d{4}-\d{2}-\d{2}\.md$", r.doc)]
+    # Of either kind: a citation in a live document is checked or reported, never classified away.
+    undated = [r for r in UNCHECKED if not re.search(r"_\d{4}-\d{2}-\d{2}\.md$", r.doc)]
     assert not undated, (
-        "a 'dated' exemption must sit in a dated record; these are live documents:\n"
-        + "\n".join(f"  {_describe(r)}" for r in undated)
+        "an UNCHECKED row, of either kind, must sit in a dated record (*_YYYY-MM-DD.md); these "
+        "are in live documents:\n"
+        + "\n".join(f"  {_describe(r)} kind={r.kind}" for r in undated)
     )
     assert {r.kind for r in UNCHECKED} <= {"dated", "not-a-contract-line"}
 
@@ -652,6 +704,76 @@ def test_mutation_d_an_empty_scan_fails_instead_of_passing_vacuously(monkeypatch
     monkeypatch.setattr(_THIS_MODULE, "_scanned_documents", lambda: {})
     with pytest.raises(AssertionError, match=r"no inscription\.py line citations found"):
         test_the_scan_finds_exactly_as_many_citations_as_the_table_lists()
+
+
+def test_mutation_e_another_copy_of_the_needle_on_the_cited_line_fails(monkeypatch):
+    """THREAT_MODEL cites the SDK client's fallback `self.app.send.inscribe(` at :182, and the first
+    attempt holds the same text. Lines inserted above the first attempt land IT on :182 while the
+    fallback moves away. The needle is still on the cited line, so presence alone passes; the
+    occurrence rule must not. Nor may a NEW copy that lands on :182 in front of the fallback."""
+    real = _target_lines()
+    client = real[SDK_CLIENT]
+    needle = "self.app.send.inscribe("
+    holders = [n for n, text in enumerate(client, 1) if needle in text]
+    assert len(holders) == 2, holders
+    (row,) = [r for r in LIVE if r.target == SDK_CLIENT and r.needles == (needle,)]
+    assert (row.lines, row.occurrence) == (str(holders[1]), (2, 2))
+    cited = holders[1]
+    # Without `occurrence`, the row fails on the unmodified client: a repeated needle must be named.
+    undeclared = stale(row._replace(occurrence=None), client)
+    assert undeclared is not None and "name the occurrence" in undeclared, undeclared
+
+    at = holders[0] - 2   # insert after line holders[0] - 2: below every other SDK client row
+    others = [r for r in LIVE if r.target == SDK_CLIENT and r != row]
+    assert others and all(int(r.lines.rpartition("-")[2]) <= at for r in others)
+    first_attempt_moved_onto_it = client[:at] + ["        # inserted"] * (cited - holders[0]) + client[at:]
+    new_copy_in_front = client[:cited - 1] + ["            self.app.send.inscribe(  # inserted"] + client[cited - 1:]
+    for shifted in (first_attempt_moved_onto_it, new_copy_in_front):
+        # Precondition: a copy that is not the fallback sits on the cited line, so presence passes.
+        assert needle in shifted[cited - 1] and "# inserted" not in client[cited - 1]
+        with monkeypatch.context() as patch:
+            patch.setattr(_THIS_MODULE, "_target_lines", lambda shifted=shifted: {**real, SDK_CLIENT: shifted})
+            with pytest.raises(AssertionError) as failure:
+                test_every_cited_line_still_holds_its_construct()
+        report = str(failure.value)
+        assert f"is not occurrence 2 of exactly 2 lines holding {needle!r}" in report, report
+        assert [r for r in LIVE if _describe(r) in report] == [row], report
+
+
+def test_mutation_f_a_range_whose_needles_all_occur_elsewhere_fails(monkeypatch):
+    """A range row holding only a needle that also occurs outside the range proves nothing about
+    the construct, even while that needle sits inside the range."""
+    contract = _target_lines()[CONTRACT]
+    needle = "Global.genesis_hash"
+    (row,) = [r for r in LIVE if r.doc == _AR and needle in r.needles]
+    assert "-" in row.lines and stale(row, contract) is None
+    assert sum(needle in text for text in contract) > 1, "precondition: the needle is repeated"
+    weakened = row._replace(needles=(needle,))
+    monkeypatch.setattr(_THIS_MODULE, "LIVE", (*LIVE, weakened))
+    with pytest.raises(AssertionError, match=r"also occurs outside it") as failure:
+        test_every_cited_line_still_holds_its_construct()
+    assert _describe(weakened) in str(failure.value)
+
+
+def test_mutation_g_an_exemption_in_a_live_document_fails(monkeypatch):
+    """An UNCHECKED row of either kind, planted beside an unreviewed citation in AUDIT_READINESS.md,
+    silences the table and count checks; the dated-record rule is what must still fail."""
+    docs = _scanned_documents()
+    assert "(L306)" not in docs[_AR]
+    planted = {**docs, _AR: docs[_AR] + "\nPlanted: the record write (L306).\n"}
+    monkeypatch.setattr(_THIS_MODULE, "_scanned_documents", lambda: planted)
+    with pytest.raises(AssertionError, match=r"not in the reviewed table"):
+        test_every_citation_is_in_the_table()          # negative control: no row, reported
+
+    reviewed = UNCHECKED
+    for kind in ("not-a-contract-line", "dated"):
+        exemption = Unchecked(_AR, "306", "the record write (L306)", kind, "planted by this test")
+        monkeypatch.setattr(_THIS_MODULE, "UNCHECKED", (*reviewed, exemption))
+        test_every_citation_is_in_the_table()          # the exemption silences this ...
+        test_the_scan_finds_exactly_as_many_citations_as_the_table_lists()   # ... and this
+        with pytest.raises(AssertionError, match=r"must sit in a dated record") as failure:
+            test_every_table_entry_is_still_cited()
+        assert f"{_AR} [306]" in str(failure.value) and f"kind={kind}" in str(failure.value)
 
 
 def test_the_scan_skips_what_the_cited_documents_sweep_skips():
