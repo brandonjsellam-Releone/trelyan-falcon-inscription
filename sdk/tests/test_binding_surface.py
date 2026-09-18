@@ -3,8 +3,10 @@ Guard: the C binding surface stays inside the allowlisted subset of algorand/fal
 
 WHY THIS TEST EXISTS
 ────────────────────────────────────────────────────────────────────────────────────────────────
-The pinned build (`algorand/falcon` @ ce15e75b, which IS tag v0.1.0 — the release go-algorand
-vendors) contains a confirmed out-of-bounds read in `falcon_det1024_convert_compressed_to_ct`:
+The pinned build (`algorand/falcon` @ ce15e75b, which IS tag v0.1.0 — the version go-algorand's
+go.mod requires; go-algorand does not vendor it, checked 2026-09-14, see
+third_party/falcon-det1024/PROVENANCE.md) contains a confirmed out-of-bounds read in
+`falcon_det1024_convert_compressed_to_ct`:
 it computes `sig_compressed_len - 2`, which wraps to SIZE_MAX on a short input, after which
 `comp_decode`'s `v >= max_in_len` guard can never fire. Proven by varying only out-of-buffer
 memory: the pinned build returns -2 / **0 (success!)** / 0 / -2 depending on adjacent bytes,
@@ -14,9 +16,11 @@ TRELYAN's documented position is ACCEPT-AND-DOCUMENT, and it rests on exactly on
 
     the SDK never binds that function, so the defect is not reachable from this package.
 
-The pin itself is deliberately NOT bumped — ce15e75b is the network's release, and moving to the
-untagged fix commit would make TRELYAN stricter than the deployed on-chain verifier for no
-reachable benefit. See PINNED_BUILD.md and FALCON_PIN_BUMP_EVIDENCE_2026-08-11.md.
+The pin itself is deliberately NOT bumped — ce15e75b is the commit go-algorand's go.mod and go.sum
+resolve for the module its falcon_verify opcode calls (source checked; which build any node runs
+is not checked), and moving to the untagged fix commit would make TRELYAN stricter than that
+verifier source for no reachable benefit. See PINNED_BUILD.md and
+third_party/falcon-det1024/PROVENANCE.md ("Why this commit").
 
 That makes the acceptance only as durable as the binding surface. One `lib.falcon_det1024_
 convert_compressed_to_ct` added later — reasonably, by someone implementing CT-format support —

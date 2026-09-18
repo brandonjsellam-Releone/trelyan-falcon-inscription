@@ -5,7 +5,8 @@
 package and the scripts in this repository (they are short — read them first); the algod endpoint
 (`verify_trelyan.py` reads everything through one provider, while
 `contracts/verify_deployment.py --compile-url` can split assembly from the deployed-program read); and
-the pinned `algorand/falcon@ce15e75b` C source, which is also what the AVM `falcon_verify` opcode runs —
+the pinned `algorand/falcon@ce15e75b` C source, which is also the source `go-algorand`'s `go.mod` and
+`go.sum` resolve for the AVM `falcon_verify` opcode (source checked; which build nodes run is not) —
 so on-chain acceptance is a sign/verify round-trip within one implementation, not independent
 verification (`AUDIT_READINESS.md` §6).
 

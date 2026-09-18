@@ -1,8 +1,10 @@
 # PROVENANCE — `third_party/falcon-det1024/`
 
-Vendored copy of the **deterministic Falcon-1024 reference C implementation** that Algorand's
-`falcon_verify` opcode and TRELYAN's signing path are built from. This directory is a
-byte-for-byte subset of one pinned upstream commit. It is **consumed, never edited**
+Vendored copy of the **deterministic Falcon-1024 reference C implementation** that TRELYAN's
+signing path is built from, at the commit tag `v0.1.0` resolves to: the version `go-algorand`'s
+`go.mod` requires for the module its `falcon_verify` opcode calls (what was checked, and when, is
+under "Why this commit" below). `src/` is a byte-for-byte copy of the complete tree at one pinned
+upstream commit. It is **consumed, never edited**
 (constitution §0 Tier 2, §2.6): if upstream must change, re-vendor from a new pinned tarball and
 update this file, `SHA256SUMS`, and the KAT goldens together in one reviewed diff.
 
@@ -19,13 +21,37 @@ update this file, `SHA256SUMS`, and the KAT goldens together in one reviewed dif
 | Cross-check | `cd third_party/falcon-det1024 && sha256sum -c SHA256SUMS` &mdash; **27 of 27 OK**, re-verified 2026-08-30. This replaces a citation of a locally-kept evidence tree that is no longer on disk; see the note below. A command an auditor can run beats a document only one machine ever had |
 | Upstream version string | `README.txt`: "DETERMINISTIC FALCON IMPLEMENTATION — Version: 2021-12-03" |
 
-**Why this commit and not HEAD:** `ce15e75b` is the commit `go-algorand`'s release vendors — it is
-what the AVM `falcon_verify` opcode actually runs, and it is the commit the SDK's KAT goldens
-(`sdk/tests/vectors/det1024_kat.json`, `pinned_commit`) were produced from. Upstream resumed
-activity in 2026 and its default branch has moved. **Do not bump the pin.** The reason is the
-two sentences above and needs no separate document: this commit is what the AVM `falcon_verify`
-opcode runs, and it is what the KAT goldens were produced from. Bumping it would break byte
-identity against the chain and against `sdk/tests/vectors/det1024_kat.json` in the same move.
+**Why this commit and not HEAD:** `go-algorand`'s `go.mod` requires `github.com/algorand/falcon`
+at `v0.1.0`, that tag resolves to `ce15e75b`, and `go-algorand`'s `go.sum` pins exactly the bytes
+of this tree for it. It is also the commit the SDK's KAT goldens
+(`sdk/tests/vectors/det1024_kat.json`, `pinned_commit`) were produced from. `go-algorand` does
+**not** vendor it. What was checked on 2026-09-14, from primary sources:
+
+- `go-algorand`'s `go.mod` requires `github.com/algorand/falcon v0.1.0`, with no `replace`
+  directive, on `master` (`3f804559`) and at tag `v4.3.0-stable` (`3e5d694b`).
+- `v0.1.0` is an annotated tag (object `ebbdb56e`) that peels to commit
+  `ce15e75bceb372867daf6b8e81918ab6978686eb` (`git ls-remote https://github.com/algorand/falcon`).
+  `https://proxy.golang.org/github.com/algorand/falcon/@v/v0.1.0.info` records the same commit
+  as its `Origin.Hash`.
+- At both refs, `go.sum` pins `github.com/algorand/falcon v0.1.0` to
+  `h1:xl832kfZ7hHG6B4p90DQynjfKFGbIUgUOnsRiMZXfAo=`. Recomputing that hash over the 27 files of
+  `src/` gives the same value (Go's `dirhash` Hash1: one line per file, ordered by path in byte
+  order, each line `<hex sha256 of file>  github.com/algorand/falcon@v0.1.0/<path>` ending in a
+  newline; the value is `h1:` + base64 of the SHA-256 of the concatenated lines).
+- `go-algorand` has **no `vendor/` directory** at either ref. The Go toolchain downloads the
+  module at build time and checks it against that `go.sum` line.
+- In that source, `opFalconVerify` (`data/transactions/logic/crypto.go`) calls
+  `crypto.FalconVerifier.VerifyBytes` (`crypto/falconWrapper.go`), which calls this module's
+  `PublicKey.Verify` (`src/falcon.go`), a cgo call into `falcon_det1024_verify_compressed`.
+- **Not checked:** which `go-algorand` version or build any TestNet or MainNet node runs. Every
+  statement above is about source code and published module metadata, not about a running node.
+
+Upstream resumed activity in 2026 and its default branch has moved. **Do not bump the pin.** The
+reason needs no separate document: this commit is the one `go-algorand`'s source resolves for
+`falcon_verify` (checked as above), and it is what the KAT goldens were produced from. Bumping it
+would make TRELYAN's signer source differ from that verifier source, and would leave
+`sdk/tests/vectors/det1024_kat.json` recording a `pinned_commit` this tree no longer holds, in the
+same move.
 
 > **A citation removed on 2026-08-30.** This paragraph pointed at
 > `FALCON_PIN_BUMP_EVIDENCE_2026-08-11.md` for that reasoning. **That file does not exist** &mdash;
