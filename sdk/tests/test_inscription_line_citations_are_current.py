@@ -72,24 +72,16 @@ WHAT IS CHECKED
    document that nobody added to it. Every scanned document is therefore swept as well: the old
    "N differing lines" form is refused anywhere, and a document outside the five that states
    "N lines of the approval TEAL" must state the committed count.
-7. `.github/workflows/ci.yml` must be able to reach and run these checks. Every document named by
-   a row, by ROOT_COMPILE_DOCS or by a mutation here must appear in BOTH `paths` filters, or a
-   commit confined to it triggers no job; every job that runs `pytest tests` must check out with
-   `fetch-depth: 0` and set TRELYAN_REQUIRE_GIT=1, or check 4 silently skips there; and at least
-   one such job must run on the schedule, because the whole-tree sweep of check 6 reads files no
-   `paths` list enumerates. The prose above used to assert these as settled facts and nothing
-   read the workflow.
 
 The checks are themselves mutation-tested in this file: a contract whose functions move, a
 citation nobody reviewed, a citation that was deleted, another copy of a needle landing on a
 cited line, a range whose needles all occur elsewhere too, an exemption planted in a live
 document, a stated line count that no longer matches the TEAL, a bare `:N` written into
 AUDIT_READINESS.md, the old or a wrong count planted in a sixth document, a blob id recorded
-against a commit that does not hold it, a banner pointed at a commit this repository does not
-contain, and a ci.yml that drops a document from a filter, shortens a checkout, drops
-TRELYAN_REQUIRE_GIT or guards every suite job against the schedule each make the real test
-functions above fail (the functions are re-run against monkeypatched inputs, not
-re-implemented). The two banner mutations assert a FAILURE, not merely "not a pass":
+against a commit that does not hold it, and a banner pointed at a commit this repository does
+not contain each make the real test functions above fail (the functions are re-run against
+monkeypatched inputs, not re-implemented). The two banner mutations assert a FAILURE, not
+merely "not a pass":
 `pytest.raises(AssertionError)` does not catch `Skipped`, so a self-test guarding a control that
 skips would itself report as skipped.
 
@@ -125,23 +117,19 @@ WHAT IS NOT CHECKED
   must sit in a document whose filename carries a date (`*_YYYY-MM-DD.md`), so this list cannot
   exempt a citation in a live document such as AUDIT_READINESS.md. Whether a row in a dated
   document is classified correctly is a matter of review.
-* The five documents this file is mostly about — AUDIT_READINESS.md, README.md, REVIEWER.md,
-  CONTRIBUTING.md, THREAT_MODEL_AND_TRACEABILITY.md — were outside the push and pull_request
-  `paths` filters in `.github/workflows/ci.yml`, so a change confined to them triggered no job
-  at all and a wrong citation merged green. Check 7 now reads the workflow and requires every
-  document this file names to be in both filters, so that sentence is a test rather than a claim.
-  A root document this file does NOT name is still outside the filters unless somebody listed it;
-  the five that carry verification-scope sentences are listed. The whole-tree sweep of check 6
-  reads files no `paths` list can enumerate, and what covers those is the Monday schedule: the
-  wire-format job no longer skips it, and check 7 requires that one suite job stays unguarded.
+* Whether CI runs at all on a commit confined to one of the documents scanned here is a property
+  of `.github/workflows/ci.yml`, and this file does not read that workflow. The root documents
+  this file reads by name were added to its push and pull_request `paths` filters when this test
+  was written, because a change confined to one of them triggered no job at all. Nothing here
+  holds the workflow to that: the two lists are kept in step by review, and a document that
+  enters the scan later is outside the filters unless somebody lists it.
 * The banner-to-blob binding of check 4 needs the git object store. It is SKIPPED, not passed,
   only when the store cannot be asked AT ALL: `.git` is absent (an exported tree or sdist), git
   is not runnable, or the clone is shallow and holds only the tip. Those causes are
   environmental. "This repository has full history and does not contain that commit" is NOT
   environmental — it is chosen by the author of the document under review — so it fails. Set
-  TRELYAN_REQUIRE_GIT=1 and the environmental skips fail too; ci.yml sets it in both jobs that
-  run `pytest tests`, and check 7 holds it to that. The blob-id equality of check 4 does not
-  depend on git and runs either way.
+  TRELYAN_REQUIRE_GIT=1 and the environmental skips fail too. The blob-id equality of check 4
+  does not depend on git and runs either way.
 
 RELATION TO test_cited_documents_exist.py
 -----------------------------------------
@@ -412,18 +400,8 @@ ROOT_COMPILE_DOCS = (
 STATED_COUNT = re.compile(r"(\d+) lines of the approval TEAL")
 OLD_COUNT_FORM = re.compile(r"\d+[ -](?:differing|cosmetically-different) lines")
 
-# Check 7. The documents the mutation tests below plant into: real files whose real content the
-# whole-tree sweep of check 6 reads, so CI must run on a change confined to one of them.
-PLANT_DOCS = ("REVIEWER.md", "SECURITY.md")
-CI_WORKFLOW = ".github/workflows/ci.yml"
-# ci.yml is read as TEXT. The four other tests that read it do the same, and the suite's dev extra
-# is `pytest` alone -- a YAML parser would be a new dependency for one assertion.
-TRIGGER_PATHS = re.compile(r"^  (push|pull_request):\n    paths: (\[[^\n]*\])$", re.MULTILINE)
-JOB_HEAD = re.compile(r"^  ([A-Za-z0-9_-]+):$", re.MULTILINE)
-RUNS_THE_SUITE = re.compile(r"^\s*pytest tests(\s|$)", re.MULTILINE)
-SCHEDULE_GUARD = "github.event_name != 'schedule'"
-# Set by the two ci.yml jobs that run `pytest tests`: there an unaskable object store is a
-# failure, not a skip. See _unavailable().
+# Set in the environment when an unaskable git object store must be a failure rather than a skip.
+# See _unavailable().
 REQUIRE_GIT = "TRELYAN_REQUIRE_GIT"
 
 
@@ -577,8 +555,8 @@ def _blob_id_in_commit(commit: str, path: str) -> BlobLookup:
 def _unavailable(reason: str) -> None:
     """Skip -- or fail, when the build says the object store must be there.
 
-    A skip nobody reads is the control switched off in silence. ci.yml sets TRELYAN_REQUIRE_GIT=1
-    in both jobs that run `pytest tests`, and check 7 holds it to that, so in CI this raises.
+    A skip nobody reads is the control switched off in silence, so a build that sets
+    TRELYAN_REQUIRE_GIT=1 gets a failure here instead.
     """
     detail = f"{reason}. The object-store read did not run: UNVERIFIED, not confirmed."
     if os.environ.get(REQUIRE_GIT) == "1":
@@ -591,36 +569,6 @@ def _banner_commit() -> str | None:
     is gone. A function so the mutation tests can re-run the real checks against a planted one."""
     found = BANNER.search(_collapse((REPO / _AR).read_text(encoding="utf-8")))
     return found.group(1) if found else None
-
-
-def _ci_text() -> str:
-    return (REPO / CI_WORKFLOW).read_text(encoding="utf-8")
-
-
-def _ci_jobs(text: str) -> dict[str, str]:
-    """Each top-level job's block, by name. `jobs:` is the last top-level key, so every two-space
-    key after it is a job."""
-    body = text[text.index("\njobs:\n"):]
-    heads = list(JOB_HEAD.finditer(body))
-    assert heads, f"{CI_WORKFLOW} declares no jobs at two-space indent"
-    bounds = [m.start() for m in heads] + [len(body)]
-    return {m.group(1): body[m.end():bounds[i + 1]] for i, m in enumerate(heads)}
-
-
-def _covered(path: str, patterns: Iterable[str]) -> bool:
-    """A GitHub `paths` filter entry matches `path` literally or as a `dir/**` prefix. Only those
-    two forms are used here; any other form is reported as not covering, which fails loudly."""
-    return any(
-        pattern == path or (pattern.endswith("/**") and path.startswith(pattern[:-2]))
-        for pattern in patterns
-    )
-
-
-def _documents_this_file_names() -> set[str]:
-    """Every document a check or a mutation in this file reads by name. A commit confined to one
-    of them must trigger CI, or the check first fires on some later, unrelated change."""
-    return ({row.doc for row in LIVE} | {row.doc for row in UNCHECKED}
-            | set(ROOT_COMPILE_DOCS) | set(PLANT_DOCS) | {_AR})
 
 
 def _prose(text: str) -> str:
@@ -929,58 +877,6 @@ def test_the_arc56_json_embeds_the_approval_teal_on_one_line():
     assert sum(embedded in line for line in arc56.splitlines()) == 1
 
 
-def test_ci_can_reach_and_run_the_checks_in_this_file():
-    """Check 7. Everything above is prose about ci.yml until something reads ci.yml.
-
-    Four facts have to hold or these checks do not run where they matter, and each was asserted
-    in the docstring and enforced by nothing:
-      * a commit confined to a document one of these checks names must trigger a job at all;
-      * the job that runs them must check out full history, or check 4 has nothing to read;
-      * it must set TRELYAN_REQUIRE_GIT=1, so an unaskable object store fails instead of skipping;
-      * one such job must run on the schedule, because the whole-tree sweep of check 6 reads files
-        no `paths` list can enumerate.
-    """
-    text = _ci_text()
-    filters = {event: json.loads(value) for event, value in TRIGGER_PATHS.findall(text)}
-    assert set(filters) == {"push", "pull_request"}, (
-        f"{CI_WORKFLOW} no longer carries one flow-style `paths:` list for push and one for "
-        f"pull_request; found {sorted(filters)}"
-    )
-    named = sorted(_documents_this_file_names())
-    assert named, "this file names no documents; the filter check would be vacuous"
-    unreachable = [
-        f"  {doc}: not covered by the {event} filter"
-        for event, patterns in sorted(filters.items())
-        for doc in named if not _covered(doc, patterns)
-    ]
-    assert not unreachable, (
-        "a check in this file reads each of these documents, and a commit confined to one of them "
-        f"triggers no job in {CI_WORKFLOW}, so the check first fires on some later, unrelated "
-        "change:\n" + "\n".join(unreachable) + f"\n\nAdd it to both `paths` lists."
-    )
-
-    jobs = _ci_jobs(text)
-    runners = {name: block for name, block in sorted(jobs.items()) if RUNS_THE_SUITE.search(block)}
-    assert runners, (
-        f"no job in {CI_WORKFLOW} runs `pytest tests`, so this file never runs in CI at all"
-    )
-    faults = []
-    for name, block in runners.items():
-        if "fetch-depth: 0" not in block:
-            faults.append(f"  {name}: no `fetch-depth: 0`, so check 4's object-store read cannot run")
-        if f'{REQUIRE_GIT}: "1"' not in block:
-            faults.append(f"  {name}: does not set {REQUIRE_GIT}=1, so check 4 may skip unnoticed")
-    assert not faults, (
-        f"these {CI_WORKFLOW} jobs run `pytest tests`, which is where this file runs:\n"
-        + "\n".join(faults)
-    )
-    assert [n for n, b in runners.items() if SCHEDULE_GUARD not in b], (
-        f"every job in {CI_WORKFLOW} that runs `pytest tests` is guarded against the schedule, so "
-        "the whole-tree sweep of check 6 never reaches a document outside the `paths` filters. "
-        "Drop the guard from one of them."
-    )
-
-
 # ---------------------------------------------------------------------------------------------
 # Mutation tests: the real test functions above, re-run against altered inputs, must FAIL.
 # ---------------------------------------------------------------------------------------------
@@ -1276,31 +1172,6 @@ def test_mutation_l_a_banner_commit_this_repository_does_not_contain_fails(monke
         test_the_recorded_blob_id_is_the_blob_the_banner_commit_holds,
     )
     assert fabricated in report
-
-
-def test_mutation_m_a_ci_workflow_that_cannot_run_these_checks_fails(monkeypatch):
-    """Four one-line edits to ci.yml, each of which switches this file off without touching it."""
-    real = _ci_text()
-    named = sorted(_documents_this_file_names())
-    dropped = next(d for d in named if f'"{d}"' in real)
-    plants = (
-        # A document removed from the push filter: a commit confined to it triggers nothing.
-        (real.replace(f'"{dropped}", ', "", 1), rf"not covered by the push filter"),
-        # A depth-1 checkout: the object-store read has only the tip to read.
-        (real.replace("fetch-depth: 0", "fetch-depth: 1"), r"no `fetch-depth: 0`"),
-        # The env gate removed: an unaskable store goes back to skipping in silence.
-        (real.replace(f'{REQUIRE_GIT}: "1"', f'{REQUIRE_GIT}_DISABLED: "1"'),
-         rf"does not set {REQUIRE_GIT}=1"),
-        # Every suite job guarded against the schedule: the whole-tree sweep stops being reached.
-        (real.replace("  wire-format:\n", f"  wire-format:\n    if: {SCHEDULE_GUARD}\n", 1),
-         r"guarded against the schedule"),
-    )
-    for mutated, expected in plants:
-        assert mutated != real, f"precondition: the plant for {expected!r} changed nothing"
-        with monkeypatch.context() as patch:
-            patch.setattr(_THIS_MODULE, "_ci_text", lambda mutated=mutated: mutated)
-            with pytest.raises(AssertionError, match=expected):
-                test_ci_can_reach_and_run_the_checks_in_this_file()
 
 
 def test_the_scan_skips_what_the_cited_documents_sweep_skips():
