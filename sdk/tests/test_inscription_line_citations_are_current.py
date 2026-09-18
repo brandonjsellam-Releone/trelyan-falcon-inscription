@@ -30,7 +30,8 @@ WHAT IS CHECKED
 1. Every citation of an `inscription.py` line number, in every form the repository uses, is
    extracted from every text file that names `inscription.py`:
        `contracts/inscription.py:404-412`      path:N and path:N-M
-       `_build_message` from `:319`            a bare :N in a file that also has a path:N
+       `_build_message` from `:319`            a bare :N, in any markdown file and in any
+                                               other file that also has a path:N
        (L288)  (L409–412)  (≈L71-73)           L-numbers, hyphen or en dash
        (C4, line ~194)  Lines 71–79, 100, 207  the word "line", including lists
 2. Each one must match exactly one row of LIVE or UNCHECKED, by document, line span, and a quote
@@ -47,7 +48,11 @@ WHAT IS CHECKED
    last line); test_the_check_fails_when_the_contract_moves_by_one_line holds the table to that.
 4. AUDIT_READINESS.md says its line numbers are against `contracts/inscription.py` at a named
    commit. The file must still be the blob that commit holds, so the banner cannot go stale
-   while every needle happens to survive.
+   while every needle happens to survive. CONTRACT_BLOB_AT records that blob id, and on its own
+   it is a self-consistent pair: the shortest path to green after a contract change would be to
+   overwrite the value under the existing key, leaving the banner naming a revision the file is
+   no longer at. So the recorded id is also read back out of the git object store, as
+   `git rev-parse <banner commit>:contracts/inscription.py`, and must agree.
 5. The extracted count is non-zero, includes AUDIT_READINESS.md, and equals the table size.
 6. CONTRIBUTING.md, README.md, THREAT_MODEL_AND_TRACEABILITY.md, contracts/requirements.txt and
    contracts/verify_teal_matches_source.py each state how many lines of the approval TEAL a
@@ -56,12 +61,18 @@ WHAT IS CHECKED
    that comment in the committed approval TEAL; none may use the old "N differing lines" form;
    and the ARC-56 JSON must embed that TEAL on one line. N is read from `contracts/out/`, not
    from a compile: the teal-matches-source CI job is what ties `contracts/out/` to the compiler.
+   Those five names are a closed list, so the same stale claim could re-enter through a sixth
+   document that nobody added to it. Every scanned document is therefore swept as well: the old
+   "N differing lines" form is refused anywhere, and a document outside the five that states
+   "N lines of the approval TEAL" must state the committed count.
 
 The checks are themselves mutation-tested in this file: a contract whose functions move, a
 citation nobody reviewed, a citation that was deleted, another copy of a needle landing on a
 cited line, a range whose needles all occur elsewhere too, an exemption planted in a live
-document, and a stated line count that no longer matches the TEAL each make the real test
-functions above fail (the functions are re-run against monkeypatched inputs, not re-implemented).
+document, a stated line count that no longer matches the TEAL, a bare `:N` written into
+AUDIT_READINESS.md, the old or a wrong count planted in a sixth document, and a blob id recorded
+against a commit that does not hold it each make the real test functions above fail (the
+functions are re-run against monkeypatched inputs, not re-implemented).
 
 WHAT IS NOT CHECKED
 -------------------
@@ -70,6 +81,16 @@ WHAT IS NOT CHECKED
   in CI, so they cannot drift without that job failing.
 * L-numbers and "line N" are only recognised in files that name `inscription.py` somewhere. A
   document that cited `(L304)` without ever naming the file would not be seen.
+* A bare `:N` is recognised in every markdown file that names `inscription.py`, and in any other
+  file that also carries a `path:N` form. A bare `:N` in a non-markdown file that carries no
+  `path:N` — a `.py`, `.yml` or `.txt` — is not read as a citation, because there a bare `:N` is
+  usually a port, a slice or a cron field: `.github/workflows/ci.yml` says "algod on :4001" today.
+* The two files the table points INTO — the TARGETS, `contracts/inscription.py` and
+  `sdk/src/trelyan_pq/inscription.py` — and this file itself are excluded from the scan, so a
+  line citation written inside one of them is not checked; none of the three holds one today.
+  Only the ten suffixes in TEXT_SUFFIXES are read, so a citation in a file with any other
+  extension is not seen either. The docstring above says "every text file that names
+  inscription.py" and means every SCANNED one; these are the exclusions.
 * A range can move by less than its slack on its un-anchored edge and still pass, because its
   unique needle is still inside the cited span; its other needles may also occur elsewhere. A
   single-line citation cannot move by any number of lines and still pass: its needle occurs on
@@ -79,14 +100,19 @@ WHAT IS NOT CHECKED
   must sit in a document whose filename carries a date (`*_YYYY-MM-DD.md`), so this list cannot
   exempt a citation in a live document such as AUDIT_READINESS.md. Whether a row in a dated
   document is classified correctly is a matter of review.
-* CI does not run this file when a change touches only root-level documents. The push and
-  pull_request path filters in `.github/workflows/ci.yml` name sdk/, contracts/, third_party/,
-  scripts/, the two Dockerfiles, ci.yml itself and BLOCKERS.md, so a change confined to root
-  documents such as AUDIT_READINESS.md, README.md, REVIEWER.md, CONTRIBUTING.md or
-  THREAT_MODEL_AND_TRACEABILITY.md triggers no job; and the two jobs that run `pytest tests`
-  (wire-format, signature-kat) skip the Monday schedule. A wrong citation added in such a change
-  first fails on the next change that does trigger CI. test_cited_documents_exist.py and
-  test_app_id_references_are_coherent.py share the gap.
+* The five documents this file is mostly about — AUDIT_READINESS.md, README.md, REVIEWER.md,
+  CONTRIBUTING.md, THREAT_MODEL_AND_TRACEABILITY.md — were outside the push and pull_request
+  `paths` filters in `.github/workflows/ci.yml`, so a change confined to them triggered no job
+  at all and a wrong citation merged green. They are in both filters now. Any OTHER root document
+  is still outside them, and the two jobs that run `pytest tests` (wire-format, signature-kat)
+  still skip the Monday schedule, so a citation added in such a change first fails on the next
+  change that does trigger CI. test_cited_documents_exist.py and
+  test_app_id_references_are_coherent.py share what is left of the gap.
+* The banner-to-blob binding of check 4 needs the git object store. It is SKIPPED, not passed,
+  when `.git` is absent (an exported tree or sdist) or when git cannot resolve the banner commit
+  — a shallow clone holds only the tip. The `pytest tests` jobs check out with `fetch-depth: 0`
+  so that it runs there; read the `-rs` skip list, never the pass count, to see whether it did.
+  The blob-id equality of check 4 does not depend on git and runs either way.
 
 RELATION TO test_cited_documents_exist.py
 -----------------------------------------
@@ -104,6 +130,7 @@ import base64
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -398,13 +425,18 @@ def extract_citations(docs: Mapping[str, str]) -> list[Citation]:
     for doc, text in sorted(docs.items()):
         if not MENTION.search(text):
             continue
-        has_path_form = PATH_FORM.search(text) is not None
+        # A bare `:N` is a citation in prose. Markdown is prose, so read it there whether or not
+        # the same document also spells out a path: AUDIT_READINESS.md, the document this file
+        # exists for, writes `(L288)` and carries no `path:N` at all, and a `:305` added to it must
+        # not be invisible. Elsewhere a bare `:N` is usually a port or a slice, so outside markdown
+        # it is only read in a file that already cites by path. See WHAT IS NOT CHECKED.
+        reads_bare_form = doc.endswith(".md") or PATH_FORM.search(text) is not None
         lines = text.splitlines()
         for n, line in enumerate(lines, 1):
             window = _collapse((lines[n - 2] if n > 1 else "") + " " + line)
             found: list[tuple[str, str, str | None]] = []   # (span, as written, path)
             found += [(_span(m["a"], m["b"]), m[0], m["path"]) for m in PATH_FORM.finditer(line)]
-            if has_path_form:
+            if reads_bare_form:
                 found += [(_span(m["a"], m["b"]), m[0], None) for m in BARE_FORM.finditer(line)]
             found += [(_span(m["a"], m["b"]), m[0], None) for m in L_FORM.finditer(line)]
             for m in LINE_WORD_FORM.finditer(line):
@@ -438,6 +470,27 @@ def _target_lines() -> dict[str, list[str]]:
 
 def _approval_teal() -> str:
     return (REPO / APPROVAL_TEAL).read_text(encoding="utf-8")
+
+
+def _blob_id_in_commit(commit: str, path: str) -> str | None:
+    """The blob id `commit` holds for `path`, or None when the object store cannot answer.
+
+    None means UNVERIFIABLE, never "agrees": no `.git` (an exported tree), no git on PATH, or a
+    shallow clone that does not hold `commit`. Callers skip on None; they must not pass.
+    """
+    if not (REPO / ".git").exists():        # a worktree's .git is a file, not a directory
+        return None
+    try:
+        done = subprocess.run(              # noqa: S603 - fixed argv, no shell, no user input
+            ["git", "-C", str(REPO), "rev-parse", "--verify", "--quiet", f"{commit}:{path}"],
+            capture_output=True, text=True, timeout=120, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if done.returncode != 0:
+        return None
+    found = done.stdout.strip()
+    return found if re.fullmatch(r"[0-9a-f]{40}", found) else None
 
 
 def _prose(text: str) -> str:
@@ -620,6 +673,36 @@ def test_audit_readiness_names_the_contract_revision_its_lines_are_against():
     )
 
 
+def test_the_recorded_blob_id_is_the_blob_the_banner_commit_holds():
+    """CONTRACT_BLOB_AT must not be a self-consistent pair.
+
+    The test above proves "the contract is the blob this dict records for string X". Nothing in it
+    ties X to a commit, so after a contract change the shortest path to green is to overwrite the
+    value under the existing key -- and the banner then names a revision the file is not at, while
+    the suite stays green. Read the id back out of the object store instead.
+    """
+    sheet = _collapse((REPO / _AR).read_text(encoding="utf-8"))
+    found = BANNER.search(sheet)
+    assert found, f"{_AR} no longer says which revision of {CONTRACT} its line numbers are against"
+    commit = found.group(1)
+    assert commit in CONTRACT_BLOB_AT, (
+        f"{_AR} says its line numbers are against {commit}, which this test has no blob id for."
+    )
+    recorded = CONTRACT_BLOB_AT[commit]
+    in_commit = _blob_id_in_commit(commit, CONTRACT)
+    if in_commit is None:
+        pytest.skip(
+            f"cannot read {commit}:{CONTRACT} from the object store (no .git, no git on PATH, or a "
+            f"shallow clone). {recorded} is UNVERIFIED against {commit} in this run, not confirmed."
+        )
+    assert in_commit == recorded, (
+        f"CONTRACT_BLOB_AT records {recorded} for {commit}, but {commit} holds {in_commit} for "
+        f"{CONTRACT}. {_AR}'s banner therefore names a revision whose contract is not the one the "
+        "line numbers were checked against. Do not edit the recorded id to match the file: point "
+        "the banner at the commit the file is actually at, and record THAT commit's blob id."
+    )
+
+
 def test_the_check_fails_when_the_contract_moves_by_one_line():
     """Proves the needle check can fail, for every row, before trusting it to pass."""
     targets = _target_lines()
@@ -679,6 +762,27 @@ def test_each_stated_root_compile_line_count_is_the_committed_count():
         f"{APPROVAL_TEAL} has {count} lines holding {SOURCE_REFERENCE!r}, and a repository-root "
         "compile changes every one of them. These documents say otherwise:\n" + "\n".join(wrong)
         + f"\n\nEach must say '{count} lines of the approval TEAL' exactly once."
+    )
+
+    # ROOT_COMPILE_DOCS is a closed list, so the loop above protects exactly those five names --
+    # the same defect this file exists to stop, one level up. Sweep the whole tree as well: the
+    # superseded form is refused wherever it is written, and a sixth document may state the count
+    # only if it states the committed one.
+    elsewhere = []
+    for doc, text in sorted(docs.items()):
+        prose = _prose(text)
+        if old := OLD_COUNT_FORM.findall(prose):
+            elsewhere.append(f"  {doc}: uses the superseded form {old}")
+        if doc in ROOT_COMPILE_DOCS:
+            continue                        # already held to the stricter rule above
+        if off := [n for n in (int(x) for x in STATED_COUNT.findall(prose)) if n != count]:
+            elsewhere.append(f"  {doc}: states {off}, not {count}")
+    assert not elsewhere, (
+        f"a root compile changes {count} lines of {APPROVAL_TEAL} (one per {SOURCE_REFERENCE!r}). "
+        "These documents are outside the reviewed five and still say otherwise:\n"
+        + "\n".join(elsewhere)
+        + f"\n\nSay '{count} lines of the approval TEAL', or drop the claim. If the document is a "
+        "build instruction that should be held to the stricter rule, add it to ROOT_COMPILE_DOCS."
     )
 
 
@@ -868,6 +972,74 @@ def test_mutation_h_a_stale_root_compile_line_count_fails(monkeypatch):
         report = str(failure.value)
         assert f"  {doc}: states" in report and shown in report, report
         assert [d for d in ROOT_COMPILE_DOCS if f"  {d}: states" in report] == [doc], report
+
+
+def test_mutation_i_a_bare_line_citation_in_the_audit_sheet_is_seen(monkeypatch):
+    """A bare `:N` added to AUDIT_READINESS.md reaches the table checks.
+
+    It did not before: BARE_FORM only fired in a document that also carried a `path:N`, and the
+    sheet carries none -- its style is `contracts/inscription.py` plus `(L288)`. The markdown rule
+    in extract_citations is what closes that, and this pins it.
+    """
+    docs = _scanned_documents()
+    assert ":305" not in docs[_AR]
+    planted = {**docs, _AR: docs[_AR] + "\nPlanted: also see the record write at :305.\n"}
+    assert PATH_FORM.search(planted[_AR]) is None, (
+        "precondition: the sheet still carries no path:N form, so only the markdown rule sees this"
+    )
+    monkeypatch.setattr(_THIS_MODULE, "_scanned_documents", lambda: planted)
+
+    with pytest.raises(AssertionError, match=r"not in the reviewed table") as failure:
+        test_every_citation_is_in_the_table()
+    assert f"{_AR}:" in str(failure.value) and "lines=305" in str(failure.value)
+    size = len(LIVE) + len(UNCHECKED)
+    with pytest.raises(AssertionError, match=rf"extracted {size + 1} citations; the table lists"):
+        test_the_scan_finds_exactly_as_many_citations_as_the_table_lists()
+
+
+def test_mutation_j_a_root_compile_claim_in_a_sixth_document_fails(monkeypatch):
+    """Check 6 walks five named documents; the same stale claim must not re-enter through a sixth.
+
+    Both plants are in documents outside ROOT_COMPILE_DOCS, and neither moves a citation, so every
+    other check in this file stays green while these run.
+    """
+    docs = _scanned_documents()
+    count = sum(SOURCE_REFERENCE in line for line in _approval_teal().splitlines())
+    for doc, extra, shown in (
+        # The superseded form, refused wherever it is written.
+        ("REVIEWER.md", "\nCompiling from the repository root yields 124 differing lines, all "
+                        "cosmetic.\n", "uses the superseded form ['124 differing lines']"),
+        # The current form with a number that is not the committed one.
+        ("SECURITY.md", f"\nNote: a root compile changes {count + 32} lines of the approval TEAL.\n",
+         f"states [{count + 32}], not {count}"),
+    ):
+        assert doc in docs and doc not in ROOT_COMPILE_DOCS, doc
+        planted = {**docs, doc: docs[doc] + extra}
+        with monkeypatch.context() as patch:
+            patch.setattr(_THIS_MODULE, "_scanned_documents", lambda planted=planted: planted)
+            with pytest.raises(AssertionError, match=r"outside the reviewed five") as failure:
+                test_each_stated_root_compile_line_count_is_the_committed_count()
+        report = str(failure.value)
+        assert f"  {doc}: " in report and shown in report, report
+        assert [d for d in docs if f"  {d}: " in report] == [doc], report
+
+
+def test_mutation_k_a_blob_id_recorded_against_the_wrong_commit_fails(monkeypatch):
+    """Overwriting CONTRACT_BLOB_AT's value under the existing key is the shortest path to green
+    after a contract change. The object-store read is what refuses it."""
+    sheet = _collapse((REPO / _AR).read_text(encoding="utf-8"))
+    commit = BANNER.search(sheet).group(1)
+    if _blob_id_in_commit(commit, CONTRACT) is None:
+        pytest.skip(f"cannot read {commit}:{CONTRACT} from the object store; nothing to mutate")
+    # What the dict would hold if someone recorded the CURRENT file under the OLD commit's key
+    # after editing the contract: a value that is a real blob id, and self-consistent with the
+    # file, but not the one `commit` holds.
+    forged = hashlib.sha1(b"blob 0\x00").hexdigest()  # noqa: S324 - git's id of an empty blob
+    assert forged != CONTRACT_BLOB_AT[commit]
+    monkeypatch.setattr(_THIS_MODULE, "CONTRACT_BLOB_AT", {**CONTRACT_BLOB_AT, commit: forged})
+    with pytest.raises(AssertionError, match=r"names a revision whose contract is not") as failure:
+        test_the_recorded_blob_id_is_the_blob_the_banner_commit_holds()
+    assert forged in str(failure.value) and commit in str(failure.value)
 
 
 def test_the_scan_skips_what_the_cited_documents_sweep_skips():
