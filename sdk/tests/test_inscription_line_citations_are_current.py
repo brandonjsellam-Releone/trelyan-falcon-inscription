@@ -79,9 +79,13 @@ cited line, a range whose needles all occur elsewhere too, an exemption planted 
 document, a stated line count that no longer matches the TEAL, a bare `:N` written into
 AUDIT_READINESS.md, the old or a wrong count planted in a sixth document, a blob id recorded
 against a commit that does not hold it, a banner pointed at a commit this repository does not
-contain, an object store that cannot be asked while TRELYAN_REQUIRE_GIT=1 is set, and a
-path-qualified citation answered by a row about something else each make the real test functions
-above fail (the functions are re-run against monkeypatched inputs, not re-implemented). The two
+contain, an object store that cannot be asked while TRELYAN_REQUIRE_GIT=1 is set, a
+path-qualified citation answered by a row about something else, a citation that two rows answer,
+one row answering two citations, an UNCHECKED row of an invented kind, an audit sheet that cites
+no line at all, and a citation naming one path answered by a LIVE row about another each make the
+real test functions above fail (the functions are re-run against monkeypatched inputs, not
+re-implemented). Nineteen mutations, lettered a to s;
+test_the_mutations_are_a_contiguous_lettered_run holds that count to the functions. The two
 banner mutations and the object-store one assert a FAILURE, not merely "not a pass":
 `pytest.raises(AssertionError)` does not catch `Skipped`, so a self-test guarding a control that
 skips would itself report as skipped.
@@ -401,6 +405,13 @@ ROOT_COMPILE_DOCS = (
 STATED_COUNT = re.compile(r"(\d+) lines of the approval TEAL")
 OLD_COUNT_FORM = re.compile(r"\d+[ -](?:differing|cosmetically-different) lines")
 
+# Spelled out because the docstring above spells its count out. See
+# test_the_mutations_are_a_contiguous_lettered_run.
+_NUMBER_WORDS = {
+    14: "Fourteen", 15: "Fifteen", 16: "Sixteen", 17: "Seventeen", 18: "Eighteen",
+    19: "Nineteen", 20: "Twenty", 21: "Twenty-one", 22: "Twenty-two", 23: "Twenty-three",
+}
+
 # Set in the environment when an unaskable git object store must be a failure rather than a skip.
 # See _unavailable().
 REQUIRE_GIT = "TRELYAN_REQUIRE_GIT"
@@ -718,7 +729,12 @@ def test_every_table_entry_is_still_cited():
         "are in live documents:\n"
         + "\n".join(f"  {_describe(r)} kind={r.kind}" for r in undated)
     )
-    assert {r.kind for r in UNCHECKED} <= {"dated", "not-a-contract-line"}
+    unknown = sorted({r.kind for r in UNCHECKED} - {"dated", "not-a-contract-line"})
+    assert not unknown, (
+        f"an UNCHECKED row's kind must be 'dated' or 'not-a-contract-line'; found {unknown}. A "
+        "new kind is a new way to classify a citation away, so it is reviewed here rather than "
+        "invented in the table."
+    )
 
 
 def test_every_cited_line_still_holds_its_construct():
@@ -1236,6 +1252,159 @@ def test_mutation_n_a_path_qualified_citation_answered_by_another_row_fails(monk
         test_every_citation_is_in_the_table()
     report = str(failure.value)
     assert f"{doc}:" in report and "is classified as dated" in report, report
+
+
+def test_mutation_o_a_citation_that_two_rows_answer_fails(monkeypatch):
+    """The `ambiguous` rule of test_every_citation_is_in_the_table, which had no mutation.
+
+    Two rows answering one citation is what copying a row instead of moving it looks like. The
+    citation is then listed twice and reviewed once, and `pairs` -- what every later rule reads,
+    including `wrong_target` and the staleness check -- drops it silently. A twin of a real row,
+    which is what a copy-paste leaves behind, is the smallest form of that.
+    """
+    original = UNCHECKED[0]
+    twin = original._replace(why="planted by this test")
+    assert (twin.doc, twin.lines, twin.quote) == (original.doc, original.lines, original.quote)
+
+    test_every_citation_is_in_the_table()      # negative control: the table is unambiguous now
+
+    monkeypatch.setattr(_THIS_MODULE, "UNCHECKED", (*UNCHECKED, twin))
+    with pytest.raises(AssertionError, match=r"match more than one row") as failure:
+        test_every_citation_is_in_the_table()
+    report = str(failure.value)
+    assert f"{original.doc}:" in report and original.quote in report, report
+
+
+def test_mutation_p_one_row_answering_two_citations_fails(monkeypatch):
+    """The `reused` rule of test_every_table_entry_is_still_cited, which had no mutation.
+
+    One row answering two citations is what duplicating a sentence looks like: the copy is never
+    reviewed, and the row's needles are read as if they had been chosen for both. Nothing else in
+    this file objects to it -- the copy matches the same row, so no citation is unlisted and no
+    row is orphaned -- which is why the rule has to be the thing that catches it.
+
+    The plant is a verbatim copy of a citing line, appended to its own document. The row whose
+    line is copied must hold its quote inside that one line: a quote that runs on from the line
+    before would not be in the copy's window, and the copy would be unlisted instead.
+    """
+    docs = _scanned_documents()
+    chosen = next(
+        (
+            (cite, row, docs[cite.doc].splitlines()[cite.line - 1])
+            for cite, row in match(extract_citations(docs), LIVE + UNCHECKED).pairs
+            if _collapse(row.quote) in _collapse(docs[cite.doc].splitlines()[cite.line - 1])
+        ),
+        None,
+    )
+    assert chosen is not None, "no row's quote sits inside its own citing line; nothing to copy"
+    cite, row, line = chosen
+    planted = {**docs, cite.doc: docs[cite.doc] + f"\n{line}\n"}
+    monkeypatch.setattr(_THIS_MODULE, "_scanned_documents", lambda: planted)
+
+    with pytest.raises(AssertionError, match=r"match several citations") as failure:
+        test_every_table_entry_is_still_cited()
+    report = str(failure.value)
+    assert _describe(row) in report, report
+
+
+def test_mutation_q_an_unchecked_row_of_an_invented_kind_fails(monkeypatch):
+    """The UNCHECKED `kind` whitelist, which had no mutation.
+
+    `kind` is the reason a citation is not checked against the current file, and there are two
+    reviewed reasons. A third invented in the table would read as reviewed while meaning whatever
+    its author meant. The row is planted with a citation of its own, so the orphaned, reused and
+    undated rules all pass and only the whitelist is left to object.
+    """
+    doc = "contracts/COMPILE_REVIEW_2026-06-01.md"
+    docs = _scanned_documents()
+    assert doc in docs and re.search(r"_\d{4}-\d{2}-\d{2}\.md$", doc), doc
+    assert "1017" not in docs[doc], "precondition: the planted span must be unused in that record"
+    quote = "Planted: `contracts/inscription.py:1017`"
+    planted = {**docs, doc: docs[doc] + f"\n{quote} is what the draft compiled.\n"}
+    monkeypatch.setattr(_THIS_MODULE, "_scanned_documents", lambda: planted)
+    exemption = Unchecked(doc, "1017", quote, "waived", "planted by this test")
+    monkeypatch.setattr(_THIS_MODULE, "UNCHECKED", (*UNCHECKED, exemption))
+
+    with pytest.raises(AssertionError, match=r"kind must be 'dated'") as failure:
+        test_every_table_entry_is_still_cited()
+    assert "'waived'" in str(failure.value), failure.value
+
+
+def test_mutation_r_an_audit_sheet_that_cites_no_line_fails(monkeypatch):
+    """The `in_audit_sheet` rule of the count check, which had no mutation.
+
+    The count check exists so the tests below cannot pass on a regex that matches nothing. This
+    rule is the same argument one document narrower: AUDIT_READINESS.md is the sheet this file
+    exists for, and an extractor that stops reading its citation style -- `(L288)` and the word
+    "line", neither of which any other document leans on -- would leave the sheet unchecked while
+    the repository-wide count still looked healthy. The table would then have to shrink to match,
+    and that is the shape this refuses.
+    """
+    docs = _scanned_documents()
+    stub = "Planted by this test: this sheet names contracts/inscription.py and cites no line.\n"
+    planted = {**docs, _AR: stub}
+    assert not [c for c in extract_citations(planted) if c.doc == _AR], (
+        "precondition: the stub must carry no citation of its own"
+    )
+    assert extract_citations(planted), (
+        "precondition: other documents still cite, so the earlier no-citations assert is not what "
+        "fires"
+    )
+    monkeypatch.setattr(_THIS_MODULE, "_scanned_documents", lambda: planted)
+
+    with pytest.raises(AssertionError, match=rf"no citations found in {re.escape(_AR)}"):
+        test_the_scan_finds_exactly_as_many_citations_as_the_table_lists()
+
+
+def test_mutation_s_a_citation_naming_one_path_answered_by_a_live_row_about_another_fails(
+    monkeypatch,
+):
+    """The `row.target == cite.path` half of `wrong_target`, which mutation N does not reach.
+
+    N plants an UNCHECKED row, so it is killed by the `isinstance(row, Live)` half alone: delete
+    the comparison and N still fails. The other half is what holds a LIVE row to the path its
+    sentence spells out, and this is the file it protects against -- a second `inscription.py`
+    elsewhere in the tree, cited by path, answered by a row that checks the contract instead.
+    """
+    row = LIVE[0]
+    other = "docs/inscription.py"
+    assert not (REPO / other).exists(), "precondition: the planted path names no file in this tree"
+    doc = "contracts/COMPILE_REVIEW_2026-06-01.md"
+    docs = _scanned_documents()
+    quote = f"Planted: `{other}:{row.lines}`"
+    assert quote not in docs[doc], "precondition: the planted sentence is not already there"
+    planted = {**docs, doc: docs[doc] + f"\n{quote} is a line of the other file.\n"}
+    monkeypatch.setattr(_THIS_MODULE, "_scanned_documents", lambda: planted)
+
+    with pytest.raises(AssertionError, match=r"not in the reviewed table"):
+        test_every_citation_is_in_the_table()   # negative control: with no row it is reported
+
+    answering = Live(doc, row.lines, quote, row.target, row.needles, row.occurrence)
+    monkeypatch.setattr(_THIS_MODULE, "LIVE", (*LIVE, answering))
+    with pytest.raises(AssertionError, match=r"names one file and its row says another") as failure:
+        test_every_citation_is_in_the_table()
+    report = str(failure.value)
+    assert f"{doc}:" in report and f"is classified as {row.target}" in report, report
+
+
+def test_the_mutations_are_a_contiguous_lettered_run():
+    """The paragraph above says how many mutations there are. Hold it to the functions.
+
+    The list is prose, so no test can check that each clause describes its function. What it can
+    check is that the paragraph's count is the number of mutation tests, and that the letters run
+    from `a` with none missing and none used twice -- which is what goes wrong when a mutation is
+    added, renamed or dropped and the paragraph is left alone.
+    """
+    letters = sorted(
+        name.split("_")[2] for name in dir(_THIS_MODULE) if name.startswith("test_mutation_")
+    )
+    assert letters == [chr(c) for c in range(ord("a"), ord("a") + len(letters))], (
+        f"the mutation letters are not a contiguous run from 'a': {letters}"
+    )
+    stated = f"{_NUMBER_WORDS[len(letters)]} mutations, lettered a to {letters[-1]}"
+    assert stated in (_THIS_MODULE.__doc__ or ""), (
+        f"this file's docstring does not say {stated!r}; it now has {len(letters)} mutation tests"
+    )
 
 
 def test_the_scan_skips_what_the_cited_documents_sweep_skips():
