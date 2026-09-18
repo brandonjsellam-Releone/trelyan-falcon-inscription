@@ -94,7 +94,8 @@ python contracts/falcon_det1024.py
 # compile the contract + generate the typed client.
 # Run from contracts/ with the BARE filename: puya writes the source path as typed into the
 # emitted TEAL comments, so compiling from the repo root produces `// contracts/inscription.py`
-# instead of the committed `// inscription.py` — 124 differing lines, none of them a real
+# instead of the committed `// inscription.py` — 67 lines of the approval TEAL, one per such
+# comment, and the ARC-56 JSON line that embeds that TEAL, none of them a real
 # change. The out-dir must also sit beside inscription.py (as out/ does), because the .puya.map
 # records the source path relative to it. contracts/verify_teal_matches_source.py enforces both.
 (cd contracts && puyapy inscription.py --out-dir out --target-avm-version 12)

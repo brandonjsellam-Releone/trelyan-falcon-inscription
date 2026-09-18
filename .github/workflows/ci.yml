@@ -8,10 +8,22 @@ on:
   # third_party/** was added 2026-08-18 with the vendored Falcon tree: every job that builds the
   # library now builds it from there, so a change to those bytes must run the KAT and the
   # sanitizer gate exactly like a change to the SDK would. scripts/**, Dockerfile.repro and Dockerfile.verify were added 2026-09-11: the reviewer-containers job builds and checks them, and a change to them alone previously ran no CI.
+  # The five root documents were added 2026-09-17. sdk/tests/test_inscription_line_citations_are_current.py,
+  # test_cited_documents_exist.py and test_app_id_references_are_coherent.py all read them, and a
+  # change confined to those files triggered no job: a wrong line citation, a dangling document
+  # reference or a stale app id could be merged green and would first fail on some later,
+  # unrelated change to sdk/ or contracts/.
+  # Five more root documents were added 2026-09-18, for the same reason. SECURITY.md and
+  # PUBLIC_CLAIMS_HARDENING_2026-06-01.md are read by name by a check or a mutation in
+  # test_inscription_line_citations_are_current.py; ROADMAP.md is in the LIVE_CLAIM set of
+  # test_app_id_references_are_coherent.py and LOCALNET_VALIDATION_2026-06-01.md in its FROZEN
+  # set; PINNED_BUILD.md is swept by test_cited_documents_exist.py like every other root
+  # markdown file. No test reads this list, so keeping it in step with what the suite reads is
+  # a review step, not a gate.
   push:
-    paths: ["sdk/**", "contracts/**", "third_party/**", "scripts/**", "Dockerfile.repro", "Dockerfile.verify", ".github/workflows/ci.yml", "BLOCKERS.md"]
+    paths: ["sdk/**", "contracts/**", "third_party/**", "scripts/**", "Dockerfile.repro", "Dockerfile.verify", ".github/workflows/ci.yml", "BLOCKERS.md", "AUDIT_READINESS.md", "README.md", "REVIEWER.md", "CONTRIBUTING.md", "THREAT_MODEL_AND_TRACEABILITY.md", "SECURITY.md", "PINNED_BUILD.md", "ROADMAP.md", "PUBLIC_CLAIMS_HARDENING_2026-06-01.md", "LOCALNET_VALIDATION_2026-06-01.md"]
   pull_request:
-    paths: ["sdk/**", "contracts/**", "third_party/**", "scripts/**", "Dockerfile.repro", "Dockerfile.verify", ".github/workflows/ci.yml", "BLOCKERS.md"]
+    paths: ["sdk/**", "contracts/**", "third_party/**", "scripts/**", "Dockerfile.repro", "Dockerfile.verify", ".github/workflows/ci.yml", "BLOCKERS.md", "AUDIT_READINESS.md", "README.md", "REVIEWER.md", "CONTRIBUTING.md", "THREAT_MODEL_AND_TRACEABILITY.md", "SECURITY.md", "PINNED_BUILD.md", "ROADMAP.md", "PUBLIC_CLAIMS_HARDENING_2026-06-01.md", "LOCALNET_VALIDATION_2026-06-01.md"]
   schedule:
     - cron: "23 6 * * 1"   # Mondays 06:23 UTC — local gates + (via testnet-followup.yml) live drift
   workflow_dispatch: {}
@@ -159,11 +171,25 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          # sdk/tests/test_inscription_line_citations_are_current.py reads
+          # `<AUDIT_READINESS.md's banner commit>:contracts/inscription.py` out of the object store
+          # to prove the recorded blob id is the one that commit holds. A depth-1 checkout has only
+          # the tip, so the store cannot answer; this job sets TRELYAN_REQUIRE_GIT=1 below, which
+          # makes an unanswerable store a FAILURE rather than a skip. So a depth-1 checkout would
+          # fail this job in every run. Full history is what lets the check run and pass.
+          fetch-depth: 0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install (dev extra) and run the wire-format + golden-vector suite
         working-directory: sdk
+        env:
+          # The banner-to-blob read in test_inscription_line_citations_are_current.py SKIPS
+          # when the object store cannot be asked. A skip nobody reads is the control
+          # switched off, so here an unreadable store is a failure instead. Same reasoning
+          # as the grep in signature-kat: passing must require that the check RAN.
+          TRELYAN_REQUIRE_GIT: "1"
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
@@ -342,6 +368,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          fetch-depth: 0   # same reason as wire-format: the banner-to-blob read needs the history
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
@@ -508,6 +536,7 @@ jobs:
         # defect, in the exact place it was just removed from. Passing must require that they RAN.
         env:
           TRELYAN_REQUIRE_KAT: "1"
+          TRELYAN_REQUIRE_GIT: "1"   # same reason as wire-format: a skipped check is not a pass
         run: |
           set -o pipefail
           pytest tests -v -rs 2>&1 | tee pytest-full.log

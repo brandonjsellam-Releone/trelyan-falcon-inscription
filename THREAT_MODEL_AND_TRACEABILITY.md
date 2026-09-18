@@ -92,9 +92,10 @@ python contracts/falcon_det1024.py        # keygen -> sign -> verify round-trip
 #    Run from contracts/ with the BARE filename. This is part of the artifact, not a
 #    preference: puya writes the source path exactly as typed into the emitted TEAL comments,
 #    and records it relative to the out-dir in the .puya.map. Compiling from the repository
-#    root yields `// contracts/inscription.py:156` where the committed artifact carries
-#    `// inscription.py:156` — 124 differing lines, all cosmetic. Every one of the five
-#    committed artifacts then reproduces byte-for-byte.
+#    root yields `// contracts/inscription.py:NNN` where the committed artifact carries
+#    `// inscription.py:NNN` — 67 lines of the approval TEAL, one per such comment, and the
+#    ARC-56 JSON line that embeds that TEAL, all cosmetic. Run from contracts/, every one of
+#    the five committed artifacts reproduces byte-for-byte.
 (cd contracts && puyapy inscription.py --out-dir out --target-avm-version 12)
 
 # 3. Generate the typed client from the ARC-56 spec (re-run after every recompile):

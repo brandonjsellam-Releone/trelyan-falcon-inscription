@@ -54,7 +54,7 @@ warrant very different responses:
 
   * TRACEABILITY drift - instructions identical, only comments and source references
     differ. Bytecode is unaffected, so nothing deployed is wrong; but an auditor following
-    `// inscription.py:156` lands on the wrong line, and the repository's claim to commit
+    `// inscription.py:NNN` lands on the wrong line, and the repository's claim to commit
     "both source and TEAL" (constitution section 5) is no longer true of the tree in front
     of them.
 
@@ -68,9 +68,10 @@ forms in two different places. Getting either wrong produces a large, entirely s
 diff, so the exact invocation is part of the artifact and is pinned below:
 
   * The .teal comments carry the path as typed. Compiling from the repository root
-    (`puyapy contracts/inscription.py`) emits `// contracts/inscription.py:156`, while the
-    committed artifacts carry `// inscription.py:156`. That single difference accounts for
-    124 differing lines - all of them cosmetic, none of them a real change.
+    (`puyapy contracts/inscription.py`) emits `// contracts/inscription.py:NNN`, while the
+    committed artifacts carry `// inscription.py:NNN`. That single difference changes 67
+    lines of the approval TEAL, one per such comment, and the ARC-56 JSON line that embeds
+    that TEAL - all of them cosmetic, none of them a real change.
 
   * The .puya.map `sources` entry is the source path RELATIVE TO THE OUT-DIR. The committed
     map says `../inscription.py`, which only reproduces when the output directory is a
@@ -89,8 +90,9 @@ Three build commands were documented, in README.md, CONTRIBUTING.md and
 contracts/requirements.txt, and NONE of them reproduced the committed artifacts - two ran
 from the repository root, and the third referenced a `crypto/contracts/` directory that
 does not exist in this repository. Following the documentation and committing the result
-would have produced a 124-line diff that looked like a change and was not. Those documents
-are corrected alongside this file.
+would have produced a diff that looked like a change and was not; when this was written
+(58b61ff, 2026-08-16), 124 of its lines were the approval TEAL's 62 source-reference comments,
+each removed and re-added. Those documents are corrected alongside this file.
 
 Exit codes match `verify_deployment.py` so the two read alike in a log:
     0 = the committed artifacts are exactly what the source compiles to

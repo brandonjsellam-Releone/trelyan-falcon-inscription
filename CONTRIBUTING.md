@@ -30,8 +30,9 @@ python -m pytest contracts/test_inscription.py -v          # 28 passed
 The compile step runs **from `contracts/` with the bare filename**, and that is not a style
 preference — the invocation is part of the artifact. puya writes the source path exactly as
 typed into the emitted TEAL comments, and records it relative to the out-dir in the
-`.puya.map`. Compiling from the repository root yields `// contracts/inscription.py:156`
-where the committed artifact carries `// inscription.py:156`: 124 differing lines, every one
+`.puya.map`. Compiling from the repository root yields `// contracts/inscription.py:NNN`
+where the committed artifact carries `// inscription.py:NNN`. That changes 67 lines of the
+approval TEAL, one per such comment, and the ARC-56 JSON line that embeds that TEAL, every one
 of them cosmetic. Use the pinned toolchain in `contracts/requirements-compile.txt`;
 `contracts/verify_teal_matches_source.py` checks the result in CI and will tell you which
 kind of difference you have produced.

@@ -16,7 +16,9 @@ py-algorand-sdk>=2
 #
 # Build: run FROM contracts/ with the BARE filename. The invocation is part of the artifact --
 # puya writes the source path as typed into the TEAL comments, and relative to the out-dir in the
-# .puya.map, so compiling from anywhere else yields 124 cosmetically-different lines. The paths
+# .puya.map, so compiling from anywhere else changes 67 lines of the approval TEAL (one per
+# source-reference comment) and the ARC-56 JSON line that embeds that TEAL, and an out-dir that is
+# not beside the source changes the approval .puya.map as well; all cosmetic. The paths
 # below previously read crypto/contracts/..., a directory that does not exist in this repository.
 #   (cd contracts && puyapy inscription.py --out-dir out --target-avm-version 12)
 # Then:
