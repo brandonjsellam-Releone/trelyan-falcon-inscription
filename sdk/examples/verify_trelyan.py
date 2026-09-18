@@ -3,7 +3,9 @@
 TRELYAN reviewer verification — one command, no trust required.
   pip install trelyan-pq && python3 verify_trelyan.py
 Checks: [1] package constants  [2] pinned golden vectors (offline)
-        [3] live TestNet app 770964251 (approval-program fingerprint + committed-approval-TEAL correspondence)
+        [3] live TestNet app 770964251 (approval- and clear-state-program fingerprints, each against
+            its pin and against what the committed TEAL assembles to; state schemas and
+            extra-program-pages are compared by contracts/verify_deployment.py, not here)
         [4] on-chain boxes (registered Falcon keys / inscription records)
         [5] message reconstruction for a live cell (byte-exact, recomputed locally)
 Read-only. Only dependency: trelyan-pq (stdlib otherwise).
@@ -18,8 +20,15 @@ APP_ID = 770964251
 # can only ever succeed. It is evidence that the application was not replaced; it is NOT
 # evidence that the deployed approval program is what the committed approval TEAL assembles to,
 # and it was previously presented as though it were. Only the second claim matters to a reviewer.
-# It is checked below (approval program only; TEAL-to-source is CI job teal-matches-source).
+# It is checked below, for the approval and the clear-state program (TEAL-to-source is CI job
+# teal-matches-source; state schemas and extra-program-pages are contracts/verify_deployment.py).
 PINNED_ON_CHAIN_SHA512_256 = "6fa5cee145762e4a0c2ba93738a0e6f51e93b02c71f23e4e663ac6d73b981c4b"
+# The clear-state program's fingerprint (4 B), recorded 2026-09-14 for the same 2026-09-03
+# deployment. Computed twice and found equal: from the live app's clear-state-program, and from
+# what contracts/out/TrelyanInscription.clear.teal assembles to via algod /v2/teal/compile.
+# The same caveat applies: the pin can only show the program was not replaced; the assembly
+# check below is the one that ties it to the committed TEAL.
+PINNED_CLEAR_STATE_SHA512_256 = "8292475190892234698c4449d07ef6a6d92f0dad7a8667ee19d3343f00de130b"
 # Committed build artifact, when this script is run from a repo clone rather than downloaded
 # on its own. sdk/examples/ -> repo root -> contracts/out/.
 # Resolved DEFENSIVELY, and it must never raise. `parents[2]` assumed this file sits at
@@ -28,11 +37,11 @@ PINNED_ON_CHAIN_SHA512_256 = "6fa5cee145762e4a0c2ba93738a0e6f51e93b02c71f23e4e66
 # raised IndexError at MODULE LEVEL - before the first print - so the documented hermetic
 # reviewer command (REVIEWER.md, AUDIT_READINESS.md) produced a traceback and ran no checks at
 # all. It failed closed, so there was no false assurance, but the docs promise 15/15.
-def _find_committed_teal():
-    env = os.environ.get("TRELYAN_COMMITTED_TEAL")
+def _find_committed_teal(name="TrelyanInscription.approval.teal", env_var="TRELYAN_COMMITTED_TEAL"):
+    env = os.environ.get(env_var)
     if env:
         return pathlib.Path(env)
-    rel = pathlib.Path("contracts") / "out" / "TrelyanInscription.approval.teal"
+    rel = pathlib.Path("contracts") / "out" / name
     here = pathlib.Path(__file__).resolve()
     for base in [here.parent, *here.parents]:
         cand = base / rel
@@ -42,6 +51,7 @@ def _find_committed_teal():
 
 
 COMMITTED_TEAL = _find_committed_teal()
+COMMITTED_CLEAR_TEAL = _find_committed_teal("TrelyanInscription.clear.teal", "TRELYAN_COMMITTED_CLEAR_TEAL")
 ALGOD = "https://testnet-api.algonode.cloud"
 TESTNET_GENESIS_B64 = "SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI="
 PASS, FAIL, NOT_CHECKED = 0, 0, 0
@@ -67,6 +77,13 @@ def not_checked(name, why):
 def get(path):
     with urllib.request.urlopen(ALGOD + path, timeout=20) as r:
         return json.load(r)
+
+def assemble(teal_path):
+    """What a committed TEAL file assembles to, via the same algod the deployed app is read from."""
+    req = urllib.request.Request(ALGOD + "/v2/teal/compile", data=teal_path.read_bytes(),
+                                 headers={"Content-Type": "text/plain"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return base64.b64decode(json.load(r)["result"])
 
 print("== [1] package ==")
 import trelyan_pq as t
@@ -97,6 +114,20 @@ check("approval program fetched", len(ap) > 0, f"{len(ap)} bytes")
 fp = t.sha512_256(ap).hex()
 check("deployed app not replaced since the 2026-09-03 pin", fp == PINNED_ON_CHAIN_SHA512_256, fp[:16] + "...")
 print(f"        approval program sha512_256: {fp}")
+# The clear-state program, the same way. An absent or empty field is NOT CHECKED (exit 2), never a
+# FAIL: no program was read, so nothing can be said to differ from the pin or the committed TEAL.
+# contracts/verify_deployment.py treats the same response as "could not check" too.
+_cp_field = app["params"].get("clear-state-program")
+cp = base64.b64decode(_cp_field) if _cp_field else b""
+if _cp_field:
+    check("clear-state program fetched", len(cp) > 0, f"{len(cp)} bytes")
+    cfp = t.sha512_256(cp).hex()
+    check("deployed clear-state program matches its 2026-09-14 pin", cfp == PINNED_CLEAR_STATE_SHA512_256, cfp[:16] + "...")
+    print(f"        clear-state program sha512_256: {cfp}")
+else:
+    _no_clear = f"algod returned no clear-state-program for app {APP_ID}"
+    not_checked("clear-state program fetched", _no_clear)
+    not_checked("deployed clear-state program matches its 2026-09-14 pin", _no_clear)
 
 # The claim that actually matters: is the deployed approval program what the committed approval TEAL assembles to?
 # Answering it requires assembling the committed TEAL, so it is only possible from a repo
@@ -104,10 +135,7 @@ print(f"        approval program sha512_256: {fp}")
 # pass nor a failure - silently omitting it is how the weaker check above came to stand in for
 # this one.
 if COMMITTED_TEAL.exists():
-    _req = urllib.request.Request(ALGOD + "/v2/teal/compile", data=COMMITTED_TEAL.read_bytes(),
-                                  headers={"Content-Type": "text/plain"})
-    with urllib.request.urlopen(_req, timeout=20) as _r:
-        _built = base64.b64decode(json.load(_r)["result"])
+    _built = assemble(COMMITTED_TEAL)
     _built_fp = t.sha512_256(_built).hex()
     check("deployed approval program is what the committed approval TEAL assembles to", _built_fp == fp, f"committed approval TEAL assembles to {_built_fp[:16]}...")
     if _built_fp != fp:
@@ -123,7 +151,29 @@ else:
                 f"no committed artifact found at {COMMITTED_TEAL} "
                 f"(set TRELYAN_COMMITTED_TEAL to override)")
     print("        Run contracts/verify_deployment.py from a repo clone to compare the deployed")
-    print("        approval program against a fresh assembly of contracts/out/TrelyanInscription.approval.teal (clear-state is not compared).")
+    print("        approval and clear-state programs against fresh assemblies of the committed TEAL,")
+    print("        the state schemas against the committed ARC-56 spec, and extra-program-pages against")
+    print("        the minimum the assembled programs need.")
+
+if not cp:
+    # The redeploy banner below is only for a program that was actually read and differs.
+    not_checked("deployed clear-state program is what the committed clear-state TEAL assembles to",
+                "no clear-state program was read from the app")
+elif COMMITTED_CLEAR_TEAL.exists():
+    _built_clear = assemble(COMMITTED_CLEAR_TEAL)
+    _built_clear_fp = t.sha512_256(_built_clear).hex()
+    check("deployed clear-state program is what the committed clear-state TEAL assembles to", _built_clear_fp == cfp, f"committed clear-state TEAL assembles to {_built_clear_fp[:16]}...")
+    if _built_clear_fp != cfp:
+        print(f"        committed clear-state TEAL assembles to: {_built_clear_fp}  ({len(_built_clear)} B)")
+        print(f"        chain is actually serving               : {cfp}  ({len(cp)} B)")
+        print(f"AWAITING TESTNET REDEPLOY of app {APP_ID}.")
+        print("        This is not a silent skip. The live clear-state program differs from the")
+        print("        committed clear-state TEAL. Deploy a NEW TestNet app from the committed")
+        print("        artifacts, then retarget APP_ID / PINNED_CLEAR_STATE_SHA512_256. Checklist: BLOCKERS.md")
+else:
+    not_checked("deployed clear-state program is what the committed clear-state TEAL assembles to",
+                f"no committed artifact found at {COMMITTED_CLEAR_TEAL} "
+                f"(set TRELYAN_COMMITTED_CLEAR_TEAL to override)")
 
 print("== [4] on-chain boxes ==")
 boxes = get(f"/v2/applications/{APP_ID}/boxes")["boxes"]

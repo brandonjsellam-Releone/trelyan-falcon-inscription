@@ -32,6 +32,6 @@ rec = c.get_inscription(cell)                   # on-chain InscriptionRecord (re
 bytes(rec.artifact_hash) == sha512_256(b"my artifact")
 ```
 
-Already deployed on TestNet (app **770964251**; its approval program matches what the committed approval TEAL assembles to) — see [DEMO](../DEMO.md) to reproduce.
+Already deployed on TestNet (app **770964251**; its approval and clear-state programs match what the committed TEAL assembles to, its state schemas match the committed ARC-56 spec, and its extra-program-pages is the minimum the assembled committed programs need; its global-state contents, boxes and creator are not compared) — see [DEMO](../DEMO.md) to reproduce.
 
 > Status: alpha — TestNet, not externally audited, not for MainNet value.
