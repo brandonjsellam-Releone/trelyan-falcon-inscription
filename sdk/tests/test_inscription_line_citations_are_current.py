@@ -1183,12 +1183,13 @@ def test_mutation_m_an_unreadable_object_store_fails_only_when_require_git_is_se
     """TRELYAN_REQUIRE_GIT=1 is what turns `_unavailable`'s environmental skip into a failure.
 
     Written claims rest on the two lines in `_unavailable` that read the variable: the docstring
-    above says it twice (the end of check 4, and WHAT IS NOT CHECKED), and two
-    `.github/workflows/ci.yml` comments say a skipped check is not a pass. Nothing exercised
-    them: with this test absent, deleting those two lines leaves the suite green, because every
-    environment the suite runs in can read the object store, so the skip branch is the only one
-    ever taken. Plant the one input that reaches them -- a lookup saying the store cannot be
-    asked at all -- and hold the banner-to-blob check to both outcomes.
+    above says it twice (the end of check 4, and WHAT IS NOT CHECKED), and the
+    `.github/workflows/ci.yml` comments that set and explain it say a skipped check is not a
+    pass. Nothing exercised them: with this test absent, deleting those two lines leaves the
+    suite green, because every environment the suite runs in can read the object store, so
+    `_unavailable` is never reached and neither of its two lines runs. Plant the one input that
+    reaches them -- a lookup saying the store cannot be asked at all -- and hold the
+    banner-to-blob check to both outcomes.
     """
     planted = BlobLookup(unavailable="planted by this test: the object store cannot be asked")
     monkeypatch.setattr(_THIS_MODULE, "_blob_id_in_commit", lambda *_args: planted)
