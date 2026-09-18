@@ -18,9 +18,11 @@ THREAT_MODEL_AND_TRACEABILITY.md and contracts/verify_teal_matches_source.py sai
 TEAL carries `// inscription.py:156`. `contracts/out/` stopped carrying that comment when it was
 regenerated on 2026-08-27 (`14515d4`), and line 156 of the contract is blank. Those sentences give
 the comment's FORM, not a line, so they now say `NNN`, the placeholder the verifier's docstring
-already used for the same comment. Those three, README.md and contracts/requirements.txt also said
-a repository-root compile gives "124 differing lines". That was the approval TEAL when the phrase
-was written (`58b61ff`, 2026-08-16): 62 `// inscription.py:` comments, each removed and re-added.
+already used for the same comment. Those three, README.md and contracts/requirements.txt also
+stated the count as 124, in two wordings: `124 differing lines` in four of them and
+`124 cosmetically-different lines` in contracts/requirements.txt. That was the approval TEAL when
+the phrase was written (`58b61ff`, 2026-08-16): 62 `// inscription.py:` comments, each removed and
+re-added.
 At `205d874` the approval TEAL carries 67, and a root compile with the pinned puya changes those
 67 lines and the ARC-56 JSON line that embeds that TEAL. The five places now say 67, and check 6
 ties that number to `contracts/out/`.
@@ -52,7 +54,12 @@ WHAT IS CHECKED
    it is a self-consistent pair: the shortest path to green after a contract change would be to
    overwrite the value under the existing key, leaving the banner naming a revision the file is
    no longer at. So the recorded id is also read back out of the git object store, as
-   `git rev-parse <banner commit>:contracts/inscription.py`, and must agree.
+   `git rev-parse <banner commit>:contracts/inscription.py`, and must agree. Changing the KEY
+   instead of the value is the same move one step along: point the banner at a hash nobody can
+   resolve and record the current blob under it, and the pair is self-consistent again. So a
+   repository with full history that does NOT contain the banner commit FAILS. Only a store that
+   cannot be asked at all -- no `.git`, no git on PATH, a shallow clone -- is allowed to skip,
+   and TRELYAN_REQUIRE_GIT=1 turns even that into a failure.
 5. The extracted count is non-zero, includes AUDIT_READINESS.md, and equals the table size.
 6. CONTRIBUTING.md, README.md, THREAT_MODEL_AND_TRACEABILITY.md, contracts/requirements.txt and
    contracts/verify_teal_matches_source.py each state how many lines of the approval TEAL a
@@ -65,14 +72,26 @@ WHAT IS CHECKED
    document that nobody added to it. Every scanned document is therefore swept as well: the old
    "N differing lines" form is refused anywhere, and a document outside the five that states
    "N lines of the approval TEAL" must state the committed count.
+7. `.github/workflows/ci.yml` must be able to reach and run these checks. Every document named by
+   a row, by ROOT_COMPILE_DOCS or by a mutation here must appear in BOTH `paths` filters, or a
+   commit confined to it triggers no job; every job that runs `pytest tests` must check out with
+   `fetch-depth: 0` and set TRELYAN_REQUIRE_GIT=1, or check 4 silently skips there; and at least
+   one such job must run on the schedule, because the whole-tree sweep of check 6 reads files no
+   `paths` list enumerates. The prose above used to assert these as settled facts and nothing
+   read the workflow.
 
 The checks are themselves mutation-tested in this file: a contract whose functions move, a
 citation nobody reviewed, a citation that was deleted, another copy of a needle landing on a
 cited line, a range whose needles all occur elsewhere too, an exemption planted in a live
 document, a stated line count that no longer matches the TEAL, a bare `:N` written into
-AUDIT_READINESS.md, the old or a wrong count planted in a sixth document, and a blob id recorded
-against a commit that does not hold it each make the real test functions above fail (the
-functions are re-run against monkeypatched inputs, not re-implemented).
+AUDIT_READINESS.md, the old or a wrong count planted in a sixth document, a blob id recorded
+against a commit that does not hold it, a banner pointed at a commit this repository does not
+contain, and a ci.yml that drops a document from a filter, shortens a checkout, drops
+TRELYAN_REQUIRE_GIT or guards every suite job against the schedule each make the real test
+functions above fail (the functions are re-run against monkeypatched inputs, not
+re-implemented). The two banner mutations assert a FAILURE, not merely "not a pass":
+`pytest.raises(AssertionError)` does not catch `Skipped`, so a self-test guarding a control that
+skips would itself report as skipped.
 
 WHAT IS NOT CHECKED
 -------------------
@@ -87,7 +106,13 @@ WHAT IS NOT CHECKED
   usually a port, a slice or a cron field: `.github/workflows/ci.yml` says "algod on :4001" today.
 * The two files the table points INTO — the TARGETS, `contracts/inscription.py` and
   `sdk/src/trelyan_pq/inscription.py` — and this file itself are excluded from the scan, so a
-  line citation written inside one of them is not checked; none of the three holds one today.
+  line citation written inside one of them is not checked. Neither TARGET holds one today. This
+  file does — the form examples above, the historical `(≈L288)` / `(≈L353–356)` / `:156`
+  references in WHY THIS FILE EXISTS, the `(L304)` in the bullet above, and the planted fixtures
+  — and none of them is checked by anything, including this file. Making that true rather than
+  correcting it would mean dropping the THIS_FILE exclusion and giving this file's own prose
+  citations LIVE rows, with the fixtures moved out of module scope: a much larger change than the
+  claim is worth.
   Only the ten suffixes in TEXT_SUFFIXES are read, so a citation in a file with any other
   extension is not seen either. The docstring above says "every text file that names
   inscription.py" and means every SCANNED one; these are the exclusions.
@@ -103,16 +128,20 @@ WHAT IS NOT CHECKED
 * The five documents this file is mostly about — AUDIT_READINESS.md, README.md, REVIEWER.md,
   CONTRIBUTING.md, THREAT_MODEL_AND_TRACEABILITY.md — were outside the push and pull_request
   `paths` filters in `.github/workflows/ci.yml`, so a change confined to them triggered no job
-  at all and a wrong citation merged green. They are in both filters now. Any OTHER root document
-  is still outside them, and the two jobs that run `pytest tests` (wire-format, signature-kat)
-  still skip the Monday schedule, so a citation added in such a change first fails on the next
-  change that does trigger CI. test_cited_documents_exist.py and
-  test_app_id_references_are_coherent.py share what is left of the gap.
+  at all and a wrong citation merged green. Check 7 now reads the workflow and requires every
+  document this file names to be in both filters, so that sentence is a test rather than a claim.
+  A root document this file does NOT name is still outside the filters unless somebody listed it;
+  the five that carry verification-scope sentences are listed. The whole-tree sweep of check 6
+  reads files no `paths` list can enumerate, and what covers those is the Monday schedule: the
+  wire-format job no longer skips it, and check 7 requires that one suite job stays unguarded.
 * The banner-to-blob binding of check 4 needs the git object store. It is SKIPPED, not passed,
-  when `.git` is absent (an exported tree or sdist) or when git cannot resolve the banner commit
-  — a shallow clone holds only the tip. The `pytest tests` jobs check out with `fetch-depth: 0`
-  so that it runs there; read the `-rs` skip list, never the pass count, to see whether it did.
-  The blob-id equality of check 4 does not depend on git and runs either way.
+  only when the store cannot be asked AT ALL: `.git` is absent (an exported tree or sdist), git
+  is not runnable, or the clone is shallow and holds only the tip. Those causes are
+  environmental. "This repository has full history and does not contain that commit" is NOT
+  environmental — it is chosen by the author of the document under review — so it fails. Set
+  TRELYAN_REQUIRE_GIT=1 and the environmental skips fail too; ci.yml sets it in both jobs that
+  run `pytest tests`, and check 7 holds it to that. The blob-id equality of check 4 does not
+  depend on git and runs either way.
 
 RELATION TO test_cited_documents_exist.py
 -----------------------------------------
@@ -129,6 +158,7 @@ import ast
 import base64
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -382,6 +412,20 @@ ROOT_COMPILE_DOCS = (
 STATED_COUNT = re.compile(r"(\d+) lines of the approval TEAL")
 OLD_COUNT_FORM = re.compile(r"\d+[ -](?:differing|cosmetically-different) lines")
 
+# Check 7. The documents the mutation tests below plant into: real files whose real content the
+# whole-tree sweep of check 6 reads, so CI must run on a change confined to one of them.
+PLANT_DOCS = ("REVIEWER.md", "SECURITY.md")
+CI_WORKFLOW = ".github/workflows/ci.yml"
+# ci.yml is read as TEXT. The four other tests that read it do the same, and the suite's dev extra
+# is `pytest` alone -- a YAML parser would be a new dependency for one assertion.
+TRIGGER_PATHS = re.compile(r"^  (push|pull_request):\n    paths: (\[[^\n]*\])$", re.MULTILINE)
+JOB_HEAD = re.compile(r"^  ([A-Za-z0-9_-]+):$", re.MULTILINE)
+RUNS_THE_SUITE = re.compile(r"^\s*pytest tests(\s|$)", re.MULTILINE)
+SCHEDULE_GUARD = "github.event_name != 'schedule'"
+# Set by the two ci.yml jobs that run `pytest tests`: there an unaskable object store is a
+# failure, not a skip. See _unavailable().
+REQUIRE_GIT = "TRELYAN_REQUIRE_GIT"
+
 
 # ---------------------------------------------------------------------------------------------
 # Extraction
@@ -472,25 +516,111 @@ def _approval_teal() -> str:
     return (REPO / APPROVAL_TEAL).read_text(encoding="utf-8")
 
 
-def _blob_id_in_commit(commit: str, path: str) -> str | None:
-    """The blob id `commit` holds for `path`, or None when the object store cannot answer.
+class BlobLookup(NamedTuple):
+    """What the git object store could say about `commit:path`. Exactly one field is set.
 
-    None means UNVERIFIABLE, never "agrees": no `.git` (an exported tree), no git on PATH, or a
-    shallow clone that does not hold `commit`. Callers skip on None; they must not pass.
+    `blob`        the store answered.
+    `unavailable` it could not be asked at all: no `.git`, no git on PATH, a shallow clone. That
+                  is a property of the ENVIRONMENT, so callers skip -- unless TRELYAN_REQUIRE_GIT=1.
+    `missing`     it was asked, this repository has full history, and it does not hold `commit`
+                  (or that path in it). That is a property of the DOCUMENT under review, chosen by
+                  its author, so callers FAIL. Skipping here would make "name a commit nobody can
+                  resolve" a way to pass check 4.
     """
-    if not (REPO / ".git").exists():        # a worktree's .git is a file, not a directory
-        return None
+
+    blob: str | None = None
+    unavailable: str | None = None
+    missing: str | None = None
+
+
+def _git(*args: str) -> subprocess.CompletedProcess[str] | None:
     try:
-        done = subprocess.run(              # noqa: S603 - fixed argv, no shell, no user input
-            ["git", "-C", str(REPO), "rev-parse", "--verify", "--quiet", f"{commit}:{path}"],
+        return subprocess.run(              # noqa: S603 - fixed argv, no shell, no user input
+            ["git", "-C", str(REPO), *args],
             capture_output=True, text=True, timeout=120, check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None
-    if done.returncode != 0:
-        return None
-    found = done.stdout.strip()
-    return found if re.fullmatch(r"[0-9a-f]{40}", found) else None
+
+
+def _blob_id_in_commit(commit: str, path: str) -> BlobLookup:
+    """Read `commit:path` out of the git object store, distinguishing "cannot ask" from "not here".
+
+    The earlier version returned None for both and every caller skipped, which made the value
+    written in the document under review able to switch the check off: a fabricated banner hash
+    skipped exactly like a missing `.git` did.
+    """
+    if not (REPO / ".git").exists():        # a worktree's .git is a file, not a directory
+        return BlobLookup(unavailable=f"{REPO} holds no .git; this is an exported tree")
+    shallow = _git("rev-parse", "--is-shallow-repository")
+    if shallow is None:
+        return BlobLookup(unavailable="git is not runnable here")
+    if shallow.returncode != 0:
+        return BlobLookup(unavailable=f"git cannot read {REPO} as a repository")
+    if shallow.stdout.strip() != "false":
+        return BlobLookup(unavailable="this is a shallow clone; it holds only the tip")
+    # Full history, git works. Every answer from here on is about this repository's CONTENT.
+    held = _git("cat-file", "-e", f"{commit}^{{commit}}")
+    if held is None:
+        return BlobLookup(unavailable="git is not runnable here")
+    if held.returncode != 0:
+        return BlobLookup(missing=f"{commit} is not a commit in this repository")
+    found = _git("rev-parse", "--verify", "--quiet", f"{commit}:{path}")
+    if found is None:
+        return BlobLookup(unavailable="git is not runnable here")
+    blob = found.stdout.strip() if found.returncode == 0 else ""
+    if not re.fullmatch(r"[0-9a-f]{40}", blob):
+        return BlobLookup(missing=f"{commit} holds no {path}")
+    return BlobLookup(blob=blob)
+
+
+def _unavailable(reason: str) -> None:
+    """Skip -- or fail, when the build says the object store must be there.
+
+    A skip nobody reads is the control switched off in silence. ci.yml sets TRELYAN_REQUIRE_GIT=1
+    in both jobs that run `pytest tests`, and check 7 holds it to that, so in CI this raises.
+    """
+    detail = f"{reason}. The object-store read did not run: UNVERIFIED, not confirmed."
+    if os.environ.get(REQUIRE_GIT) == "1":
+        pytest.fail(f"{REQUIRE_GIT}=1, but {detail}")
+    pytest.skip(detail)
+
+
+def _banner_commit() -> str | None:
+    """The revision AUDIT_READINESS.md says its line numbers are against, or None if the sentence
+    is gone. A function so the mutation tests can re-run the real checks against a planted one."""
+    found = BANNER.search(_collapse((REPO / _AR).read_text(encoding="utf-8")))
+    return found.group(1) if found else None
+
+
+def _ci_text() -> str:
+    return (REPO / CI_WORKFLOW).read_text(encoding="utf-8")
+
+
+def _ci_jobs(text: str) -> dict[str, str]:
+    """Each top-level job's block, by name. `jobs:` is the last top-level key, so every two-space
+    key after it is a job."""
+    body = text[text.index("\njobs:\n"):]
+    heads = list(JOB_HEAD.finditer(body))
+    assert heads, f"{CI_WORKFLOW} declares no jobs at two-space indent"
+    bounds = [m.start() for m in heads] + [len(body)]
+    return {m.group(1): body[m.end():bounds[i + 1]] for i, m in enumerate(heads)}
+
+
+def _covered(path: str, patterns: Iterable[str]) -> bool:
+    """A GitHub `paths` filter entry matches `path` literally or as a `dir/**` prefix. Only those
+    two forms are used here; any other form is reported as not covering, which fails loudly."""
+    return any(
+        pattern == path or (pattern.endswith("/**") and path.startswith(pattern[:-2]))
+        for pattern in patterns
+    )
+
+
+def _documents_this_file_names() -> set[str]:
+    """Every document a check or a mutation in this file reads by name. A commit confined to one
+    of them must trigger CI, or the check first fires on some later, unrelated change."""
+    return ({row.doc for row in LIVE} | {row.doc for row in UNCHECKED}
+            | set(ROOT_COMPILE_DOCS) | set(PLANT_DOCS) | {_AR})
 
 
 def _prose(text: str) -> str:
@@ -655,10 +785,8 @@ def test_every_cited_line_still_holds_its_construct():
 
 def test_audit_readiness_names_the_contract_revision_its_lines_are_against():
     """The banner says which revision the numbers belong to. That claim must stay true."""
-    sheet = _collapse((REPO / _AR).read_text(encoding="utf-8"))
-    found = BANNER.search(sheet)
-    assert found, f"{_AR} no longer says which revision of {CONTRACT} its line numbers are against"
-    commit = found.group(1)
+    commit = _banner_commit()
+    assert commit, f"{_AR} no longer says which revision of {CONTRACT} its line numbers are against"
     assert commit in CONTRACT_BLOB_AT, (
         f"{_AR} says its line numbers are against {commit}, which this test has no blob id for. "
         f"Add `git rev-parse {commit}:{CONTRACT}` to CONTRACT_BLOB_AT after re-verifying every row."
@@ -680,21 +808,27 @@ def test_the_recorded_blob_id_is_the_blob_the_banner_commit_holds():
     ties X to a commit, so after a contract change the shortest path to green is to overwrite the
     value under the existing key -- and the banner then names a revision the file is not at, while
     the suite stays green. Read the id back out of the object store instead.
+
+    Changing the KEY is the same move one step along: point the banner at a hash the store cannot
+    resolve, record the current blob under it, and the pair is self-consistent again. That is why
+    "this repository does not contain that commit" fails here rather than skipping.
     """
-    sheet = _collapse((REPO / _AR).read_text(encoding="utf-8"))
-    found = BANNER.search(sheet)
-    assert found, f"{_AR} no longer says which revision of {CONTRACT} its line numbers are against"
-    commit = found.group(1)
+    commit = _banner_commit()
+    assert commit, f"{_AR} no longer says which revision of {CONTRACT} its line numbers are against"
     assert commit in CONTRACT_BLOB_AT, (
         f"{_AR} says its line numbers are against {commit}, which this test has no blob id for."
     )
     recorded = CONTRACT_BLOB_AT[commit]
-    in_commit = _blob_id_in_commit(commit, CONTRACT)
-    if in_commit is None:
-        pytest.skip(
-            f"cannot read {commit}:{CONTRACT} from the object store (no .git, no git on PATH, or a "
-            f"shallow clone). {recorded} is UNVERIFIED against {commit} in this run, not confirmed."
-        )
+    lookup = _blob_id_in_commit(commit, CONTRACT)
+    assert lookup.missing is None, (
+        f"{_AR} says its line numbers are against {commit}, and this repository does not contain "
+        f"it: {lookup.missing}. Recording a blob id under a hash nobody can resolve satisfies the "
+        f"equality check above and leaves the scope sheet naming a revision that does not exist. "
+        f"Point the banner at a commit this repository holds, and record THAT commit's blob id."
+    )
+    if lookup.blob is None:
+        _unavailable(f"cannot read {commit}:{CONTRACT} from the object store ({lookup.unavailable})")
+    in_commit = lookup.blob
     assert in_commit == recorded, (
         f"CONTRACT_BLOB_AT records {recorded} for {commit}, but {commit} holds {in_commit} for "
         f"{CONTRACT}. {_AR}'s banner therefore names a revision whose contract is not the one the "
@@ -793,6 +927,58 @@ def test_the_arc56_json_embeds_the_approval_teal_on_one_line():
     teal = (REPO / APPROVAL_TEAL).read_bytes().replace(b"\r\n", b"\n")
     assert base64.b64decode(embedded, validate=True) == teal, f"{ARC56_JSON} does not embed {APPROVAL_TEAL}"
     assert sum(embedded in line for line in arc56.splitlines()) == 1
+
+
+def test_ci_can_reach_and_run_the_checks_in_this_file():
+    """Check 7. Everything above is prose about ci.yml until something reads ci.yml.
+
+    Four facts have to hold or these checks do not run where they matter, and each was asserted
+    in the docstring and enforced by nothing:
+      * a commit confined to a document one of these checks names must trigger a job at all;
+      * the job that runs them must check out full history, or check 4 has nothing to read;
+      * it must set TRELYAN_REQUIRE_GIT=1, so an unaskable object store fails instead of skipping;
+      * one such job must run on the schedule, because the whole-tree sweep of check 6 reads files
+        no `paths` list can enumerate.
+    """
+    text = _ci_text()
+    filters = {event: json.loads(value) for event, value in TRIGGER_PATHS.findall(text)}
+    assert set(filters) == {"push", "pull_request"}, (
+        f"{CI_WORKFLOW} no longer carries one flow-style `paths:` list for push and one for "
+        f"pull_request; found {sorted(filters)}"
+    )
+    named = sorted(_documents_this_file_names())
+    assert named, "this file names no documents; the filter check would be vacuous"
+    unreachable = [
+        f"  {doc}: not covered by the {event} filter"
+        for event, patterns in sorted(filters.items())
+        for doc in named if not _covered(doc, patterns)
+    ]
+    assert not unreachable, (
+        "a check in this file reads each of these documents, and a commit confined to one of them "
+        f"triggers no job in {CI_WORKFLOW}, so the check first fires on some later, unrelated "
+        "change:\n" + "\n".join(unreachable) + f"\n\nAdd it to both `paths` lists."
+    )
+
+    jobs = _ci_jobs(text)
+    runners = {name: block for name, block in sorted(jobs.items()) if RUNS_THE_SUITE.search(block)}
+    assert runners, (
+        f"no job in {CI_WORKFLOW} runs `pytest tests`, so this file never runs in CI at all"
+    )
+    faults = []
+    for name, block in runners.items():
+        if "fetch-depth: 0" not in block:
+            faults.append(f"  {name}: no `fetch-depth: 0`, so check 4's object-store read cannot run")
+        if f'{REQUIRE_GIT}: "1"' not in block:
+            faults.append(f"  {name}: does not set {REQUIRE_GIT}=1, so check 4 may skip unnoticed")
+    assert not faults, (
+        f"these {CI_WORKFLOW} jobs run `pytest tests`, which is where this file runs:\n"
+        + "\n".join(faults)
+    )
+    assert [n for n, b in runners.items() if SCHEDULE_GUARD not in b], (
+        f"every job in {CI_WORKFLOW} that runs `pytest tests` is guarded against the schedule, so "
+        "the whole-tree sweep of check 6 never reaches a document outside the `paths` filters. "
+        "Drop the guard from one of them."
+    )
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1024,22 +1210,97 @@ def test_mutation_j_a_root_compile_claim_in_a_sixth_document_fails(monkeypatch):
         assert [d for d in docs if f"  {d}: " in report] == [doc], report
 
 
+def _must_fail_not_skip(pattern: str, run):
+    """Run a check that must FAIL, and refuse to let it SKIP instead.
+
+    `pytest.raises(AssertionError)` does not catch `Skipped`: a skip raised inside it propagates
+    and the self-test reports as skipped, green. The two mutations below guard a control whose
+    whole failure mode was degrading to a skip, so they must not be able to do that themselves.
+    """
+    try:
+        with pytest.raises(AssertionError, match=pattern) as failure:
+            run()
+    except pytest.skip.Exception as skipped:   # pragma: no cover - only when the control breaks
+        pytest.fail(f"the check SKIPPED where it must fail: {skipped}")
+    return str(failure.value)
+
+
 def test_mutation_k_a_blob_id_recorded_against_the_wrong_commit_fails(monkeypatch):
     """Overwriting CONTRACT_BLOB_AT's value under the existing key is the shortest path to green
     after a contract change. The object-store read is what refuses it."""
-    sheet = _collapse((REPO / _AR).read_text(encoding="utf-8"))
-    commit = BANNER.search(sheet).group(1)
-    if _blob_id_in_commit(commit, CONTRACT) is None:
-        pytest.skip(f"cannot read {commit}:{CONTRACT} from the object store; nothing to mutate")
+    commit = _banner_commit()
+    lookup = _blob_id_in_commit(commit, CONTRACT)
+    assert lookup.missing is None, f"precondition: {lookup.missing}"
+    if lookup.blob is None:
+        _unavailable(f"cannot read {commit}:{CONTRACT} from the object store; nothing to mutate")
     # What the dict would hold if someone recorded the CURRENT file under the OLD commit's key
     # after editing the contract: a value that is a real blob id, and self-consistent with the
     # file, but not the one `commit` holds.
     forged = hashlib.sha1(b"blob 0\x00").hexdigest()  # noqa: S324 - git's id of an empty blob
     assert forged != CONTRACT_BLOB_AT[commit]
     monkeypatch.setattr(_THIS_MODULE, "CONTRACT_BLOB_AT", {**CONTRACT_BLOB_AT, commit: forged})
-    with pytest.raises(AssertionError, match=r"names a revision whose contract is not") as failure:
-        test_the_recorded_blob_id_is_the_blob_the_banner_commit_holds()
-    assert forged in str(failure.value) and commit in str(failure.value)
+    report = _must_fail_not_skip(
+        r"names a revision whose contract is not",
+        test_the_recorded_blob_id_is_the_blob_the_banner_commit_holds,
+    )
+    assert forged in report and commit in report
+
+
+def test_mutation_l_a_banner_commit_this_repository_does_not_contain_fails(monkeypatch):
+    """Change the KEY, not the value: the shortest path to green once mutation K is closed.
+
+    Point AUDIT_READINESS.md's banner at a hash the object store cannot resolve and record the
+    CURRENT blob under it. The blob-equality half of check 4 then passes -- the pair is
+    self-consistent -- and the object-store half used to SKIP, taking this self-test with it.
+    Both must fail now, and the scope sheet must not be able to name a revision that does not
+    exist.
+    """
+    real = _banner_commit()
+    assert real, "precondition: the sheet must carry a banner"
+    lookup = _blob_id_in_commit(real, CONTRACT)
+    assert lookup.missing is None, f"precondition: {lookup.missing}"
+    if lookup.blob is None:
+        _unavailable(f"cannot read {real}:{CONTRACT} from the object store; nothing to mutate")
+    fabricated = "d0d0bee"      # hex, banner-shaped, and not a commit in this repository
+    assert _blob_id_in_commit(fabricated, CONTRACT).missing, (
+        f"precondition: {fabricated} must not resolve here, or this mutation proves nothing"
+    )
+    monkeypatch.setattr(_THIS_MODULE, "_banner_commit", lambda: fabricated)
+    monkeypatch.setattr(
+        _THIS_MODULE, "CONTRACT_BLOB_AT", {**CONTRACT_BLOB_AT, fabricated: CONTRACT_BLOB_AT[real]},
+    )
+    # The self-consistent half is satisfied by the plant: it must not be what catches this.
+    test_audit_readiness_names_the_contract_revision_its_lines_are_against()
+    report = _must_fail_not_skip(
+        r"does not contain it",
+        test_the_recorded_blob_id_is_the_blob_the_banner_commit_holds,
+    )
+    assert fabricated in report
+
+
+def test_mutation_m_a_ci_workflow_that_cannot_run_these_checks_fails(monkeypatch):
+    """Four one-line edits to ci.yml, each of which switches this file off without touching it."""
+    real = _ci_text()
+    named = sorted(_documents_this_file_names())
+    dropped = next(d for d in named if f'"{d}"' in real)
+    plants = (
+        # A document removed from the push filter: a commit confined to it triggers nothing.
+        (real.replace(f'"{dropped}", ', "", 1), rf"not covered by the push filter"),
+        # A depth-1 checkout: the object-store read has only the tip to read.
+        (real.replace("fetch-depth: 0", "fetch-depth: 1"), r"no `fetch-depth: 0`"),
+        # The env gate removed: an unaskable store goes back to skipping in silence.
+        (real.replace(f'{REQUIRE_GIT}: "1"', f'{REQUIRE_GIT}_DISABLED: "1"'),
+         rf"does not set {REQUIRE_GIT}=1"),
+        # Every suite job guarded against the schedule: the whole-tree sweep stops being reached.
+        (real.replace("  wire-format:\n", f"  wire-format:\n    if: {SCHEDULE_GUARD}\n", 1),
+         r"guarded against the schedule"),
+    )
+    for mutated, expected in plants:
+        assert mutated != real, f"precondition: the plant for {expected!r} changed nothing"
+        with monkeypatch.context() as patch:
+            patch.setattr(_THIS_MODULE, "_ci_text", lambda mutated=mutated: mutated)
+            with pytest.raises(AssertionError, match=expected):
+                test_ci_can_reach_and_run_the_checks_in_this_file()
 
 
 def test_the_scan_skips_what_the_cited_documents_sweep_skips():

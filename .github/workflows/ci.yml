@@ -13,10 +13,18 @@ on:
   # change confined to those files triggered no job: a wrong line citation, a dangling document
   # reference or a stale app id could be merged green and would first fail on some later,
   # unrelated change to sdk/ or contracts/.
+  # Five more root documents were added 2026-09-18. SECURITY.md and
+  # PUBLIC_CLAIMS_HARDENING_2026-06-01.md are named by a check or a mutation in
+  # test_inscription_line_citations_are_current.py; PINNED_BUILD.md, ROADMAP.md and
+  # LOCALNET_VALIDATION_2026-06-01.md carry verification-scope sentences that its whole-tree
+  # sweep reads. That test now reads THIS list and fails when a document it names is absent
+  # from either filter, so the two cannot drift apart again. The sweep still reads documents
+  # no `paths` list can enumerate; the wire-format job runs on the Monday schedule, which is
+  # what covers those.
   push:
-    paths: ["sdk/**", "contracts/**", "third_party/**", "scripts/**", "Dockerfile.repro", "Dockerfile.verify", ".github/workflows/ci.yml", "BLOCKERS.md", "AUDIT_READINESS.md", "README.md", "REVIEWER.md", "CONTRIBUTING.md", "THREAT_MODEL_AND_TRACEABILITY.md"]
+    paths: ["sdk/**", "contracts/**", "third_party/**", "scripts/**", "Dockerfile.repro", "Dockerfile.verify", ".github/workflows/ci.yml", "BLOCKERS.md", "AUDIT_READINESS.md", "README.md", "REVIEWER.md", "CONTRIBUTING.md", "THREAT_MODEL_AND_TRACEABILITY.md", "SECURITY.md", "PINNED_BUILD.md", "ROADMAP.md", "PUBLIC_CLAIMS_HARDENING_2026-06-01.md", "LOCALNET_VALIDATION_2026-06-01.md"]
   pull_request:
-    paths: ["sdk/**", "contracts/**", "third_party/**", "scripts/**", "Dockerfile.repro", "Dockerfile.verify", ".github/workflows/ci.yml", "BLOCKERS.md", "AUDIT_READINESS.md", "README.md", "REVIEWER.md", "CONTRIBUTING.md", "THREAT_MODEL_AND_TRACEABILITY.md"]
+    paths: ["sdk/**", "contracts/**", "third_party/**", "scripts/**", "Dockerfile.repro", "Dockerfile.verify", ".github/workflows/ci.yml", "BLOCKERS.md", "AUDIT_READINESS.md", "README.md", "REVIEWER.md", "CONTRIBUTING.md", "THREAT_MODEL_AND_TRACEABILITY.md", "SECURITY.md", "PINNED_BUILD.md", "ROADMAP.md", "PUBLIC_CLAIMS_HARDENING_2026-06-01.md", "LOCALNET_VALIDATION_2026-06-01.md"]
   schedule:
     - cron: "23 6 * * 1"   # Mondays 06:23 UTC — local gates + (via testnet-followup.yml) live drift
   workflow_dispatch: {}
@@ -157,7 +165,12 @@ jobs:
   wire-format:
     name: Wire-format tests (no network, no native lib)
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
+    # Runs on the schedule too, unlike every other job here. The `paths` filters above can
+    # only enumerate documents; the whole-tree sweep in
+    # sdk/tests/test_inscription_line_citations_are_current.py reads every scanned file, so a
+    # stale claim planted in a file nobody thought to list would never be reached on push or
+    # pull_request. The Monday run is what reaches it. required-merge-gates counts this job's
+    # success the same as its schedule-skip, so nothing about the gate set changes.
     strategy:
       fail-fast: false
       matrix:
@@ -175,6 +188,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install (dev extra) and run the wire-format + golden-vector suite
         working-directory: sdk
+        env:
+          # The banner-to-blob read in test_inscription_line_citations_are_current.py SKIPS
+          # when the object store cannot be asked. A skip nobody reads is the control
+          # switched off, so here an unreadable store is a failure instead. Same reasoning
+          # as the grep in signature-kat: passing must require that the check RAN.
+          TRELYAN_REQUIRE_GIT: "1"
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
@@ -521,6 +540,7 @@ jobs:
         # defect, in the exact place it was just removed from. Passing must require that they RAN.
         env:
           TRELYAN_REQUIRE_KAT: "1"
+          TRELYAN_REQUIRE_GIT: "1"   # same reason as wire-format: a skipped check is not a pass
         run: |
           set -o pipefail
           pytest tests -v -rs 2>&1 | tee pytest-full.log
