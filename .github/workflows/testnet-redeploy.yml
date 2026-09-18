@@ -77,6 +77,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r contracts/requirements.txt
 
+      # Presence-only ran before pip. algosdk is available now: reject a
+      # non-mnemonic secret WITHOUT printing it (algosdk ValueError includes
+      # the word list — that must never reach the log).
+      - name: Fail closed if DEPLOYER_MNEMONIC is not a valid Algorand mnemonic
+        env:
+          DEPLOYER_MNEMONIC: ${{ secrets.DEPLOYER_MNEMONIC }}
+        run: python contracts/require_testnet_deploy_secret.py --parse
+
       - name: Deploy a new TestNet app from the committed client
         id: deploy
         continue-on-error: true

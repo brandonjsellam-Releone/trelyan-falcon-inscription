@@ -80,7 +80,14 @@ def main() -> None:
         sys.exit("Refusing to run: ALGORAND_NETWORK looks like MainNet. TestNet only.")
 
     algorand = AlgorandClient.testnet()
-    deployer = algorand.account.from_mnemonic(mnemonic=mn)
+    try:
+        deployer = algorand.account.from_mnemonic(mnemonic=mn)
+    except Exception:
+        # algosdk ValueError includes the word list. Never re-raise or log it.
+        sys.exit(
+            "DEPLOYER_MNEMONIC is set but is not a valid Algorand mnemonic. "
+            "Replace the repository secret. The value is not printed."
+        )
     print(f"deployer: {deployer.address}")
 
     gh = algorand.client.algod.suggested_params().gh
