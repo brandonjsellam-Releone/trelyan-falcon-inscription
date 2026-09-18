@@ -78,10 +78,11 @@ citation nobody reviewed, a citation that was deleted, another copy of a needle 
 cited line, a range whose needles all occur elsewhere too, an exemption planted in a live
 document, a stated line count that no longer matches the TEAL, a bare `:N` written into
 AUDIT_READINESS.md, the old or a wrong count planted in a sixth document, a blob id recorded
-against a commit that does not hold it, and a banner pointed at a commit this repository does
-not contain each make the real test functions above fail (the functions are re-run against
-monkeypatched inputs, not re-implemented). The two banner mutations assert a FAILURE, not
-merely "not a pass":
+against a commit that does not hold it, a banner pointed at a commit this repository does not
+contain, an object store that cannot be asked while TRELYAN_REQUIRE_GIT=1 is set, and a
+path-qualified citation answered by a row about something else each make the real test functions
+above fail (the functions are re-run against monkeypatched inputs, not re-implemented). The two
+banner mutations and the object-store one assert a FAILURE, not merely "not a pass":
 `pytest.raises(AssertionError)` does not catch `Skipped`, so a self-test guarding a control that
 skips would itself report as skipped.
 
@@ -1106,15 +1107,19 @@ def test_mutation_j_a_root_compile_claim_in_a_sixth_document_fails(monkeypatch):
         assert [d for d in docs if f"  {d}: " in report] == [doc], report
 
 
-def _must_fail_not_skip(pattern: str, run):
+def _must_fail_not_skip(pattern: str, run, expected: type[BaseException] = AssertionError):
     """Run a check that must FAIL, and refuse to let it SKIP instead.
 
     `pytest.raises(AssertionError)` does not catch `Skipped`: a skip raised inside it propagates
-    and the self-test reports as skipped, green. The two mutations below guard a control whose
-    whole failure mode was degrading to a skip, so they must not be able to do that themselves.
+    and the self-test reports as skipped, green. The mutations below that guard a control whose
+    whole failure mode was degrading to a skip must not be able to do that themselves.
+
+    `expected` is what the check raises when it fails. A failed `assert` raises `AssertionError`;
+    `_unavailable` under TRELYAN_REQUIRE_GIT=1 calls `pytest.fail`, which raises `Failed`, and
+    `Failed` is not an `AssertionError` -- so mutation M passes `pytest.fail.Exception` here.
     """
     try:
-        with pytest.raises(AssertionError, match=pattern) as failure:
+        with pytest.raises(expected, match=pattern) as failure:
             run()
     except pytest.skip.Exception as skipped:   # pragma: no cover - only when the control breaks
         pytest.fail(f"the check SKIPPED where it must fail: {skipped}")
@@ -1172,6 +1177,64 @@ def test_mutation_l_a_banner_commit_this_repository_does_not_contain_fails(monke
         test_the_recorded_blob_id_is_the_blob_the_banner_commit_holds,
     )
     assert fabricated in report
+
+
+def test_mutation_m_an_unreadable_object_store_fails_only_when_require_git_is_set(monkeypatch):
+    """TRELYAN_REQUIRE_GIT=1 is what turns `_unavailable`'s environmental skip into a failure.
+
+    Written claims rest on the two lines in `_unavailable` that read the variable: the docstring
+    above says it twice (the end of check 4, and WHAT IS NOT CHECKED), and two
+    `.github/workflows/ci.yml` comments say a skipped check is not a pass. Nothing exercised
+    them: with this test absent, deleting those two lines leaves the suite green, because every
+    environment the suite runs in can read the object store, so the skip branch is the only one
+    ever taken. Plant the one input that reaches them -- a lookup saying the store cannot be
+    asked at all -- and hold the banner-to-blob check to both outcomes.
+    """
+    planted = BlobLookup(unavailable="planted by this test: the object store cannot be asked")
+    monkeypatch.setattr(_THIS_MODULE, "_blob_id_in_commit", lambda *_args: planted)
+
+    monkeypatch.setenv(REQUIRE_GIT, "1")
+    report = _must_fail_not_skip(
+        rf"{REQUIRE_GIT}=1, but ",
+        test_the_recorded_blob_id_is_the_blob_the_banner_commit_holds,
+        pytest.fail.Exception,      # `pytest.fail` raises `Failed`, not `AssertionError`
+    )
+    assert planted.unavailable in report, report
+
+    # Negative control: the same lookup with the variable unset SKIPS. Without it, a failure
+    # arriving for any other reason would read as the variable doing its job.
+    monkeypatch.delenv(REQUIRE_GIT, raising=False)
+    with pytest.raises(pytest.skip.Exception) as skipped:
+        test_the_recorded_blob_id_is_the_blob_the_banner_commit_holds()
+    assert planted.unavailable in str(skipped.value), skipped.value
+    assert f"{REQUIRE_GIT}=1" not in str(skipped.value), skipped.value
+
+
+def test_mutation_n_a_path_qualified_citation_answered_by_another_row_fails(monkeypatch):
+    """The `wrong_target` rule of test_every_citation_is_in_the_table, which had no mutation.
+
+    It is the only rule that reads the path a citation spells out. An exemption in a dated record
+    answers a path-qualified citation with nothing else objecting: the table checks compare
+    document, span and quote, and none of them looks at the path. A dated record is where such a
+    row can sit, because an UNCHECKED row in a live document is refused. That is what this plants.
+    """
+    doc = "contracts/COMPILE_REVIEW_2026-06-01.md"
+    docs = _scanned_documents()
+    assert doc in docs and re.search(r"_\d{4}-\d{2}-\d{2}\.md$", doc), doc
+    assert "1014" not in docs[doc], "precondition: the planted span must be unused in that record"
+    quote = "Planted: `contracts/inscription.py:1014`"
+    planted = {**docs, doc: docs[doc] + f"\n{quote} is what the draft compiled.\n"}
+    monkeypatch.setattr(_THIS_MODULE, "_scanned_documents", lambda: planted)
+
+    with pytest.raises(AssertionError, match=r"not in the reviewed table"):
+        test_every_citation_is_in_the_table()      # negative control: with no row it is reported
+
+    exemption = Unchecked(doc, "1014", quote, "dated", "planted by this test")
+    monkeypatch.setattr(_THIS_MODULE, "UNCHECKED", (*UNCHECKED, exemption))
+    with pytest.raises(AssertionError, match=r"names one file and its row says another") as failure:
+        test_every_citation_is_in_the_table()
+    report = str(failure.value)
+    assert f"{doc}:" in report and "is classified as dated" in report, report
 
 
 def test_the_scan_skips_what_the_cited_documents_sweep_skips():
