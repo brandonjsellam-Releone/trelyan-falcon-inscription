@@ -1,17 +1,26 @@
-"""sdk/examples/verify_trelyan.py's clear-state checks, run offline against a stubbed algod.
+"""sdk/examples/verify_trelyan.py's approval- and clear-state-program checks, offline.
 
 The script is a top-level reviewer script, so it is executed with runpy after
 `urllib.request.urlopen` is replaced with a stub that serves the application, its boxes and
 /v2/teal/compile. No request reaches the network: an unexpected URL or TEAL raises.
 
-Three cases:
-  * the deployed clear-state program is present and equals the committed one -> no FAIL, no SKIP;
-  * it is absent or empty -> its three checks are NOT CHECKED (exit 2), with no FAIL line and no
-    redeploy banner, and the committed clear-state TEAL is never assembled;
-  * it differs -> the pin and assembly checks FAIL (exit 1) and the redeploy banner names it.
+Either deployed program can be varied independently; the other is served as the real bytes, so
+exactly one side moves per case.
 
-The deployed approval program is served as the real bytes (APPROVAL_PROGRAM_B64), so the
-script's approval pin passes and only the clear-state program varies between cases.
+Clear-state:
+  * present and equal to the committed one -> no FAIL, no SKIP;
+  * absent or empty -> its three checks are NOT CHECKED (exit 2), with no FAIL line and no
+    redeploy banner, and the committed clear-state TEAL is never assembled;
+  * differs -> the pin and assembly checks FAIL (exit 1) and the redeploy banner names it.
+
+Approval:
+  * differs -> the pin and assembly checks FAIL (exit 1), the redeploy banner is printed, and
+    both fingerprints appear.
+
+The approval case is here because the script's approval comparison is the one the README's
+headline rests on, and nothing made it fail: replacing the deployed approval bytes with the
+committed assembly, or comparing either the pin or the assembly with itself, left the whole
+suite green.
 """
 
 from __future__ import annotations
@@ -52,6 +61,9 @@ APPROVAL_PROGRAM_B64 = (
     "RDIDSwNJTwITREsCSbxITL8jQyJC/+k2GgFJFSQSRBcWK0xQvkSABBUffHVMULAjQw=="
 )
 APPROVAL_PROGRAM = base64.b64decode(APPROVAL_PROGRAM_B64)
+# One flipped bit in the last byte: same 709 B length, different sha512_256. A same-length
+# program keeps the banner's two sizes equal, so only the fingerprints can distinguish them.
+OTHER_APPROVAL_PROGRAM = APPROVAL_PROGRAM[:-1] + bytes([APPROVAL_PROGRAM[-1] ^ 0x01])
 CLEAR_PROGRAM = bytes([0x0C, 0x81, 0x01, 0x43])  # pushint 1; return (what the committed TEAL assembles to)
 OTHER_CLEAR_PROGRAM = bytes([0x0C, 0x81, 0x00, 0x43])  # pushint 0; return
 
@@ -60,6 +72,11 @@ CLEAR_CHECKS = (
     "deployed clear-state program matches its 2026-09-14 pin",
     "deployed clear-state program is what the committed clear-state TEAL assembles to",
 )
+APPROVAL_CHECKS = (
+    "approval program fetched",
+    "deployed app not replaced since the 2026-09-03 pin",
+    "deployed approval program is what the committed approval TEAL assembles to",
+)
 RESULT_RE = re.compile(r"== RESULT: (\d+) passed, (\d+) failed, (\d+) not checked ==")
 
 
@@ -67,10 +84,14 @@ def _json(obj: object) -> io.BytesIO:
     return io.BytesIO(json.dumps(obj).encode())
 
 
-def _run(monkeypatch, clear_field: str | None):
-    """Execute verify_trelyan.py with algod stubbed. `clear_field` None removes the key."""
+def _run(monkeypatch, clear_field: str | None, approval_field: str = APPROVAL_PROGRAM_B64):
+    """Execute verify_trelyan.py with algod stubbed. `clear_field` None removes the key.
+
+    `approval_field` defaults to the real deployed approval program, so the approval side is
+    fixed unless a test varies it.
+    """
     params: dict = {
-        "approval-program": APPROVAL_PROGRAM_B64,
+        "approval-program": approval_field,
         "global-state-schema": {"num-uint": 1, "num-byte-slice": 1},
         "local-state-schema": {},
     }
@@ -139,6 +160,35 @@ def test_an_absent_clear_state_program_is_not_checked(monkeypatch, clear_field):
     assert not _lines(text, "  FAIL  "), text
     assert "AWAITING TESTNET REDEPLOY" not in text
     assert CLEAR_TEAL not in compiled, "nothing was read, so nothing should be assembled to compare"
+
+
+def test_a_differing_approval_program_fails_and_names_the_redeploy(monkeypatch):
+    """The comparison the README's headline rests on must be able to FAIL.
+
+    Nothing else in the suite drives this path: the other cases serve the real approval bytes,
+    so the pin and assembly checks pass in every one of them.
+    """
+    rc, text, (passed, failed, not_checked), compiled = _run(
+        monkeypatch,
+        base64.b64encode(CLEAR_PROGRAM).decode(),
+        approval_field=base64.b64encode(OTHER_APPROVAL_PROGRAM).decode(),
+    )
+    assert (rc, failed, not_checked) == (1, 2, 0), text
+    failures = [line.split("  [")[0].removeprefix("FAIL  ") for line in _lines(text, "  FAIL  ")]
+    assert failures == list(APPROVAL_CHECKS[1:]), text
+    # The program was read, so "fetched" still passes; the two comparisons are what fail.
+    assert any(line.startswith(f"PASS  {APPROVAL_CHECKS[0]}") for line in _lines(text, "  PASS  ")), text
+    assert APPROVAL_TEAL in compiled, "the committed approval TEAL must be assembled to compare"
+    assert "AWAITING TESTNET REDEPLOY" in text
+    assert "The live approval program predates the committed" in text
+    # Both sides of the drift, not just a verdict: the banner carries each fingerprint.
+    committed_fp = trelyan_pq.sha512_256(APPROVAL_PROGRAM).hex()
+    deployed_fp = trelyan_pq.sha512_256(OTHER_APPROVAL_PROGRAM).hex()
+    assert committed_fp != deployed_fp
+    assert f"committed TEAL assembles to: {committed_fp}" in text, text
+    assert f"chain is actually serving  : {deployed_fp}" in text, text
+    # The clear-state side was untouched, so it must be unaffected.
+    assert not any(name in failures for name in CLEAR_CHECKS), text
 
 
 def test_a_differing_clear_state_program_fails_and_names_the_redeploy(monkeypatch):
