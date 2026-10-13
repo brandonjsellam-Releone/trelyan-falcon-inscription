@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/trelyan-pq-ffi", "crates/trelyan-pq-core", "crates/falcon-ct"]
+members = ["crates/trelyan-pq-ffi", "crates/trelyan-pq-core", "crates/falcon-ct", "crates/contract-checks"]
 
 [workspace.package]
 edition = "2024"
