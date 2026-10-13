@@ -14,10 +14,13 @@ not commitments.
   against a fresh compile, the signer byte-identity KAT on 3 OSes, and the full
   contract suite on LocalNet (the runner provides Docker), on pushes and PRs that
   touch the filtered paths.
+- 1,024-cell cap check (threat model §2): the Rust `contract-checks` crate requires the
+  compiled `cells_registered < TOTAL_CELLS` assert in the committed approval TEAL, ahead
+  of the counter write, and fails closed; `rust-ci.yml` runs it on 3 OSes. It checks the
+  artifact statically; the cap itself is still not exercised on LocalNet (that needs
+  1,024 real ASAs).
 
 ## Next (near-term)
-- **1,024-record cap test:** add a static/unit check for the `cells_registered <
-  TOTAL_RECORDS` cap (currently reasoned, not unit-tested).
 - **Signature-suite agility:** document and prototype an **ML-DSA (FIPS 204)**
   path alongside Falcon-1024, so the primitive is algorithm-agile.
 - **FN-DSA / FIPS 206 tracking:** when FIPS 206 is published, document how it relates to this

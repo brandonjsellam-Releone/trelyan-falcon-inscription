@@ -43,6 +43,7 @@ network`); (c) on-chain box state (write-once record). Artifact bytes live entir
 | Commit a malformed key (brick a cell) | exact 1793 B length checked at register | `test_register_rejects_bad_pubkey_length` |
 | Re-register / rebind a cell | register-once (`cid not in committed_pubkey/controlling_owner`) | `test_reregister_rejected` |
 | Non-admin mints | admin-only `register_cell` | `test_register_only_admin` |
+| Mint past the 1,024-cell supply (spec §2) | `register_cell` asserts `cells_registered < TOTAL_CELLS` before the counter is stored | (not localnet-testable: needs 1,024 real ASAs; static instead: `contract-checks` `committed_approval_program_enforces_the_cap_before_counting` over the committed approval TEAL, with mutation tests showing a removed or weakened guard fails) |
 | Oversized inputs (DoS / box bloat) | sig ≤ 1423 B, payload_uri ≤ 128 B (cheap, pre-verify) | `test_sig_too_large_rejected`, `test_payload_uri_too_long_rejected` |
 | Steal inscription rights via owner change | `update_owner` only by current owner, only pre-inscription | `test_update_owner_only_owner`, `test_update_owner_after_inscribed_rejected` |
 
@@ -63,8 +64,9 @@ network`); (c) on-chain box state (write-once record). Artifact bytes live entir
 | **C4** | Falcon-1024 signature valid | `test_inscribe_accepts_valid`, `_rejects_tampered_sig`, `_rejects_wrong_key` | `inscribe` C4 (`op.falcon_verify`) |
 | **C5** | Key is the one committed at mint | `test_inscribe_rejects_wrong_key`, `test_inscribe_accepts_valid` | `inscribe` reads `committed_pubkey[cid]` |
 
-**Not covered by localnet tests (left to RV / static / TestNet):** the 1,024-cell cap (enforced by
-`cells_registered < TOTAL_CELLS`; testing it needs 1,024 real ASAs); write-once / immutability across
+**Not covered by localnet tests (left to RV / static / TestNet):** the 1,024-cell cap is covered
+statically instead (§2: the Rust `contract-checks` crate requires the compiled guard in the committed
+approval TEAL, since exercising it on localnet needs 1,024 real ASAs); write-once / immutability across
 *arbitrary* prior histories and any future-AVM upgrade path; cross-network replay; consensus / fee
 divergence between localnet and TestNet/MainNet.
 

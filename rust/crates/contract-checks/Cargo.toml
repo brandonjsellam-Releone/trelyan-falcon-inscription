@@ -1,0 +1,16 @@
+[package]
+name = "contract-checks"
+version = "0.1.0"
+description = "Static checks over the committed TEAL artifacts in contracts/out: invariants that LocalNet cannot exercise at a sensible cost, starting with the 1,024-cell cap. Test-only."
+# Internal to TRELYAN; not distributed via crates.io.
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+# No dependencies on purpose: the checks read TEAL text with std only (constitution §3).
+
+[lints]
+workspace = true

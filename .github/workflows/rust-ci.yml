@@ -7,7 +7,9 @@ name: rust-ci
 # det1024 goldens byte for byte, on every OS in the matrix, from the vendored pinned tree.
 #
 # Path filters include third_party/** because the ffi build script compiles that tree and refuses
-# to compile anything but the pinned digest — a change there must run this workflow.
+# to compile anything but the pinned digest — a change there must run this workflow. They also
+# include the committed approval TEAL and the contract source, because contract-checks reads both:
+# a recompile that drops or weakens the 1,024-cell cap must fail here, not wait for a rust/ change.
 
 on:
   # `push` is restricted to the default branch on purpose. A pull_request's path filter is
@@ -17,9 +19,9 @@ on:
   # eight concurrent runs queued behind documentation-only commits.
   push:
     branches: [main]
-    paths: ["rust/**", "third_party/**", ".github/workflows/rust-ci.yml"]
+    paths: ["rust/**", "third_party/**", "contracts/out/**", "contracts/inscription.py", ".github/workflows/rust-ci.yml"]
   pull_request:
-    paths: ["rust/**", "third_party/**", ".github/workflows/rust-ci.yml"]
+    paths: ["rust/**", "third_party/**", "contracts/out/**", "contracts/inscription.py", ".github/workflows/rust-ci.yml"]
   schedule:
     # Weekly: cargo audit reads a database that changes without this repo changing, and the
     # falcon-ct evidence session below now runs on this cadence rather than per-push.
