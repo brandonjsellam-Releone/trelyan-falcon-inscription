@@ -63,6 +63,43 @@ coverage-guided fuzzing of the encoder (atheris) and the C verifier (libFuzzer �
 provenance (SLSA + cosign) is wired for future tagged releases in `release.yml` ([`RELEASES.md`](RELEASES.md)); it
 has not run yet: tags v0.2.0 / v0.2.1 predate it and carry no attestations, and PyPI `trelyan-pq` 0.1.0 was not built by it.
 
+### Rust verifier: approval *and* clear-state program (read-only)
+
+[`rust/crates/teal-deploy-verify`](rust/crates/teal-deploy-verify) is a Rust port of `contracts/verify_deployment.py`
+(the script the TestNet follow-up's `contract-drift` job runs), written with the Python as its oracle. It goes one step
+further: it compares **both** programs of the TestNet app, where the Python compares the approval program only.
+
+```
+cd rust
+cargo build --locked -p teal-deploy-verify       # pure Rust: no C, no TLS crate (HTTPS is the system curl)
+./target/debug/verify-deployment                 # or: cargo run --locked -q -p teal-deploy-verify
+```
+
+It assembles `contracts/out/TrelyanInscription.approval.teal` and `…clear.teal` with algod (`POST /v2/teal/compile`),
+fetches the deployed programs (`GET /v2/applications/770964251`), reads the network's genesis id and hash
+(`GET /versions`), prints length and SHA-512/256 (Algorand's program hash, not SHA-256) of expected and actual for both
+programs, and then one `MATCH` / `DRIFT` / `COULD NOT CHECK` line per program. The verdict compares the bytes; the
+hashes are for display. On 2026-11-05 it reported `MATCH` for both: approval 709 B `6fa5cee1…` (the fingerprint the
+Python prints), clear-state 4 B `82924751…` (`DIEBQw==`). Options: `--app-id`, `--algod`, `--compile-url`,
+`--approval-teal`, `--clear-teal`, `--timeout`; see `--help`. `--recompile` is not ported (it needs the puya toolchain).
+The `contract-drift-rust` job in `testnet-followup.yml` runs it beside the Python job, not instead of it.
+
+| exit | verdict | meaning |
+|---|---|---|
+| 0 | `MATCH` | both deployed programs are what the committed TEAL assembles to |
+| 1 | `DRIFT` | at least one deployed program differs from what the committed TEAL assembles to |
+| 2 | `COULD NOT CHECK` | network, missing or empty artifact, bad response, usage or internal error — never agreement, never drift |
+
+**Trust note.** Assembling and serving both come from algod endpoints the operator chose. By default one endpoint does
+both, so a dishonest endpoint could lie consistently; `--compile-url <independent node>` splits that trust, and the
+result is only as strong as the weaker of the two sources. The system `curl` is invoked directly (never through a
+shell), with `.curlrc` disabled, HTTPS only (plain `http://` only to localhost), and redirects not followed.
+
+**What it does not prove.** TestNet only: it says nothing about MainNet. Bytecode identity only: it is not an audit of
+the contract. It is not an independent review of Falcon signatures: the AVM `falcon_verify` opcode and this
+repository's signer are built from the same upstream `algorand/falcon` code. det1024 is Algorand's deterministic
+Falcon-1024 variant; no FIPS 206 / FN-DSA claim is made.
+
 ## Why this exists — two integration traps, solved and documented
 Algorand ships `falcon_verify` as a live native AVM opcode, but two non‑obvious things will cost the
 next team a week. This repo solves both, with the reasoning written down:

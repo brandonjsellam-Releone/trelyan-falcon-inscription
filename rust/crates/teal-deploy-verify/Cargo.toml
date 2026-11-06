@@ -1,0 +1,27 @@
+[package]
+name = "teal-deploy-verify"
+version = "0.1.0"
+description = "READ-ONLY check that a deployed Algorand application's approval AND clear-state programs are what the committed TEAL assembles to. Rust port of contracts/verify_deployment.py (same exit codes: 0 MATCH, 1 DRIFT, 2 COULD NOT CHECK)."
+# Internal to TRELYAN; not distributed via crates.io.
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "verify-deployment"
+path = "src/main.rs"
+
+# No TLS crate, no HTTP crate, no C. HTTPS goes through the system `curl` executable as a
+# subprocess (see src/curl.rs for why): the dependency graph below stays pure Rust, with no `ring`,
+# `aws-lc-*` or `openssl-sys`. Every dependency is justified in rust/Cargo.toml.
+[dependencies]
+base64.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

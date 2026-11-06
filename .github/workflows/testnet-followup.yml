@@ -17,6 +17,7 @@ on:
       - "contracts/**"
       - "third_party/**"
       - ".github/workflows/testnet-followup.yml"
+      - "rust/crates/teal-deploy-verify/**"
       - "BLOCKERS.md"
   pull_request:
     paths:
@@ -24,6 +25,7 @@ on:
       - "contracts/**"
       - "third_party/**"
       - ".github/workflows/testnet-followup.yml"
+      - "rust/crates/teal-deploy-verify/**"
       - "BLOCKERS.md"
   schedule:
     - cron: "23 6 * * 1"   # same Monday slot as trelyan-pq CI
@@ -87,3 +89,43 @@ jobs:
         # Exit 1 = drift: the deployed approval program is not what the committed approval TEAL assembles to.
         # Exit 2 = could not check (network, missing artifact). Distinct on purpose:
         # an unreachable node must never be reported as agreement, nor as drift.
+
+  contract-drift-rust:
+    name: Committed approval + clear-state TEAL vs deployed programs, Rust port (follow-up; not a merge gate)
+    # rust/crates/teal-deploy-verify is the Rust port of contracts/verify_deployment.py. It runs
+    # BESIDE the Python job above, not instead of it: same default target (TestNet app 770964251),
+    # same exit codes, but it ALSO compares the clear-state program, which the Python job does not.
+    # A separate job on purpose, so a failure in either can never hide the other's result.
+    # Read-only: two TEAL compiles and two GETs through the runner's own curl. No secrets.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned toolchain (rust/rust-toolchain.toml)
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustc --version && cargo --version && curl --version | head -n 1
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: rust
+      # Its own step, so a build failure (cargo exits 101) can never be read as one of the
+      # verifier's exit codes.
+      - name: Build the verifier
+        run: cargo build --locked -p teal-deploy-verify
+      - name: Assemble both committed TEAL programs and compare them to the deployed programs
+        run: |
+          set +e
+          ./target/debug/verify-deployment
+          rc=$?
+          set -e
+          if [ "$rc" = "1" ]; then
+            echo "::error::DRIFT on TestNet app 770964251 (approval and/or clear-state program): the deployed bytecode is not what the committed TEAL assembles to. See BLOCKERS.md."
+          fi
+          exit "$rc"
+        # Exit 1 = drift in the approval OR the clear-state program.
+        # Exit 2 = could not check (network, missing artifact, bad response, usage error).
+        # Distinct on purpose: never reported as agreement, nor as drift.

@@ -72,6 +72,11 @@ FROZEN = {
     "BLOCKERS.md",
     # A dated validation record. It says what was true on 2026-06-01 and must not be rewritten.
     "LOCALNET_VALIDATION_2026-06-01.md",
+    # The algod response for this app, recorded read-only on 2026-11-05 for the Rust port's offline
+    # tests (rust/crates/teal-deploy-verify). It is a record of what the chain served that day,
+    # not a claim about the current deployment; the Rust default app id is tied to this file's
+    # DEFAULT_APP_ID source by a Rust test instead.
+    "rust/crates/teal-deploy-verify/tests/fixtures/application_recorded.json",
 }
 
 # Files whose app-id mentions are LIVE CLAIMS. These must agree with the deployment under test,

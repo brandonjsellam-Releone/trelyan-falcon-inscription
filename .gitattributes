@@ -17,3 +17,8 @@ evidence/ct/**/*.csv         -text
 evidence/ct/**/report.json   -text
 evidence/ct/**/SHA256SUMS    -text
 evidence/ct/**/console.log   -text
+
+# teal-deploy-verify's recorded algod responses and the two TEAL files they were recorded from
+# (rust/crates/teal-deploy-verify/tests/fixtures): a frozen record, compared byte for byte by the
+# offline tests. Same reason as above: no end-of-line conversion on any checkout.
+rust/crates/teal-deploy-verify/tests/fixtures/**  -text

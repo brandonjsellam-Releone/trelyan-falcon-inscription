@@ -1,6 +1,7 @@
 name: rust-ci
 
-# Gates for the Rust workspace under rust/ (trelyan-pq-ffi, trelyan-pq-core) — constitution §3
+# Gates for the Rust workspace under rust/ (trelyan-pq-ffi, trelyan-pq-core, falcon-ct,
+# teal-deploy-verify) — constitution §3
 # and §6: cargo fmt, clippy (pedantic + nursery, -D warnings), the full test suite on three OSes,
 # a build on the declared MSRV, cargo audit + cargo deny. The KAT test in trelyan-pq-core is the
 # first thing that must be green (§2.5): it asserts the Rust signer reproduces the committed
@@ -108,6 +109,25 @@ jobs:
           fi
           grep -q "signatures_are_byte_identical_to_the_committed_goldens ... ok" test.log \
             || { echo "::error::the det1024 byte-identity KAT did not run or did not pass"; exit 1; }
+      # teal-deploy-verify is the Rust port of contracts/verify_deployment.py. Its load-bearing
+      # tests are asserted BY NAME, for the same reason as the KAT above: the clear-state drift
+      # test (the check the Python verifier does not have), a transport failure that must never
+      # read as agreement, and the loopback tests that drive the REAL system curl and the REAL
+      # binary's exit code. The live TestNet test must be collected and ignored — never silently
+      # dropped from the offline suite, and never run here.
+      - name: Assert the deployment-verifier suite ran (clear-state drift, real curl, exit codes)
+        shell: bash
+        run: |
+          set -o pipefail
+          for t in clear_state_drift_only_exit_1 \
+                   transport_failure_exit_2_never_match \
+                   curl_transport_end_to_end_match_and_what_went_over_the_wire \
+                   binary_exits_1_on_clear_state_drift; do
+            grep -q "^test $t \.\.\. ok" test.log \
+              || { echo "::error::teal-deploy-verify test '$t' did not run or did not pass"; exit 1; }
+          done
+          grep -q "^test live_testnet_default_app_runs_the_committed_teal \.\.\. ignored" test.log \
+            || { echo "::error::the live TestNet test was not collected (as ignored) by the offline suite"; exit 1; }
 
   msrv:
     name: rust build on the declared MSRV
