@@ -5,7 +5,7 @@ requests: no account, no key, no transaction. The offline tests replay them byte
 
 | File | Request |
 |---|---|
-| `application_recorded.json` | `GET /v2/applications/770964251` — **one field removed**, see below |
+| `application_recorded.json` | `GET /v2/applications/<id>` for the TestNet app under test (the id is `DEFAULT_APP_ID` in `contracts/verify_deployment.py`) — **one field removed**, see below |
 | `compile_approval.json` | `POST /v2/teal/compile` with `recorded_approval.teal` |
 | `compile_clear.json` | `POST /v2/teal/compile` with `recorded_clear.teal` |
 | `versions_testnet.json` | `GET /versions` |
